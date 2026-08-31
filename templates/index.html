@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AI Data Analyst Agent - Automated CSV exploratory data analysis, schema profiling, statistical modeling, and AI business insights.">
+    <title>Upload Dataset | AI Data Analyst Agent</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Core Styles -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="dark-theme">
+    <!-- Background Ambient Glows -->
+    <div class="ambient-glow glow-1"></div>
+    <div class="ambient-glow glow-2"></div>
+    
+    <!-- Header Navigation -->
+    <header class="main-header">
+        <div class="container nav-container">
+            <a href="/" class="brand-logo" id="brand-logo">
+                <div class="logo-icon">⚡</div>
+                <div class="logo-text">
+                    <span class="logo-title">AI Data Analyst</span>
+                    <span class="logo-badge">AGENT</span>
+                </div>
+            </a>
+            
+            <nav class="nav-links">
+                <a href="/" class="nav-link active">Upload CSV</a>
+                <a href="/dashboard" class="nav-link" id="nav-dashboard">Dashboard</a>
+                <a href="/chat" class="nav-link" id="nav-chat">AI Analyst</a>
+                <div class="system-status-pill">
+                    <span class="status-dot"></span>
+                    <span>Phase 2 Ingestion Ready</span>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="container">
+        <!-- Hero Section -->
+        <section class="hero-section">
+            <div class="hero-tag">
+                <span class="sparkle">✨</span> Phase 2: CSV Upload & Dataset Ingestion
+            </div>
+            <h1 class="hero-title">
+                Upload & Ingest Any <br>
+                <span class="gradient-text">CSV Dataset</span>
+            </h1>
+            <p class="hero-subtitle">
+                Securely validate, inspect encodings, infer column schemas, audit RAM memory usage, 
+                and preview data instantly. Raw datasets are stored immutably in <code>data/uploads/</code> with zero overwrites.
+            </p>
+        </section>
+
+        <!-- Upload & Ingestion Section -->
+        <section class="upload-section" id="upload-section">
+            <div class="upload-card">
+                <div class="upload-header">
+                    <div class="upload-header-left">
+                        <h2>Upload Dataset</h2>
+                        <p>Validates file extension, size caps (50MB), empty files, encoding issues, and structural corruption.</p>
+                    </div>
+                    <div class="upload-badge">Raw CSV • Read-Only</div>
+                </div>
+
+                <!-- Drag and Drop Dropzone -->
+                <div class="dropzone" id="dropzone">
+                    <input type="file" id="csv-file-input" class="file-input" accept=".csv" />
+                    <div class="dropzone-content">
+                        <div class="dropzone-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                        </div>
+                        <div class="dropzone-text">
+                            <h3>Drag & drop your CSV file here</h3>
+                            <p>or <span class="browse-link">browse files</span> from your computer</p>
+                        </div>
+                        <div class="dropzone-hint">
+                            Strict Immutability: Each upload receives a unique timestamped session ID.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Selected File Info & Upload Action -->
+                <div class="file-preview-bar hidden" id="file-preview-bar">
+                    <div class="file-preview-details">
+                        <div class="file-icon">📄</div>
+                        <div class="file-meta">
+                            <span class="file-name" id="selected-file-name">filename.csv</span>
+                            <span class="file-size" id="selected-file-size">0 KB</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" id="upload-btn">
+                        <span class="btn-text">Upload & Ingest Dataset</span>
+                        <span class="btn-loader hidden" id="upload-loader"></span>
+                    </button>
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="progress-container hidden" id="progress-container">
+                    <div class="progress-bar" id="progress-bar"></div>
+                </div>
+
+                <!-- Notification Alert Banner -->
+                <div class="alert-box hidden" id="alert-box">
+                    <span class="alert-icon" id="alert-icon">ℹ️</span>
+                    <span class="alert-message" id="alert-message">Message text</span>
+                </div>
+
+                <!-- Sample Datasets Quick-Load -->
+                <div class="sample-datasets-card">
+                    <div class="sample-header">
+                        <span class="sample-label">Or test immediately with a bundled sample dataset:</span>
+                    </div>
+                    <div class="sample-buttons">
+                        <button class="btn btn-outline" id="load-sample-ecommerce">
+                            <span class="sample-btn-icon">🛒</span>
+                            <span>E-Commerce Orders (250 rows)</span>
+                        </button>
+                        <button class="btn btn-outline" id="load-sample-employee">
+                            <span class="sample-btn-icon">💼</span>
+                            <span>Employee Workforce (250 rows)</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Ingestion Results Summary View (Rendered post-upload) -->
+        <section class="ingestion-summary-section hidden" id="ingestion-summary-section">
+            <div class="summary-card">
+                <div class="summary-header">
+                    <div>
+                        <div class="status-badge success">✓ Ingestion Successful</div>
+                        <h2 class="summary-title" id="summary-file-name">filename.csv</h2>
+                        <div class="summary-meta-row">
+                            <span>Dataset ID: <code id="summary-dataset-id">--</code></span>
+                            <span>•</span>
+                            <span>Encoding: <code id="summary-encoding">utf-8</code></span>
+                            <span>•</span>
+                            <span>Delimiter: <code id="summary-delimiter">,</code></span>
+                        </div>
+                    </div>
+                    <div class="summary-header-actions">
+                        <a href="#" class="btn btn-primary" id="go-to-dashboard-btn">
+                            <span>Open Full Dashboard &rarr;</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Ingestion Metrics Grid -->
+                <div class="summary-metrics-grid">
+                    <div class="metric-box">
+                        <span class="metric-label">Total Rows</span>
+                        <span class="metric-value" id="sum-metric-rows">--</span>
+                        <span class="metric-sub">Observations</span>
+                    </div>
+                    <div class="metric-box">
+                        <span class="metric-label">Total Columns</span>
+                        <span class="metric-value" id="sum-metric-cols">--</span>
+                        <span class="metric-sub">Features</span>
+                    </div>
+                    <div class="metric-box">
+                        <span class="metric-label">RAM Memory</span>
+                        <span class="metric-value" id="sum-metric-memory">--</span>
+                        <span class="metric-sub">In-memory footprint</span>
+                    </div>
+                    <div class="metric-box">
+                        <span class="metric-label">Missing Data Cells</span>
+                        <span class="metric-value" id="sum-metric-missing">--</span>
+                        <span class="metric-sub" id="sum-metric-missing-pct">0.0% null rate</span>
+                    </div>
+                </div>
+
+                <!-- Column Metadata & Data Types Table -->
+                <div class="summary-section-block">
+                    <h3 class="section-title">Ingested Columns & Data Types</h3>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40px;">#</th>
+                                    <th>Column Name</th>
+                                    <th>Pandas Dtype</th>
+                                    <th>Detected Semantic Type</th>
+                                    <th>Non-Null Count</th>
+                                    <th>Missing Count</th>
+                                    <th>Missing %</th>
+                                </tr>
+                            </thead>
+                            <tbody id="summary-columns-tbody">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Preview of First 10 Rows -->
+                <div class="summary-section-block">
+                    <div class="preview-header-row">
+                        <h3 class="section-title">First 10 Rows Preview</h3>
+                        <span class="preview-badge">Raw Ingestion Preview</span>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table" id="summary-preview-table">
+                            <thead id="summary-preview-thead">
+                                <!-- Populated dynamically -->
+                            </thead>
+                            <tbody id="summary-preview-tbody">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Capabilities Grid -->
+        <section class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🛡️</div>
+                <h3>Defensive Validation</h3>
+                <p>Protects against non-CSV files, 0-byte uploads, corrupted lines, unclosed quotes, and oversized files.</p>
+                <div class="feature-phase-badge completed">Phase 2 • Active</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔍</div>
+                <h3>Encoding & Delimiter Sniffing</h3>
+                <p>Automatic detection of UTF-8, UTF-8-BOM, Latin-1, CP1252, and comma, semicolon, tab delimiters.</p>
+                <div class="feature-phase-badge completed">Phase 2 • Active</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔒</div>
+                <h3>Session Isolation</h3>
+                <p>Unique UUID prefixing ensures datasets never collide or overwrite existing user data in <code>data/uploads/</code>.</p>
+                <div class="feature-phase-badge completed">Phase 2 • Active</div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="main-footer">
+        <div class="container footer-content">
+            <div class="footer-left">
+                <span class="footer-title">AI Data Analyst Agent</span>
+                <span class="footer-desc">Production-grade portfolio system for Data Analysts & AI Engineers.</span>
+            </div>
+            <div class="footer-right">
+                <span>Phase 2: CSV Upload & Dataset Ingestion</span>
+                <span>•</span>
+                <span>Python / Flask / Pandas</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript Bundle -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
