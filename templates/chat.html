@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AI Data Analyst Agent - Natural language dataset analysis and business insight queries.">
+    <title>AI Analyst Chat | AI Data Analyst Agent</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Core Styles -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="dark-theme">
+    <!-- Ambient Glows -->
+    <div class="ambient-glow glow-1"></div>
+    <div class="ambient-glow glow-2"></div>
+    
+    <!-- Header Navigation -->
+    <header class="main-header">
+        <div class="container nav-container">
+            <a href="/" class="brand-logo" id="brand-logo">
+                <div class="logo-icon">⚡</div>
+                <div class="logo-text">
+                    <span class="logo-title">AI Data Analyst</span>
+                    <span class="logo-badge">AGENT</span>
+                </div>
+            </a>
+            
+            <nav class="nav-links">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/dashboard{% if dataset_id %}?dataset_id={{ dataset_id }}{% endif %}" class="nav-link" id="nav-dashboard">Dashboard</a>
+                <a href="/chat" class="nav-link active" id="nav-chat">AI Analyst</a>
+                <div class="system-status-pill">
+                    <span class="status-dot"></span>
+                    <span>Phase 1 Foundation</span>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Chat Container -->
+    <main class="container chat-main">
+        <div class="chat-layout">
+            
+            <!-- Left Sidebar: Dataset Context & Preset Prompts -->
+            <aside class="chat-sidebar">
+                <div class="sidebar-card">
+                    <h3>Active Dataset Context</h3>
+                    <div class="context-box">
+                        <span class="context-icon">📊</span>
+                        <div class="context-text">
+                            <span class="context-id" id="chat-dataset-id">{{ dataset_id if dataset_id else 'No dataset selected' }}</span>
+                            <span class="context-sub">Deterministic Python Execution</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sidebar-card">
+                    <h3>Sample Analytical Prompts</h3>
+                    <div class="prompt-suggestions">
+                        <button class="prompt-chip" onclick="setPrompt('What are the key statistical drivers and distributions in this dataset?')">
+                            📈 "What are the key statistical drivers?"
+                        </button>
+                        <button class="prompt-chip" onclick="setPrompt('Identify any severe outliers or anomalies in numerical columns.')">
+                            ⚠️ "Detect severe outliers or anomalies."
+                        </button>
+                        <button class="prompt-chip" onclick="setPrompt('What data quality issues exist and what cleaning steps do you recommend?')">
+                            🧹 "Recommend data cleaning actions."
+                        </button>
+                        <button class="prompt-chip" onclick="setPrompt('Generate an executive business summary of this dataset.')">
+                            📑 "Generate an executive business summary."
+                        </button>
+                    </div>
+                </div>
+
+                <div class="sidebar-card info-card">
+                    <h4>🔒 Factual Grounding Notice</h4>
+                    <p>The AI Analyst will never hallucinate or invent statistical figures. All metrics will be retrieved through deterministic Python tools in Phase 5.</p>
+                </div>
+            </aside>
+
+            <!-- Right Area: Conversational Stream & Input -->
+            <section class="chat-stream-card">
+                <div class="chat-header">
+                    <div class="agent-avatar">🤖</div>
+                    <div>
+                        <h2>AI Data Analyst Agent</h2>
+                        <span class="agent-status-tag">Phase 5 Integration Preview</span>
+                    </div>
+                </div>
+
+                <!-- Messages Stream -->
+                <div class="messages-container" id="messages-container">
+                    <div class="message-bubble assistant">
+                        <div class="message-avatar">🤖</div>
+                        <div class="message-content">
+                            <p>Hello! I am your <strong>AI Data Analyst Agent</strong>.</p>
+                            <p>In <strong>Phase 1</strong>, the foundational architecture, secure ingestion pipeline, and dataset profiling engine are active.</p>
+                            <p>In upcoming phases, you will be able to ask me complex natural-language questions about your uploaded datasets, request anomaly detection, and get instant executive reports powered by verified Python computations.</p>
+                            {% if dataset_id %}
+                            <div class="message-action-tip">
+                                👉 Your active dataset is <code>{{ dataset_id }}</code>. You can explore its full schema in the <a href="/dashboard?dataset_id={{ dataset_id }}" class="link-highlight">Dashboard &rarr;</a>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input Box -->
+                <div class="chat-input-bar">
+                    <input type="text" id="chat-input" class="chat-input" placeholder="Ask a question about the dataset (Enabled in Phase 5)..." />
+                    <button class="btn btn-primary" id="chat-send-btn">
+                        <span>Send</span>
+                    </button>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="main-footer">
+        <div class="container footer-content">
+            <div class="footer-left">
+                <span class="footer-title">AI Data Analyst Agent</span>
+                <span class="footer-desc">Production-grade portfolio system for Data Analysts & AI Engineers.</span>
+            </div>
+            <div class="footer-right">
+                <span>Phase 1: Architecture & Foundation</span>
+                <span>•</span>
+                <span>Python / Flask / Pandas / Plotly</span>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        function setPrompt(text) {
+            const input = document.getElementById('chat-input');
+            if (input) input.value = text;
+        }
+
+        document.getElementById('chat-send-btn')?.addEventListener('click', () => {
+            const input = document.getElementById('chat-input');
+            if (!input || !input.value.trim()) return;
+            const container = document.getElementById('messages-container');
+            
+            // Append user bubble
+            const userBubble = document.createElement('div');
+            userBubble.className = 'message-bubble user';
+            userBubble.innerHTML = `<div class="message-content"><p>${escapeHtml(input.value)}</p></div>`;
+            container.appendChild(userBubble);
+            
+            // Append assistant response
+            const responseBubble = document.createElement('div');
+            responseBubble.className = 'message-bubble assistant';
+            responseBubble.innerHTML = `
+                <div class="message-avatar">🤖</div>
+                <div class="message-content">
+                    <p><em>Query received: "${escapeHtml(input.value)}"</em></p>
+                    <p>⚡ The AI Agent Tool-Calling layer and NL Query Router will be activated in <strong>Phase 5</strong> with full LLM API grounding.</p>
+                </div>
+            `;
+            container.appendChild(responseBubble);
+            input.value = '';
+            container.scrollTop = container.scrollHeight;
+        });
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

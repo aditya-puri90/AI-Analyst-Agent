@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AI Data Analyst Agent Dashboard - Dataset exploration, schema inspection, and automated profiling.">
+    <title>Dataset Dashboard | AI Data Analyst Agent</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Core Styles -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="dark-theme">
+    <!-- Ambient Glows -->
+    <div class="ambient-glow glow-1"></div>
+    <div class="ambient-glow glow-2"></div>
+    
+    <!-- Header Navigation -->
+    <header class="main-header">
+        <div class="container nav-container">
+            <a href="/" class="brand-logo" id="brand-logo">
+                <div class="logo-icon">⚡</div>
+                <div class="logo-text">
+                    <span class="logo-title">AI Data Analyst</span>
+                    <span class="logo-badge">DASHBOARD</span>
+                </div>
+            </a>
+            
+            <nav class="nav-links">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/dashboard" class="nav-link active" id="nav-dashboard">Dashboard</a>
+                <a href="/chat{% if dataset_id %}?dataset_id={{ dataset_id }}{% endif %}" class="nav-link" id="nav-chat">AI Analyst</a>
+                <div class="system-status-pill">
+                    <span class="status-dot"></span>
+                    <span>Phase 1 Active</span>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="container dashboard-main">
+        <!-- Top Toolbar: Dataset Selector & Actions -->
+        <section class="dashboard-toolbar">
+            <div class="dataset-meta-info">
+                <div class="dataset-icon">📁</div>
+                <div>
+                    <h1 class="dataset-title" id="active-dataset-name">Loading Dataset...</h1>
+                    <div class="dataset-sub-meta">
+                        <span id="active-dataset-id" class="meta-tag">{{ dataset_id if dataset_id else 'No dataset loaded' }}</span>
+                        <span id="active-dataset-size" class="meta-tag">-- KB</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="toolbar-actions">
+                <div class="select-wrapper">
+                    <select id="dataset-selector" class="custom-select" title="Switch Dataset">
+                        <option value="">Select an uploaded dataset...</option>
+                    </select>
+                </div>
+                <a href="/" class="btn btn-outline" id="upload-new-btn">
+                    <span>+ Upload New CSV</span>
+                </a>
+                <a href="/chat{% if dataset_id %}?dataset_id={{ dataset_id }}{% endif %}" class="btn btn-primary" id="open-chat-btn">
+                    <span>💬 Ask AI Analyst</span>
+                </a>
+            </div>
+        </section>
+
+        <!-- Loading State Indicator -->
+        <div class="dashboard-loading" id="dashboard-loading">
+            <div class="spinner"></div>
+            <p>Analyzing dataset structure and computing profiling metrics...</p>
+        </div>
+
+        <!-- Error State Indicator -->
+        <div class="dashboard-error hidden" id="dashboard-error">
+            <div class="error-card">
+                <div class="error-icon">⚠️</div>
+                <h3 id="error-title">No Dataset Found</h3>
+                <p id="error-message">Please select an existing dataset or upload a new CSV file to view analytics.</p>
+                <a href="/" class="btn btn-primary">Go to CSV Upload</a>
+            </div>
+        </div>
+
+        <!-- Dashboard Content View (Shown when dataset loaded) -->
+        <div class="dashboard-content hidden" id="dashboard-content">
+            
+            <!-- KPI Summary Cards -->
+            <section class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Records</div>
+                    <div class="kpi-value" id="kpi-rows">--</div>
+                    <div class="kpi-hint">Total observational rows</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Features / Columns</div>
+                    <div class="kpi-value" id="kpi-cols">--</div>
+                    <div class="kpi-hint">Tabular dimensions</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Memory Footprint</div>
+                    <div class="kpi-value" id="kpi-memory">--</div>
+                    <div class="kpi-hint">In-memory RAM usage</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Missing Cells</div>
+                    <div class="kpi-value" id="kpi-missing">--</div>
+                    <div class="kpi-hint" id="kpi-missing-hint">0.0% overall missingness</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Duplicate Rows</div>
+                    <div class="kpi-value" id="kpi-duplicates">--</div>
+                    <div class="kpi-hint" id="kpi-duplicates-hint">0.0% redundancy rate</div>
+                </div>
+            </section>
+
+            <!-- Column Type Breakdown Badges -->
+            <section class="type-breakdown-card">
+                <div class="type-header">
+                    <h3>Inferred Schema Types</h3>
+                    <span class="type-sub">Automatically detected semantic types</span>
+                </div>
+                <div class="type-badges-grid" id="type-badges-grid">
+                    <!-- Injected dynamically via JS -->
+                </div>
+            </section>
+
+            <!-- Main Tab Navigation -->
+            <section class="dashboard-tabs-section">
+                <div class="tabs-header">
+                    <button class="tab-btn active" data-tab="tab-schema" id="tab-btn-schema">
+                        <span>📋 Schema & Column Profiler</span>
+                    </button>
+                    <button class="tab-btn" data-tab="tab-explorer" id="tab-btn-explorer">
+                        <span>🔍 Interactive Data Explorer</span>
+                    </button>
+                    <button class="tab-btn" data-tab="tab-phases" id="tab-btn-phases">
+                        <span>🚀 Next Phases (Roadmap)</span>
+                    </button>
+                </div>
+
+                <!-- Tab 1: Column Schema Profiler -->
+                <div class="tab-pane active" id="tab-schema">
+                    <div class="pane-header">
+                        <div>
+                            <h3>Column Profiling Inspector</h3>
+                            <p>Per-feature metrics, non-null counts, cardinality, and sample value distributions.</p>
+                        </div>
+                    </div>
+                    <div class="column-cards-grid" id="column-cards-grid">
+                        <!-- Injected dynamically via JS -->
+                    </div>
+                </div>
+
+                <!-- Tab 2: Interactive Data Explorer -->
+                <div class="tab-pane" id="tab-explorer">
+                    <div class="explorer-toolbar">
+                        <div class="search-box">
+                            <span class="search-icon">🔎</span>
+                            <input type="text" id="table-search" placeholder="Filter rows in view..." class="search-input" />
+                        </div>
+                        <div class="pagination-info" id="pagination-info">
+                            Showing page 1 of 1 (0 total rows)
+                        </div>
+                        <div class="pagination-buttons">
+                            <button class="btn btn-outline btn-sm" id="prev-page-btn" disabled>&larr; Previous</button>
+                            <button class="btn btn-outline btn-sm" id="next-page-btn" disabled>Next &rarr;</button>
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="data-table" id="data-preview-table">
+                            <thead id="data-table-head">
+                                <!-- Headers injected via JS -->
+                            </thead>
+                            <tbody id="data-table-body">
+                                <!-- Rows injected via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tab 3: Next Phases Roadmap -->
+                <div class="tab-pane" id="tab-phases">
+                    <div class="roadmap-grid">
+                        <div class="roadmap-card">
+                            <div class="roadmap-badge">Phase 2</div>
+                            <h4>Deep Statistical Analysis & Quality Scoring</h4>
+                            <p>Automated computing of parametric (mean, std, skewness, kurtosis) and non-parametric (median, IQR, quantiles) metrics, categorical modes, and a composite 0-100 data health grade.</p>
+                        </div>
+                        <div class="roadmap-card">
+                            <div class="roadmap-badge">Phase 3</div>
+                            <h4>Multimodal Correlation & Plotly Charts</h4>
+                            <p>Correlation heatmaps (Pearson, Spearman, Cramér's V), anomaly outlier detection (IQR, Z-Score, Isolation Forest), and dynamic interactive Plotly visualizations.</p>
+                        </div>
+                        <div class="roadmap-card">
+                            <div class="roadmap-badge">Phase 4</div>
+                            <h4>Automated Data Cleaning Engine</h4>
+                            <p>Non-destructive transformations (smart imputation, outlier clipping, deduplication, type casting) and download of cleaned datasets in <code>data/processed/</code>.</p>
+                        </div>
+                        <div class="roadmap-card">
+                            <div class="roadmap-badge">Phase 5</div>
+                            <h4>AI Analyst Agent & NL Reporting</h4>
+                            <p>Conversational LLM agent with deterministic tool binding to answer natural-language inquiries, surface business insights, and generate downloadable executive reports.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="main-footer">
+        <div class="container footer-content">
+            <div class="footer-left">
+                <span class="footer-title">AI Data Analyst Agent</span>
+                <span class="footer-desc">Production-grade portfolio system for Data Analysts & AI Engineers.</span>
+            </div>
+            <div class="footer-right">
+                <span>Phase 1: Architecture & Foundation</span>
+                <span>•</span>
+                <span>Python / Flask / Pandas / Plotly</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Pass backend dataset_id safely to JavaScript -->
+    <script>
+        window.INITIAL_DATASET_ID = "{{ dataset_id or '' }}";
+    </script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>
