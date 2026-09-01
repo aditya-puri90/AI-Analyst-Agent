@@ -19,7 +19,12 @@ from utils.file_handler import (
     list_uploaded_datasets,
     get_file_path,
 )
-from analysis.profiler import profile_dataset, get_dataset_preview
+from analysis.profiler import (
+    DatasetProfiler,
+    profile_dataset,
+    profile_column,
+    get_dataset_preview,
+)
 
 # Configure logging
 logging.basicConfig(
@@ -89,7 +94,7 @@ def create_app() -> Flask:
         return jsonify({
             "status": "healthy",
             "service": "AI Data Analyst Agent",
-            "phase": "Phase 2 - CSV Upload & Ingestion",
+            "phase": "Phase 3 - Automatic Dataset Profiling",
             "max_upload_mb": Config.MAX_CONTENT_LENGTH / (1024 * 1024),
             "allowed_extensions": list(Config.ALLOWED_EXTENSIONS),
         })
@@ -97,7 +102,7 @@ def create_app() -> Flask:
     @app.route("/api/upload", methods=["POST"])
     def upload_file():
         """
-        Handle secure CSV file upload, validation, ingestion, and extraction of summary metadata.
+        Handle secure CSV file upload, validation, ingestion, and extraction of summary metadata and profile.
         """
         if "file" not in request.files:
             return jsonify({"success": False, "error": "No file part in the request. Please choose a CSV file."}), 400
@@ -115,13 +120,13 @@ def create_app() -> Flask:
         if sum_err:
             return jsonify({"success": False, "error": sum_err}), 400
 
-        # Full profile
+        # Full Phase 3 profile
         df, load_err = load_dataset(dataset_id)
         profile = profile_dataset(df, dataset_id=dataset_id) if not load_err else {}
 
         return jsonify({
             "success": True,
-            "message": f"Dataset '{file_storage.filename}' uploaded and ingested successfully.",
+            "message": f"Dataset '{file_storage.filename}' uploaded and profiled successfully.",
             "dataset_id": dataset_id,
             "original_filename": file_storage.filename,
             "summary": summary,
@@ -144,13 +149,58 @@ def create_app() -> Flask:
 
     @app.route("/api/profile/<dataset_id>", methods=["GET"])
     def get_profile(dataset_id: str):
-        """Retrieve the automated data profile for a dataset."""
+        """Retrieve the automated full data profile for a dataset."""
         df, error = load_dataset(dataset_id)
         if error:
             return jsonify({"success": False, "error": error}), 404
 
-        profile = profile_dataset(df, dataset_id=dataset_id)
+        profiler = DatasetProfiler(df, dataset_id=dataset_id)
+        profile = profiler.to_dict()
         return jsonify({"success": True, "profile": profile})
+
+    @app.route("/api/profile/<dataset_id>/columns", methods=["GET"])
+    def get_column_profiles(dataset_id: str):
+        """Retrieve column-level profiling metrics for a dataset."""
+        col_type_filter = request.args.get("type", "").strip()
+
+        df, error = load_dataset(dataset_id)
+        if error:
+            return jsonify({"success": False, "error": error}), 404
+
+        profiler = DatasetProfiler(df, dataset_id=dataset_id)
+        profile = profiler.to_dict()
+        columns = profile.get("columns", [])
+
+        if col_type_filter:
+            columns = [c for c in columns if c.get("classified_type", "").lower() == col_type_filter.lower()]
+
+        return jsonify({
+            "success": True,
+            "dataset_id": dataset_id,
+            "total_columns": len(columns),
+            "columns": columns,
+        })
+
+    @app.route("/api/profile/<dataset_id>/column/<column_name>", methods=["GET"])
+    def get_single_column_profile(dataset_id: str, column_name: str):
+        """Retrieve detailed profiling metrics for an individual column."""
+        df, error = load_dataset(dataset_id)
+        if error:
+            return jsonify({"success": False, "error": error}), 404
+
+        if column_name not in df.columns:
+            return jsonify({
+                "success": False,
+                "error": f"Column '{column_name}' not found in dataset '{dataset_id}'. Available columns: {list(df.columns)}",
+            }), 404
+
+        profiler = DatasetProfiler(df, dataset_id=dataset_id)
+        col_profile = profiler.profile_column(column_name)
+        return jsonify({
+            "success": True,
+            "dataset_id": dataset_id,
+            "column": col_profile,
+        })
 
     @app.route("/api/preview/<dataset_id>", methods=["GET"])
     def get_preview(dataset_id: str):
@@ -239,7 +289,7 @@ def create_app() -> Flask:
 
         return jsonify({
             "success": True,
-            "message": f"Sample dataset '{filename}' ingested successfully.",
+            "message": f"Sample dataset '{filename}' ingested and profiled successfully.",
             "dataset_id": dataset_id,
             "original_filename": filename,
             "summary": summary,

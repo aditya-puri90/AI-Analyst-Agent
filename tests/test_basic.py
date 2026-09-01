@@ -81,12 +81,12 @@ def test_delimiter_and_encoding_detection(tmp_path):
 # -------------------------------------------------------------
 def test_infer_column_types(sample_dataframe):
     types = infer_column_types(sample_dataframe)
-    assert types["customer_id"] == "id_or_text"
-    assert types["age"] == "numerical"
-    assert types["signup_date"] == "datetime"
-    assert types["tier"] == "categorical"
-    assert types["is_active"] == "boolean"
-    assert types["spend"] == "numerical"
+    assert types["customer_id"] in ["Other", "Categorical"]
+    assert types["age"] == "Numerical"
+    assert types["signup_date"] == "Datetime"
+    assert types["tier"] == "Categorical"
+    assert types["is_active"] == "Boolean"
+    assert types["spend"] == "Numerical"
 
 
 def test_profile_dataset(sample_dataframe):

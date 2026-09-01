@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="AI Data Analyst Agent Dashboard - Dataset exploration, schema inspection, and automated profiling.">
-    <title>Dataset Dashboard | AI Data Analyst Agent</title>
+    <meta name="description" content="AI Data Analyst Agent Dashboard - Automated Dataset Profiling, Schema Inference, Data Quality Scoring, and Exploration.">
+    <title>Dataset Profiler Dashboard | AI Data Analyst Agent</title>
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     
     <!-- Core Styles -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
@@ -26,7 +26,7 @@
                 <div class="logo-icon">⚡</div>
                 <div class="logo-text">
                     <span class="logo-title">AI Data Analyst</span>
-                    <span class="logo-badge">DASHBOARD</span>
+                    <span class="logo-badge">PROFILER</span>
                 </div>
             </a>
             
@@ -36,7 +36,7 @@
                 <a href="/chat{% if dataset_id %}?dataset_id={{ dataset_id }}{% endif %}" class="nav-link" id="nav-chat">AI Analyst</a>
                 <div class="system-status-pill">
                     <span class="status-dot"></span>
-                    <span>Phase 1 Active</span>
+                    <span>Phase 3 Profiler Active</span>
                 </div>
             </nav>
         </div>
@@ -47,9 +47,9 @@
         <!-- Top Toolbar: Dataset Selector & Actions -->
         <section class="dashboard-toolbar">
             <div class="dataset-meta-info">
-                <div class="dataset-icon">📁</div>
+                <div class="dataset-icon">📊</div>
                 <div>
-                    <h1 class="dataset-title" id="active-dataset-name">Loading Dataset...</h1>
+                    <h1 class="dataset-title" id="active-dataset-name">Loading Dataset Profile...</h1>
                     <div class="dataset-sub-meta">
                         <span id="active-dataset-id" class="meta-tag">{{ dataset_id if dataset_id else 'No dataset loaded' }}</span>
                         <span id="active-dataset-size" class="meta-tag">-- KB</span>
@@ -64,7 +64,7 @@
                     </select>
                 </div>
                 <a href="/" class="btn btn-outline" id="upload-new-btn">
-                    <span>+ Upload New CSV</span>
+                    <span>+ Upload CSV</span>
                 </a>
                 <a href="/chat{% if dataset_id %}?dataset_id={{ dataset_id }}{% endif %}" class="btn btn-primary" id="open-chat-btn">
                     <span>💬 Ask AI Analyst</span>
@@ -75,15 +75,15 @@
         <!-- Loading State Indicator -->
         <div class="dashboard-loading" id="dashboard-loading">
             <div class="spinner"></div>
-            <p>Analyzing dataset structure and computing profiling metrics...</p>
+            <p>Running automated dataset profiling, computing parametric & non-parametric statistics, categorical modes, and schema classification...</p>
         </div>
 
         <!-- Error State Indicator -->
         <div class="dashboard-error hidden" id="dashboard-error">
             <div class="error-card">
                 <div class="error-icon">⚠️</div>
-                <h3 id="error-title">No Dataset Found</h3>
-                <p id="error-message">Please select an existing dataset or upload a new CSV file to view analytics.</p>
+                <h3 id="error-title">No Dataset Loaded</h3>
+                <p id="error-message">Please select an existing dataset or upload a new CSV file to view automated profiling analytics.</p>
                 <a href="/" class="btn btn-primary">Go to CSV Upload</a>
             </div>
         </div>
@@ -91,141 +91,237 @@
         <!-- Dashboard Content View (Shown when dataset loaded) -->
         <div class="dashboard-content hidden" id="dashboard-content">
             
-            <!-- KPI Summary Cards -->
-            <section class="kpi-grid">
-                <div class="kpi-card">
-                    <div class="kpi-label">Total Records</div>
-                    <div class="kpi-value" id="kpi-rows">--</div>
-                    <div class="kpi-hint">Total observational rows</div>
+            <!-- 1. DATASET OVERVIEW CARDS -->
+            <section class="overview-section">
+                <div class="section-title-wrap">
+                    <h2 class="section-title">Dataset Overview</h2>
+                    <span class="section-badge">Structural Metrics</span>
                 </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">Features / Columns</div>
-                    <div class="kpi-value" id="kpi-cols">--</div>
-                    <div class="kpi-hint">Tabular dimensions</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">Memory Footprint</div>
-                    <div class="kpi-value" id="kpi-memory">--</div>
-                    <div class="kpi-hint">In-memory RAM usage</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">Missing Cells</div>
-                    <div class="kpi-value" id="kpi-missing">--</div>
-                    <div class="kpi-hint" id="kpi-missing-hint">0.0% overall missingness</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">Duplicate Rows</div>
-                    <div class="kpi-value" id="kpi-duplicates">--</div>
-                    <div class="kpi-hint" id="kpi-duplicates-hint">0.0% redundancy rate</div>
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-icon-wrap icon-blue">📄</div>
+                        <div class="kpi-meta">
+                            <div class="kpi-label">Total Rows</div>
+                            <div class="kpi-value" id="kpi-rows">--</div>
+                            <div class="kpi-hint">Observational records</div>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon-wrap icon-cyan">📐</div>
+                        <div class="kpi-meta">
+                            <div class="kpi-label">Total Columns</div>
+                            <div class="kpi-value" id="kpi-cols">--</div>
+                            <div class="kpi-hint">Features / Dimensions</div>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon-wrap icon-purple">💾</div>
+                        <div class="kpi-meta">
+                            <div class="kpi-label">Memory Usage</div>
+                            <div class="kpi-value" id="kpi-memory">--</div>
+                            <div class="kpi-hint" id="kpi-memory-bytes">In-memory footprint</div>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon-wrap icon-amber">❓</div>
+                        <div class="kpi-meta">
+                            <div class="kpi-label">Missing Cells</div>
+                            <div class="kpi-value" id="kpi-missing">--</div>
+                            <div class="kpi-hint" id="kpi-missing-hint">0.0% overall missingness</div>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon-wrap icon-rose">🔁</div>
+                        <div class="kpi-meta">
+                            <div class="kpi-label">Duplicate Rows</div>
+                            <div class="kpi-value" id="kpi-duplicates">--</div>
+                            <div class="kpi-hint" id="kpi-duplicates-hint">0.0% redundancy rate</div>
+                        </div>
+                    </div>
+                    <div class="kpi-card kpi-card-quality">
+                        <div class="kpi-icon-wrap icon-emerald">⭐</div>
+                        <div class="kpi-meta">
+                            <div class="kpi-label">Data Health Grade</div>
+                            <div class="kpi-value quality-grade-val" id="kpi-health-grade">--</div>
+                            <div class="kpi-hint" id="kpi-health-score">Score: --/100</div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
-            <!-- Column Type Breakdown Badges -->
-            <section class="type-breakdown-card">
-                <div class="type-header">
-                    <h3>Inferred Schema Types</h3>
-                    <span class="type-sub">Automatically detected semantic types</span>
-                </div>
-                <div class="type-badges-grid" id="type-badges-grid">
-                    <!-- Injected dynamically via JS -->
-                </div>
-            </section>
-
-            <!-- Main Tab Navigation -->
-            <section class="dashboard-tabs-section">
-                <div class="tabs-header">
-                    <button class="tab-btn active" data-tab="tab-schema" id="tab-btn-schema">
-                        <span>📋 Schema & Column Profiler</span>
-                    </button>
-                    <button class="tab-btn" data-tab="tab-explorer" id="tab-btn-explorer">
-                        <span>🔍 Interactive Data Explorer</span>
-                    </button>
-                    <button class="tab-btn" data-tab="tab-phases" id="tab-btn-phases">
-                        <span>🚀 Next Phases (Roadmap)</span>
-                    </button>
-                </div>
-
-                <!-- Tab 1: Column Schema Profiler -->
-                <div class="tab-pane active" id="tab-schema">
-                    <div class="pane-header">
+            <!-- 2. DATA QUALITY SUMMARY -->
+            <section class="quality-summary-section">
+                <div class="quality-card">
+                    <div class="quality-header">
                         <div>
-                            <h3>Column Profiling Inspector</h3>
-                            <p>Per-feature metrics, non-null counts, cardinality, and sample value distributions.</p>
+                            <h2 class="section-title">Data Quality & Health Summary</h2>
+                            <p class="quality-subtitle">Automated integrity scoring across completeness, uniqueness, and feature distributions</p>
                         </div>
-                    </div>
-                    <div class="column-cards-grid" id="column-cards-grid">
-                        <!-- Injected dynamically via JS -->
-                    </div>
-                </div>
-
-                <!-- Tab 2: Interactive Data Explorer -->
-                <div class="tab-pane" id="tab-explorer">
-                    <div class="explorer-toolbar">
-                        <div class="search-box">
-                            <span class="search-icon">🔎</span>
-                            <input type="text" id="table-search" placeholder="Filter rows in view..." class="search-input" />
-                        </div>
-                        <div class="pagination-info" id="pagination-info">
-                            Showing page 1 of 1 (0 total rows)
-                        </div>
-                        <div class="pagination-buttons">
-                            <button class="btn btn-outline btn-sm" id="prev-page-btn" disabled>&larr; Previous</button>
-                            <button class="btn btn-outline btn-sm" id="next-page-btn" disabled>Next &rarr;</button>
+                        <div class="quality-status-badge" id="quality-status-badge">
+                            <span class="status-indicator"></span>
+                            <span id="quality-status-text">Analyzing Quality...</span>
                         </div>
                     </div>
 
-                    <div class="table-container">
-                        <table class="data-table" id="data-preview-table">
-                            <thead id="data-table-head">
-                                <!-- Headers injected via JS -->
-                            </thead>
-                            <tbody id="data-table-body">
-                                <!-- Rows injected via JS -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                    <div class="quality-grid">
+                        <div class="quality-meter-col">
+                            <div class="score-circle-wrap">
+                                <div class="score-number" id="quality-score-display">--</div>
+                                <div class="score-label">OUT OF 100</div>
+                            </div>
+                            <div class="quality-checks-count" id="quality-checks-count">Passed 5 of 5 checks</div>
+                        </div>
 
-                <!-- Tab 3: Next Phases Roadmap -->
-                <div class="tab-pane" id="tab-phases">
-                    <div class="roadmap-grid">
-                        <div class="roadmap-card">
-                            <div class="roadmap-badge">Phase 2</div>
-                            <h4>Deep Statistical Analysis & Quality Scoring</h4>
-                            <p>Automated computing of parametric (mean, std, skewness, kurtosis) and non-parametric (median, IQR, quantiles) metrics, categorical modes, and a composite 0-100 data health grade.</p>
+                        <div class="quality-bars-col">
+                            <div class="quality-bar-item">
+                                <div class="quality-bar-header">
+                                    <span>Completeness Score</span>
+                                    <strong id="completeness-score-val">--%</strong>
+                                </div>
+                                <div class="progress-bar-bg">
+                                    <div class="progress-bar-fill fill-emerald" id="completeness-bar-fill" style="width: 0%;"></div>
+                                </div>
+                                <span class="quality-bar-hint">100% minus total missing cell percentage</span>
+                            </div>
+
+                            <div class="quality-bar-item">
+                                <div class="quality-bar-header">
+                                    <span>Uniqueness Score</span>
+                                    <strong id="uniqueness-score-val">--%</strong>
+                                </div>
+                                <div class="progress-bar-bg">
+                                    <div class="progress-bar-fill fill-indigo" id="uniqueness-bar-fill" style="width: 0%;"></div>
+                                </div>
+                                <span class="quality-bar-hint">100% minus duplicate row rate</span>
+                            </div>
                         </div>
-                        <div class="roadmap-card">
-                            <div class="roadmap-badge">Phase 3</div>
-                            <h4>Multimodal Correlation & Plotly Charts</h4>
-                            <p>Correlation heatmaps (Pearson, Spearman, Cramér's V), anomaly outlier detection (IQR, Z-Score, Isolation Forest), and dynamic interactive Plotly visualizations.</p>
-                        </div>
-                        <div class="roadmap-card">
-                            <div class="roadmap-badge">Phase 4</div>
-                            <h4>Automated Data Cleaning Engine</h4>
-                            <p>Non-destructive transformations (smart imputation, outlier clipping, deduplication, type casting) and download of cleaned datasets in <code>data/processed/</code>.</p>
-                        </div>
-                        <div class="roadmap-card">
-                            <div class="roadmap-badge">Phase 5</div>
-                            <h4>AI Analyst Agent & NL Reporting</h4>
-                            <p>Conversational LLM agent with deterministic tool binding to answer natural-language inquiries, surface business insights, and generate downloadable executive reports.</p>
+
+                        <div class="quality-insights-col">
+                            <h4 class="insights-title">Quality Insights & Findings</h4>
+                            <ul class="insights-list" id="quality-insights-list">
+                                <li>Loading quality findings...</li>
+                            </ul>
                         </div>
                     </div>
                 </div>
             </section>
+
+            <!-- 3. COLUMN PROFILING TABLE & INSPECTION -->
+            <section class="profiling-section">
+                <div class="section-header-flex">
+                    <div>
+                        <h2 class="section-title">Column Profiling Table</h2>
+                        <p class="section-subtitle">Automatic classification, missingness rates, uniqueness, parametric & non-parametric statistics, and samples.</p>
+                    </div>
+                    <!-- Type Filter Tabs -->
+                    <div class="type-filter-group" id="type-filter-group">
+                        <button class="type-filter-btn active" data-type="all">All (<span id="count-all">0</span>)</button>
+                        <button class="type-filter-btn" data-type="Numerical">🔢 Numerical (<span id="count-numerical">0</span>)</button>
+                        <button class="type-filter-btn" data-type="Categorical">🏷️ Categorical (<span id="count-categorical">0</span>)</button>
+                        <button class="type-filter-btn" data-type="Datetime">📅 Datetime (<span id="count-datetime">0</span>)</button>
+                        <button class="type-filter-btn" data-type="Boolean">⚖️ Boolean (<span id="count-boolean">0</span>)</button>
+                        <button class="type-filter-btn" data-type="Other">🔤 Other (<span id="count-other">0</span>)</button>
+                    </div>
+                </div>
+
+                <!-- Column Table Toolbar -->
+                <div class="column-table-toolbar">
+                    <div class="search-box">
+                        <span class="search-icon">🔎</span>
+                        <input type="text" id="column-search" placeholder="Search columns by name or dtype..." class="search-input" />
+                    </div>
+                    <div class="column-table-meta" id="column-table-meta">
+                        Showing 0 columns
+                    </div>
+                </div>
+
+                <!-- Column Profiling Table Container -->
+                <div class="table-container profiling-table-container">
+                    <table class="data-table profiling-table" id="columns-profile-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;">#</th>
+                                <th>Column Name & Classification</th>
+                                <th>Missing Values</th>
+                                <th>Unique / Duplicates</th>
+                                <th>Statistical Summary / Distribution</th>
+                                <th>Sample Values</th>
+                                <th style="width: 90px; text-align: center;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="columns-profile-tbody">
+                            <!-- Injected dynamically via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- 4. DATASET PREVIEW (Paginated Real Data) -->
+            <section class="preview-section">
+                <div class="section-header-flex">
+                    <div>
+                        <h2 class="section-title">Dataset Preview</h2>
+                        <p class="section-subtitle">Real uploaded CSV records with live search filter and pagination.</p>
+                    </div>
+                </div>
+
+                <div class="explorer-toolbar">
+                    <div class="search-box">
+                        <span class="search-icon">🔎</span>
+                        <input type="text" id="table-search" placeholder="Filter rows in current view..." class="search-input" />
+                    </div>
+                    <div class="pagination-info" id="pagination-info">
+                        Showing page 1 of 1 (0 total rows)
+                    </div>
+                    <div class="pagination-buttons">
+                        <button class="btn btn-outline btn-sm" id="prev-page-btn" disabled>&larr; Previous</button>
+                        <button class="btn btn-outline btn-sm" id="next-page-btn" disabled>Next &rarr;</button>
+                    </div>
+                </div>
+
+                <div class="table-container preview-table-container">
+                    <table class="data-table" id="data-preview-table">
+                        <thead id="data-table-head">
+                            <!-- Injected via JS -->
+                        </thead>
+                        <tbody id="data-table-body">
+                            <!-- Injected via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
         </div>
     </main>
+
+    <!-- Column Deep Inspection Modal -->
+    <div class="modal-backdrop hidden" id="column-modal-backdrop">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <div class="modal-title-wrap">
+                    <span class="modal-type-badge" id="modal-col-type">Numerical</span>
+                    <h3 class="modal-title" id="modal-col-name">Column Name</h3>
+                    <code class="modal-dtype" id="modal-col-dtype">int64</code>
+                </div>
+                <button class="modal-close-btn" id="modal-close-btn">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-col-body">
+                <!-- Injected dynamically via JS -->
+            </div>
+        </div>
+    </div>
 
     <!-- Footer -->
     <footer class="main-footer">
         <div class="container footer-content">
             <div class="footer-left">
                 <span class="footer-title">AI Data Analyst Agent</span>
-                <span class="footer-desc">Production-grade portfolio system for Data Analysts & AI Engineers.</span>
+                <span class="footer-desc">Production-Grade Automated Dataset Profiler & Exploratory Analytics Engine.</span>
             </div>
             <div class="footer-right">
-                <span>Phase 1: Architecture & Foundation</span>
+                <span>Phase 3: Automatic Dataset Profiling</span>
                 <span>•</span>
-                <span>Python / Flask / Pandas / Plotly</span>
+                <span>Python / Flask / Pandas</span>
             </div>
         </div>
     </footer>

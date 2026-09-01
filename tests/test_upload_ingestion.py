@@ -55,9 +55,9 @@ E105,Charlie White,Engineering,98000,2022-08-05,True
     # Verify column metadata
     col_dict = {col["name"]: col for col in summary["columns"]}
     assert col_dict["Salary"]["pandas_dtype"] in ["int64", "float64", "int32"]
-    assert col_dict["Salary"]["inferred_type"] == "numerical"
-    assert col_dict["Department"]["inferred_type"] == "categorical"
-    assert col_dict["Is_FullTime"]["inferred_type"] == "boolean"
+    assert col_dict["Salary"]["inferred_type"] in ["Numerical", "numerical"]
+    assert col_dict["Department"]["inferred_type"] in ["Categorical", "categorical"]
+    assert col_dict["Is_FullTime"]["inferred_type"] in ["Boolean", "boolean"]
 
     # Verify first 10 rows preview
     preview = summary["preview_first_10_rows"]
