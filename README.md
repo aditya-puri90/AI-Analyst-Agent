@@ -181,7 +181,7 @@ AI-Data-Analyst-Agent/
 
 ## 🗺 Phased Implementation Roadmap
 
-- [x] **Phase 1: Project Foundation & Architecture** *(Current Phase)*
+- [x] **Phase 1: Project Foundation & Architecture**
   - [x] Modular project scaffolding & package structure.
   - [x] Settings management with `.env` and `config/settings.py`.
   - [x] Secure file upload handler with multi-encoding fallback and delimiter sniffing.
@@ -197,10 +197,13 @@ AI-Data-Analyst-Agent/
   - [ ] Numerical and categorical correlation engines (Pearson, Spearman, Cramér's V).
   - [ ] Outlier detection algorithms (IQR, Z-Score, Isolation Forest).
   - [ ] Interactive Plotly chart builders (distributions, heatmaps, box plots, scatter matrices).
-- [ ] **Phase 4: Automated Data Cleaning Engine & Dataset Export**
-  - [ ] Cleaning rule recommendation engine (smart missing value imputation, deduplication, type casting).
-  - [ ] Non-destructive transformation pipeline generating cleaned datasets in `data/processed/`.
-  - [ ] Cleaned dataset download in CSV and Excel formats.
+- [x] **Phase 4: Automated Data Quality and Cleaning Engine** *(Current Phase)*
+  - [x] 12-point deterministic quality defect inspection (missingness, duplicates, invalid numbers, outliers, whitespace, inconsistent casings, type anomalies).
+  - [x] Live transformation preview engine (`Original value → Proposed cleaned value`).
+  - [x] Configurable cleaning pipeline (deduplication, median/mode imputation, string casting, outlier capping, column filtering).
+  - [x] Strict non-destructive persistence saving processed datasets to `data/processed/`.
+  - [x] Comprehensive cleaning summary KPIs (rows before/after, duplicates removed, missing handled, columns converted, values standardized).
+  - [x] Cleaned CSV download button and preview toggle in Data Explorer.
 - [ ] **Phase 5: AI Agent Integration, NL Querying & Automated Reports**
   - [ ] Tool-augmented AI Agent with deterministic tool calling.
   - [ ] Natural-language Q&A interface for dataset inquiries.
@@ -258,21 +261,25 @@ The application will be accessible at:
 
 ### Available Pages:
 - **`http://127.0.0.1:5000/`** - Home & CSV Upload Zone
-- **`http://127.0.0.1:5000/dashboard`** - Analytics Dashboard & Data Explorer
+- **`http://127.0.0.1:5000/dashboard`** - Analytics Dashboard, Profiler & Data Cleaning Studio
 - **`http://127.0.0.1:5000/chat`** - AI Agent Conversational Interface
 
 ---
 
-## 📡 API Reference (Phase 1)
+## 📡 API Reference
 
 | Endpoint | Method | Description |
 | :--- | :--- | :--- |
 | `/api/health` | `GET` | System health check and status |
 | `/api/upload` | `POST` | Upload and validate a new CSV dataset |
 | `/api/datasets` | `GET` | List all available uploaded datasets |
-| `/api/profile/<filename>` | `GET` | Retrieve metadata profile & schema for a dataset |
-| `/api/preview/<filename>` | `GET` | Retrieve paginated rows for tabular inspection |
+| `/api/profile/<dataset_id>` | `GET` | Retrieve metadata profile & schema for a dataset |
+| `/api/preview/<dataset_id>` | `GET` | Retrieve paginated rows for tabular inspection |
 | `/api/sample/<name>` | `POST` | Load bundled sample dataset (e.g. Sales, Employees) |
+| `/api/cleaning/audit/<dataset_id>` | `GET` | Run 12-point data quality audit and get defect list |
+| `/api/cleaning/preview/<dataset_id>` | `GET` | Generate before-and-after transformation preview pairs |
+| `/api/cleaning/apply/<dataset_id>` | `POST` | Execute configurable cleaning pipeline & persist to `data/processed/` |
+| `/api/cleaning/download/<dataset_id>` | `GET` | Download cleaned CSV file from `data/processed/` |
 
 ---
 
@@ -280,5 +287,5 @@ The application will be accessible at:
 
 Run the automated test suite with `pytest`:
 ```bash
-pytest -v tests/
+python -m pytest -v tests/
 ```

@@ -308,8 +308,105 @@ def list_uploaded_datasets() -> List[Dict[str, Any]]:
         key=lambda item: item[1].get("uploaded_at", ""),
         reverse=True,
     ):
-        file_path = Config.UPLOAD_FOLDER / meta["filename"]
-        if file_path.exists():
-            datasets.append(meta)
+        if not meta.get("is_processed", False):
+            file_path = Config.UPLOAD_FOLDER / meta["filename"]
+            if file_path.exists():
+                datasets.append(meta)
 
     return datasets
+
+
+def save_processed_dataset(
+    df: pd.DataFrame,
+    original_dataset_id: str,
+    cleaning_summary: Optional[Dict[str, Any]] = None,
+) -> Tuple[Optional[str], Optional[Path], Optional[str]]:
+    """
+    Save a cleaned/transformed DataFrame into data/processed/.
+    Guarantees raw dataset immutability in data/uploads/ and records processed lineage.
+    
+    Args:
+        df: The cleaned pandas DataFrame.
+        original_dataset_id: Unique ID of the parent raw dataset.
+        cleaning_summary: Summary metrics of operations applied.
+        
+    Returns:
+        Tuple[Optional[str], Optional[Path], Optional[str]]:
+        (processed_dataset_id, saved_path, error_message)
+    """
+    registry = _read_registry()
+    parent_meta = registry.get(original_dataset_id, {})
+    parent_name = parent_meta.get("original_name", "dataset.csv")
+    clean_base = sanitize_filename(parent_name).replace(".csv", "")
+
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    processed_id = f"proc_{timestamp}_{uuid.uuid4().hex[:6]}"
+    disk_filename = f"cleaned_{original_dataset_id}_{clean_base}.csv"
+    target_path = Config.PROCESSED_FOLDER / disk_filename
+
+    try:
+        # Save cleaned dataset non-destructively to data/processed/
+        df.to_csv(target_path, index=False, encoding="utf-8")
+        file_size = target_path.stat().st_size
+
+        processed_meta = {
+            "id": processed_id,
+            "filename": disk_filename,
+            "original_name": f"cleaned_{parent_name}",
+            "parent_dataset_id": original_dataset_id,
+            "is_processed": True,
+            "processed_at": datetime.utcnow().isoformat(),
+            "size_bytes": file_size,
+            "size_formatted": _format_bytes(file_size),
+            "encoding": "utf-8",
+            "delimiter": ",",
+            "columns_count": len(df.columns),
+            "rows_count": len(df),
+            "cleaning_summary": cleaning_summary or {},
+        }
+
+        registry[processed_id] = processed_meta
+        # Link latest processed ID to parent dataset record
+        if original_dataset_id in registry:
+            registry[original_dataset_id]["latest_processed_id"] = processed_id
+            registry[original_dataset_id]["latest_cleaned_filename"] = disk_filename
+
+        _write_registry(registry)
+        logger.info("Saved processed dataset %s for parent %s (%d rows)", processed_id, original_dataset_id, len(df))
+        return processed_id, target_path, None
+
+    except Exception as e:
+        logger.error("Failed to save processed dataset for %s: %s", original_dataset_id, e, exc_info=True)
+        return None, None, f"Failed to save processed dataset: {str(e)}"
+
+
+def get_latest_processed_file(dataset_id: str) -> Optional[Path]:
+    """
+    Retrieve the Path to the latest processed CSV file for a given dataset ID.
+    
+    Args:
+        dataset_id: Raw dataset ID or processed ID.
+        
+    Returns:
+        Optional[Path]: Path to processed CSV if found, None otherwise.
+    """
+    registry = _read_registry()
+    if dataset_id in registry:
+        meta = registry[dataset_id]
+        if meta.get("is_processed", False):
+            return get_file_path(meta["filename"], is_processed=True)
+        # Check if parent has a latest processed record
+        latest_proc_id = meta.get("latest_processed_id")
+        if latest_proc_id and latest_proc_id in registry:
+            return get_file_path(registry[latest_proc_id]["filename"], is_processed=True)
+        latest_filename = meta.get("latest_cleaned_filename")
+        if latest_filename:
+            return get_file_path(latest_filename, is_processed=True)
+
+    # Fallback search by pattern in processed folder
+    matches = list(Config.PROCESSED_FOLDER.glob(f"*{dataset_id}*.csv"))
+    if matches:
+        return sorted(matches, key=lambda p: p.stat().st_mtime, reverse=True)[0]
+
+    return None
+

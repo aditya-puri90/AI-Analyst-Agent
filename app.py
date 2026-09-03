@@ -6,7 +6,7 @@ Provides REST API endpoints and web views for dataset uploading, ingestion, prof
 import io
 import logging
 from pathlib import Path
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, send_file
 import pandas as pd
 import numpy as np
 
@@ -18,12 +18,29 @@ from utils.file_handler import (
     get_dataset_summary,
     list_uploaded_datasets,
     get_file_path,
+    save_processed_dataset,
+    get_latest_processed_file,
 )
 from analysis.profiler import (
     DatasetProfiler,
     profile_dataset,
     profile_column,
+    infer_column_type,
     get_dataset_preview,
+    _safe_json_value,
+)
+from analysis.cleaning import (
+    detect_data_quality_issues,
+    generate_cleaning_preview,
+    execute_cleaning_pipeline,
+)
+from analysis.statistics import (
+    StatisticalAnalysisEngine,
+    compute_descriptive_statistics,
+    analyze_numerical_column,
+    analyze_categorical_column,
+    analyze_datetime_column,
+    generate_statistical_observations,
 )
 
 # Configure logging
@@ -94,7 +111,7 @@ def create_app() -> Flask:
         return jsonify({
             "status": "healthy",
             "service": "AI Data Analyst Agent",
-            "phase": "Phase 3 - Automatic Dataset Profiling",
+            "phase": "Phase 5 - Statistical Analysis Engine",
             "max_upload_mb": Config.MAX_CONTENT_LENGTH / (1024 * 1024),
             "allowed_extensions": list(Config.ALLOWED_EXTENSIONS),
         })
@@ -215,6 +232,93 @@ def create_app() -> Flask:
         preview_data = get_dataset_preview(df, page=page, page_size=page_size)
         return jsonify({"success": True, **preview_data})
 
+    @app.route("/api/statistics/<dataset_id>", methods=["GET"])
+    def get_statistics(dataset_id: str):
+        """
+        Retrieve comprehensive Phase 5 statistical analysis:
+        - Numerical descriptive & inferential moments (mean, std, var, min, max, range, IQR, skewness, kurtosis, CI, percentiles)
+        - Categorical distributions and entropy
+        - Datetime periodicity and temporal breakdown
+        - Rule-based deterministic statistical observations
+        """
+        confidence_level = request.args.get("ci", 0.95, type=float)
+        df, error = load_dataset(dataset_id)
+        if error:
+            return jsonify({"success": False, "error": error}), 404
+
+        engine = StatisticalAnalysisEngine(df, dataset_id=dataset_id)
+        stats_data = engine.analyze(confidence_level=confidence_level)
+        return jsonify({"success": True, "statistics": stats_data})
+
+    @app.route("/api/statistics/<dataset_id>/numerical", methods=["GET"])
+    def get_numerical_statistics(dataset_id: str):
+        """Retrieve tabular summary of numerical descriptive statistics."""
+        confidence_level = request.args.get("ci", 0.95, type=float)
+        df, error = load_dataset(dataset_id)
+        if error:
+            return jsonify({"success": False, "error": error}), 404
+
+        engine = StatisticalAnalysisEngine(df, dataset_id=dataset_id)
+        stats_data = engine.analyze(confidence_level=confidence_level)
+        num_stats = stats_data.get("numerical_statistics", {})
+        return jsonify({
+            "success": True,
+            "dataset_id": dataset_id,
+            "count": len(num_stats),
+            "columns": list(num_stats.values()),
+        })
+
+    @app.route("/api/statistics/<dataset_id>/column/<column_name>", methods=["GET"])
+    def get_column_statistics(dataset_id: str, column_name: str):
+        """Retrieve deep statistical profile for an individual column."""
+        confidence_level = request.args.get("ci", 0.95, type=float)
+        df, error = load_dataset(dataset_id)
+        if error:
+            return jsonify({"success": False, "error": error}), 404
+
+        if column_name not in df.columns:
+            return jsonify({
+                "success": False,
+                "error": f"Column '{column_name}' not found in dataset '{dataset_id}'. Available columns: {list(df.columns)}",
+            }), 404
+
+        series = df[column_name]
+        col_type = infer_column_type(series)
+
+        if col_type == "Numerical":
+            col_stat = analyze_numerical_column(series, col_name=column_name, confidence_level=confidence_level)
+        elif col_type == "Categorical" or col_type == "Boolean":
+            col_stat = analyze_categorical_column(series, col_name=column_name)
+        elif col_type == "Datetime":
+            col_stat = analyze_datetime_column(series, col_name=column_name)
+        else:
+            if pd.api.types.is_numeric_dtype(series):
+                col_stat = analyze_numerical_column(series, col_name=column_name, confidence_level=confidence_level)
+            else:
+                col_stat = analyze_categorical_column(series, col_name=column_name)
+
+        return jsonify({
+            "success": True,
+            "dataset_id": dataset_id,
+            "column_name": column_name,
+            "statistics": col_stat,
+        })
+
+    @app.route("/api/statistics/<dataset_id>/observations", methods=["GET"])
+    def get_statistical_observations_route(dataset_id: str):
+        """Retrieve rule-based statistical observations and data patterns."""
+        df, error = load_dataset(dataset_id)
+        if error:
+            return jsonify({"success": False, "error": error}), 404
+
+        engine = StatisticalAnalysisEngine(df, dataset_id=dataset_id)
+        stats_data = engine.analyze()
+        return jsonify({
+            "success": True,
+            "dataset_id": dataset_id,
+            "observations": stats_data.get("statistical_observations", []),
+        })
+
     @app.route("/api/sample/<sample_type>", methods=["POST"])
     def load_sample_dataset(sample_type: str):
         """
@@ -295,6 +399,124 @@ def create_app() -> Flask:
             "summary": summary,
             "profile": profile,
         }), 201
+
+    # -------------------------------------------------------------
+    # Phase 4: Automated Data Quality & Cleaning API Routes
+    # -------------------------------------------------------------
+    @app.route("/api/cleaning/audit/<dataset_id>", methods=["GET"])
+    def audit_dataset_quality(dataset_id: str):
+        """
+        Run all 12 deterministic data quality issue detection algorithms on the dataset.
+        Returns categorized issues, severity breakdown, and transformation previews.
+        """
+        df, error = load_dataset(dataset_id)
+        if error:
+            return jsonify({"success": False, "error": error}), 404
+
+        issues = detect_data_quality_issues(df)
+        preview_data = generate_cleaning_preview(df, issues)
+
+        severity_counts = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0}
+        for issue in issues:
+            sev = issue.get("severity", "Low")
+            if sev in severity_counts:
+                severity_counts[sev] += 1
+
+        return jsonify({
+            "success": True,
+            "dataset_id": dataset_id,
+            "total_issues": len(issues),
+            "severity_counts": severity_counts,
+            "issues": issues,
+            "preview": preview_data,
+        })
+
+    @app.route("/api/cleaning/preview/<dataset_id>", methods=["GET"])
+    def get_cleaning_transformation_preview(dataset_id: str):
+        """
+        Generate illustrative before-and-after transformation preview pairs (Original -> Cleaned).
+        """
+        df, error = load_dataset(dataset_id)
+        if error:
+            return jsonify({"success": False, "error": error}), 404
+
+        preview_data = generate_cleaning_preview(df)
+        return jsonify({
+            "success": True,
+            "dataset_id": dataset_id,
+            **preview_data,
+        })
+
+    @app.route("/api/cleaning/apply/<dataset_id>", methods=["POST"])
+    def apply_cleaning_pipeline(dataset_id: str):
+        """
+        Execute the configurable cleaning pipeline on a raw dataset.
+        Never modifies raw files; saves output to data/processed/ and returns comprehensive summary metrics.
+        """
+        df, error = load_dataset(dataset_id, is_processed=False)
+        if error:
+            return jsonify({"success": False, "error": error}), 404
+
+        # Parse requested cleaning configuration
+        req_json = request.get_json() or {}
+        operations = req_json.get("operations") if "operations" in req_json else req_json
+
+        # Execute transformation pipeline non-destructively
+        clean_df, summary = execute_cleaning_pipeline(df, operations)
+
+        # Save to data/processed/
+        proc_id, saved_path, save_err = save_processed_dataset(
+            clean_df,
+            original_dataset_id=dataset_id,
+            cleaning_summary=summary,
+        )
+        if save_err:
+            return jsonify({"success": False, "error": save_err}), 500
+
+        # Extract first 10 preview rows of cleaned data
+        head_records = clean_df.head(10).replace({np.nan: None}).to_dict(orient="records")
+        clean_head = [{k: _safe_json_value(v) for k, v in row.items()} for row in head_records]
+
+        return jsonify({
+            "success": True,
+            "message": "Dataset cleaned and saved to data/processed/ successfully.",
+            "dataset_id": dataset_id,
+            "processed_id": proc_id,
+            "summary": summary,
+            "preview_head": clean_head,
+            "download_url": f"/api/cleaning/download/{dataset_id}",
+        }), 200
+
+    @app.route("/api/cleaning/download/<dataset_id>", methods=["GET"])
+    def download_cleaned_dataset(dataset_id: str):
+        """
+        Download the cleaned CSV dataset from data/processed/.
+        If no processed version exists yet, executes default cleaning and serves the file.
+        """
+        proc_path = get_latest_processed_file(dataset_id)
+        
+        if not proc_path or not proc_path.exists():
+            # Automatically apply standard cleaning pipeline and save
+            df, error = load_dataset(dataset_id, is_processed=False)
+            if error:
+                return jsonify({"success": False, "error": error}), 404
+
+            clean_df, summary = execute_cleaning_pipeline(df)
+            proc_id, proc_path, save_err = save_processed_dataset(
+                clean_df,
+                original_dataset_id=dataset_id,
+                cleaning_summary=summary,
+            )
+            if save_err or not proc_path or not proc_path.exists():
+                return jsonify({"success": False, "error": "Could not generate cleaned dataset for download."}), 500
+
+        download_filename = proc_path.name
+        return send_file(
+            str(proc_path),
+            as_attachment=True,
+            download_name=download_filename,
+            mimetype="text/csv",
+        )
 
     return app
 

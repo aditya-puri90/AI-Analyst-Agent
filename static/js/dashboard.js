@@ -1,6 +1,6 @@
 /**
  * Dashboard Client-Side Controller for AI Data Analyst Agent.
- * Phase 3: Automatic Dataset Profiling, Schema Inference, Data Quality Scoring, and Exploration.
+ * Phase 4: Automatic Dataset Profiling, Data Quality Auditing, Cleaning Engine & Exploration.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -11,6 +11,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let activeTypeFilter = 'all';
     let columnSearchQuery = '';
     
+    // Cleaning Studio State
+    let allDetectedIssues = [];
+    let activeSeverityFilter = 'all';
+    let currentCleaningSummary = null;
+    let isViewingCleanedData = false;
+
+    // Explorer Table State
     let currentPage = 1;
     const pageSize = 20;
     let currentPreviewRows = [];
@@ -24,7 +31,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const activeDatasetName = document.getElementById('active-dataset-name');
     const activeDatasetIdEl = document.getElementById('active-dataset-id');
     const activeDatasetSize = document.getElementById('active-dataset-size');
+    const activeDatasetStatus = document.getElementById('active-dataset-status');
     const openChatBtn = document.getElementById('open-chat-btn');
+
+    // DOM Elements - Studio Tabs
+    const studioTabBtns = document.querySelectorAll('.studio-tab-btn');
+    const studioTabContents = document.querySelectorAll('.studio-tab-content');
+    const cleaningIssuesBadge = document.getElementById('cleaning-issues-badge');
 
     // DOM Elements - Overview KPIs
     const kpiRows = document.getElementById('kpi-rows');
@@ -61,6 +74,45 @@ document.addEventListener('DOMContentLoaded', () => {
     const columnTableMeta = document.getElementById('column-table-meta');
     const columnsProfileTbody = document.getElementById('columns-profile-tbody');
 
+    // DOM Elements - Cleaning Studio
+    const btnApplyCleaning = document.getElementById('btn-apply-cleaning');
+    const btnApplyCleaningBottom = document.getElementById('btn-apply-cleaning-bottom');
+    const btnDownloadCleaned = document.getElementById('btn-download-cleaned');
+    const cleaningSummarySection = document.getElementById('cleaning-summary-section');
+    const cleaningTimestamp = document.getElementById('cleaning-timestamp');
+    const cleanKpiRowsBefore = document.getElementById('clean-kpi-rows-before');
+    const cleanKpiRowsAfter = document.getElementById('clean-kpi-rows-after');
+    const cleanKpiDuplicatesRemoved = document.getElementById('clean-kpi-duplicates-removed');
+    const cleanKpiMissingHandled = document.getElementById('clean-kpi-missing-handled');
+    const cleanKpiColsConverted = document.getElementById('clean-kpi-cols-converted');
+    const cleanKpiValsStandardized = document.getElementById('clean-kpi-vals-standardized');
+    const appliedOperationsChips = document.getElementById('applied-operations-chips');
+
+    const sevCountAll = document.getElementById('sev-count-all');
+    const sevCountCritical = document.getElementById('sev-count-critical');
+    const sevCountHigh = document.getElementById('sev-count-high');
+    const sevCountMedium = document.getElementById('sev-count-medium');
+    const sevCountLow = document.getElementById('sev-count-low');
+    const sevFilterBtns = document.querySelectorAll('.sev-filter-btn');
+    const cleaningIssuesTbody = document.getElementById('cleaning-issues-tbody');
+    const previewPairsCount = document.getElementById('preview-pairs-count');
+    const previewCardsGrid = document.getElementById('preview-cards-grid');
+
+    // Config Checkbox Elements
+    const cfgRemoveDuplicates = document.getElementById('cfg-remove-duplicates');
+    const cfgFillNumericMissing = document.getElementById('cfg-fill-numeric-missing');
+    const cfgNumericStrategy = document.getElementById('cfg-numeric-strategy');
+    const cfgFillCategoricalMissing = document.getElementById('cfg-fill-categorical-missing');
+    const cfgCategoricalStrategy = document.getElementById('cfg-categorical-strategy');
+    const cfgStandardizeWhitespace = document.getElementById('cfg-standardize-whitespace');
+    const cfgStandardizeCategorical = document.getElementById('cfg-standardize-categorical');
+    const cfgConvertNumericStrings = document.getElementById('cfg-convert-numeric-strings');
+    const cfgConvertDatetimeStrings = document.getElementById('cfg-convert-datetime-strings');
+    const cfgHandleInvalidNumerical = document.getElementById('cfg-handle-invalid-numerical');
+    const cfgDropHighMissing = document.getElementById('cfg-drop-high-missing');
+    const cfgDropConstantColumns = document.getElementById('cfg-drop-constant-columns');
+    const cfgCapOutliers = document.getElementById('cfg-cap-outliers');
+
     // DOM Elements - Modal Inspector
     const modalBackdrop = document.getElementById('column-modal-backdrop');
     const modalColName = document.getElementById('modal-col-name');
@@ -70,12 +122,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalCloseBtn = document.getElementById('modal-close-btn');
 
     // DOM Elements - Preview Explorer
+    const viewRawDataBtn = document.getElementById('view-raw-data-btn');
+    const viewCleanDataBtn = document.getElementById('view-clean-data-btn');
     const tableHead = document.getElementById('data-table-head');
     const tableBody = document.getElementById('data-table-body');
     const paginationInfo = document.getElementById('pagination-info');
-    const prevPageBtn = document.getElementById('prev-page-btn');
-    const nextPageBtn = document.getElementById('next-page-btn');
     const tableSearch = document.getElementById('table-search');
+
+    // DOM Elements - Phase 5 Statistical Analysis
+    let currentStatistics = null;
+    let statsSearchQuery = '';
+    const statsKpiNumCount = document.getElementById('stats-kpi-num-count');
+    const statsKpiCatCount = document.getElementById('stats-kpi-cat-count');
+    const statsKpiDtCount = document.getElementById('stats-kpi-dt-count');
+    const statsKpiOutliersCount = document.getElementById('stats-kpi-outliers-count');
+    const statsKpiNormalCount = document.getElementById('stats-kpi-normal-count');
+    const statsObservationsGrid = document.getElementById('stats-observations-grid');
+    const statsTableSearch = document.getElementById('stats-table-search');
+    const summaryStatisticsTbody = document.getElementById('summary-statistics-tbody');
+    const statsColumnSelector = document.getElementById('stats-column-selector');
+    const distributionDetailsCard = document.getElementById('distribution-details-card');
 
     // Helper: Format bytes
     function formatBytes(bytes, decimals = 2) {
@@ -94,6 +160,25 @@ document.addEventListener('DOMContentLoaded', () => {
         div.textContent = str;
         return div.innerHTML;
     }
+
+    // Tab Switcher Handling
+    studioTabBtns.forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const targetTabId = btn.getAttribute('data-tab');
+            studioTabBtns.forEach((b) => b.classList.remove('active'));
+            studioTabContents.forEach((c) => {
+                c.classList.remove('active');
+                c.classList.add('hidden');
+            });
+
+            btn.classList.add('active');
+            const targetContent = document.getElementById(targetTabId);
+            if (targetContent) {
+                targetContent.classList.remove('hidden');
+                targetContent.classList.add('active');
+            }
+        });
+    });
 
     // Load available datasets for the dropdown
     async function loadDatasetsList() {
@@ -151,10 +236,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (errorState) errorState.classList.add('hidden');
         if (contentState) contentState.classList.add('hidden');
 
-        // Update links
+        // Update links & download URL
         if (openChatBtn) openChatBtn.href = `/chat?dataset_id=${encodeURIComponent(datasetId)}`;
+        if (btnDownloadCleaned) {
+            btnDownloadCleaned.href = `/api/cleaning/download/${encodeURIComponent(datasetId)}`;
+        }
 
         try {
+            // 1. Fetch Profile
             const res = await fetch(`/api/profile/${encodeURIComponent(datasetId)}`);
             const data = await res.json();
 
@@ -171,7 +260,16 @@ document.addEventListener('DOMContentLoaded', () => {
             updateTypeCounts(currentProfile.type_counts, allColumnsProfile.length);
             renderColumnProfilingTable();
 
-            // Load table preview
+            // 2. Fetch Data Quality & Cleaning Audit
+            await loadCleaningAudit(datasetId);
+
+            // 3. Fetch Phase 5 Statistical Analysis
+            await loadStatisticsData(datasetId);
+
+            // 4. Load table preview (Raw)
+            isViewingCleanedData = false;
+            if (viewRawDataBtn) viewRawDataBtn.classList.add('active');
+            if (viewCleanDataBtn) viewCleanDataBtn.classList.remove('active');
             currentPage = 1;
             await loadTablePreview(datasetId, currentPage);
 
@@ -323,12 +421,10 @@ document.addEventListener('DOMContentLoaded', () => {
         columnsProfileTbody.innerHTML = filtered.map((col, idx) => {
             const colType = col.classified_type || col.inferred_type || 'Other';
             
-            // Missing bar color
             let missingBarClass = 'fill-emerald';
             if (col.missing_percentage > 15) missingBarClass = 'fill-rose';
             else if (col.missing_percentage > 0) missingBarClass = 'fill-amber';
 
-            // Stats summary content based on column type
             let statsSummaryHtml = '';
 
             if (colType === 'Numerical' && col.numerical_stats) {
@@ -386,7 +482,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 statsSummaryHtml = `<span style="color: var(--text-muted); font-size: 11px;">Standard text/ID distribution</span>`;
             }
 
-            // Samples pills
             const samplesHtml = (col.sample_values || [])
                 .map((v) => `<span class="sample-chip" title="${escapeHtml(v)}">${escapeHtml(v !== null ? v : 'NULL')}</span>`)
                 .join('');
@@ -448,6 +543,271 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // =========================================================================
+    // 4. AUTOMATED DATA QUALITY & CLEANING STUDIO CONTROLLER
+    // =========================================================================
+
+    async function loadCleaningAudit(datasetId) {
+        try {
+            const res = await fetch(`/api/cleaning/audit/${encodeURIComponent(datasetId)}`);
+            const data = await res.json();
+
+            if (!res.ok || !data.success) {
+                console.error('Failed to load cleaning audit:', data.error);
+                return;
+            }
+
+            allDetectedIssues = data.issues || [];
+            const sc = data.severity_counts || { Critical: 0, High: 0, Medium: 0, Low: 0 };
+
+            // Update badge counters
+            if (cleaningIssuesBadge) cleaningIssuesBadge.textContent = allDetectedIssues.length;
+            if (sevCountAll) sevCountAll.textContent = allDetectedIssues.length;
+            if (sevCountCritical) sevCountCritical.textContent = sc.Critical || 0;
+            if (sevCountHigh) sevCountHigh.textContent = sc.High || 0;
+            if (sevCountMedium) sevCountMedium.textContent = sc.Medium || 0;
+            if (sevCountLow) sevCountLow.textContent = sc.Low || 0;
+
+            renderCleaningIssuesTable();
+            renderTransformationPreviews(data.preview);
+
+        } catch (e) {
+            console.error('Error fetching cleaning audit:', e);
+        }
+    }
+
+    // Severity Filter buttons handler
+    sevFilterBtns.forEach((btn) => {
+        btn.addEventListener('click', () => {
+            sevFilterBtns.forEach((b) => b.classList.remove('active'));
+            btn.classList.add('active');
+            activeSeverityFilter = btn.getAttribute('data-sev');
+            renderCleaningIssuesTable();
+        });
+    });
+
+    // Render 12-point Quality Issues Table
+    function renderCleaningIssuesTable() {
+        if (!cleaningIssuesTbody) return;
+
+        let filtered = allDetectedIssues;
+        if (activeSeverityFilter !== 'all') {
+            filtered = filtered.filter((i) => i.severity.toLowerCase() === activeSeverityFilter.toLowerCase());
+        }
+
+        if (filtered.length === 0) {
+            cleaningIssuesTbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--accent-emerald); padding: 30px; font-weight: 600;">✨ No data quality issues detected for the selected filter!</td></tr>`;
+            return;
+        }
+
+        cleaningIssuesTbody.innerHTML = filtered.map((issue, idx) => {
+            const sev = issue.severity || 'Low';
+            const sevClass = `sev-badge sev-badge-${sev.toLowerCase()}`;
+            const colDisplay = issue.column === '(Entire Dataset)' 
+                ? `<span style="font-weight: 700; color: var(--accent-indigo);">(Entire Dataset)</span>`
+                : `<strong style="color: var(--text-primary); font-family: var(--font-mono);">${escapeHtml(issue.column)}</strong>`;
+
+            return `
+                <tr>
+                    <td style="color: var(--text-muted); font-family: var(--font-mono); font-size: 11px;">${idx + 1}</td>
+                    <td>${colDisplay}</td>
+                    <td>
+                        <div style="font-weight: 600; color: var(--text-primary); font-size: 13px;">${escapeHtml(issue.title)}</div>
+                        <div style="color: var(--text-muted); font-size: 11px; font-family: var(--font-mono);">${escapeHtml(issue.issue_type)}</div>
+                    </td>
+                    <td>
+                        <div style="font-size: 12px; font-family: var(--font-mono);">
+                            <strong>${issue.affected_rows.toLocaleString()}</strong> rows
+                            <span style="color: var(--text-muted);">(${issue.percentage_affected}%)</span>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="${sevClass}">${sev}</span>
+                    </td>
+                    <td>
+                        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4;">
+                            ${escapeHtml(issue.recommended_action)}
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    // Render Transformation Preview Cards (Original -> Cleaned)
+    function renderTransformationPreviews(previewData) {
+        if (!previewCardsGrid) return;
+
+        const previews = previewData && previewData.previews ? previewData.previews : [];
+        if (previewPairsCount) previewPairsCount.textContent = `${previews.length} proposed transformation${previews.length === 1 ? '' : 's'}`;
+
+        if (previews.length === 0) {
+            previewCardsGrid.innerHTML = `
+                <div class="preview-card-placeholder">
+                    ✨ No transformation previews needed for this dataset. All data conforms to standard formatting.
+                </div>
+            `;
+            return;
+        }
+
+        previewCardsGrid.innerHTML = previews.map((p) => {
+            return `
+                <div class="preview-card">
+                    <div class="preview-card-header">
+                        <span class="preview-card-col">${escapeHtml(p.column)}</span>
+                        <span class="preview-card-category">${escapeHtml(p.category)}</span>
+                    </div>
+                    <div class="preview-transform-flow">
+                        <span class="preview-orig" title="Original raw value">${escapeHtml(p.original_value)}</span>
+                        <span class="preview-arrow">&rarr;</span>
+                        <span class="preview-clean" title="Proposed cleaned value">${escapeHtml(p.cleaned_value)}</span>
+                    </div>
+                    <div class="preview-rule">${escapeHtml(p.rule)}</div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // Gather configurable cleaning operations from checkboxes
+    function getSelectedCleaningOperations() {
+        return {
+            remove_duplicates: cfgRemoveDuplicates ? cfgRemoveDuplicates.checked : true,
+            fill_numeric_missing: cfgFillNumericMissing && cfgFillNumericMissing.checked 
+                ? (cfgNumericStrategy ? cfgNumericStrategy.value : 'median') 
+                : 'none',
+            fill_categorical_missing: cfgFillCategoricalMissing && cfgFillCategoricalMissing.checked 
+                ? (cfgCategoricalStrategy ? cfgCategoricalStrategy.value : 'mode') 
+                : 'none',
+            standardize_whitespace: cfgStandardizeWhitespace ? cfgStandardizeWhitespace.checked : true,
+            standardize_categorical: cfgStandardizeCategorical ? cfgStandardizeCategorical.checked : true,
+            convert_numeric_strings: cfgConvertNumericStrings ? cfgConvertNumericStrings.checked : true,
+            convert_datetime_strings: cfgConvertDatetimeStrings ? cfgConvertDatetimeStrings.checked : true,
+            handle_invalid_numerical: cfgHandleInvalidNumerical ? cfgHandleInvalidNumerical.checked : true,
+            drop_high_missing_columns: cfgDropHighMissing ? cfgDropHighMissing.checked : false,
+            drop_constant_columns: cfgDropConstantColumns ? cfgDropConstantColumns.checked : false,
+            cap_outliers: cfgCapOutliers ? cfgCapOutliers.checked : false,
+        };
+    }
+
+    // Apply Cleaning Pipeline Action Handler
+    async function handleApplyCleaning() {
+        if (!activeDatasetId) return;
+
+        const originalBtnHtml = btnApplyCleaning ? btnApplyCleaning.innerHTML : '';
+        if (btnApplyCleaning) {
+            btnApplyCleaning.disabled = true;
+            btnApplyCleaning.innerHTML = `<span class="spinner" style="width: 14px; height: 14px; border-width: 2px; margin: 0; display: inline-block;"></span> Applying...`;
+        }
+        if (btnApplyCleaningBottom) {
+            btnApplyCleaningBottom.disabled = true;
+            btnApplyCleaningBottom.innerHTML = `<span class="spinner" style="width: 14px; height: 14px; border-width: 2px; margin: 0; display: inline-block;"></span> Applying...`;
+        }
+
+        const operations = getSelectedCleaningOperations();
+
+        try {
+            const res = await fetch(`/api/cleaning/apply/${encodeURIComponent(activeDatasetId)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ operations }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok || !data.success) {
+                alert(`Cleaning failed: ${data.error || 'Unknown error'}`);
+                return;
+            }
+
+            currentCleaningSummary = data.summary;
+            renderCleaningSummary(data.summary);
+
+            // Update download button
+            if (btnDownloadCleaned) {
+                btnDownloadCleaned.href = data.download_url || `/api/cleaning/download/${encodeURIComponent(activeDatasetId)}`;
+            }
+
+            // Show active status tag
+            if (activeDatasetStatus) activeDatasetStatus.classList.remove('hidden');
+
+            // Refresh audit findings after cleaning
+            await loadCleaningAudit(activeDatasetId);
+
+            // Switch explorer to cleaned preview
+            if (viewCleanDataBtn) viewCleanDataBtn.classList.remove('hidden');
+
+            // Scroll to summary smoothly
+            if (cleaningSummarySection) {
+                cleaningSummarySection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+
+        } catch (err) {
+            alert(`Error applying cleaning pipeline: ${err.message}`);
+        } finally {
+            if (btnApplyCleaning) {
+                btnApplyCleaning.disabled = false;
+                btnApplyCleaning.innerHTML = originalBtnHtml;
+            }
+            if (btnApplyCleaningBottom) {
+                btnApplyCleaningBottom.disabled = false;
+                btnApplyCleaningBottom.innerHTML = `<span class="btn-icon">⚡</span><span>Apply Cleaning Pipeline</span>`;
+            }
+        }
+    }
+
+    // Attach Apply Button Listeners
+    if (btnApplyCleaning) btnApplyCleaning.addEventListener('click', handleApplyCleaning);
+    if (btnApplyCleaningBottom) btnApplyCleaningBottom.addEventListener('click', handleApplyCleaning);
+
+    // Render Cleaning Summary Box
+    function renderCleaningSummary(summary) {
+        if (!summary || !cleaningSummarySection) return;
+
+        cleaningSummarySection.classList.remove('hidden');
+        if (cleaningTimestamp) cleaningTimestamp.textContent = new Date().toLocaleTimeString();
+
+        if (cleanKpiRowsBefore) cleanKpiRowsBefore.textContent = summary.rows_before.toLocaleString();
+        if (cleanKpiRowsAfter) cleanKpiRowsAfter.textContent = summary.rows_after.toLocaleString();
+        if (cleanKpiDuplicatesRemoved) cleanKpiDuplicatesRemoved.textContent = summary.duplicates_removed.toLocaleString();
+        if (cleanKpiMissingHandled) cleanKpiMissingHandled.textContent = summary.missing_values_handled.toLocaleString();
+        if (cleanKpiColsConverted) cleanKpiColsConverted.textContent = summary.columns_converted.toLocaleString();
+        if (cleanKpiValsStandardized) cleanKpiValsStandardized.textContent = summary.values_standardized.toLocaleString();
+
+        if (appliedOperationsChips) {
+            appliedOperationsChips.innerHTML = '';
+            (summary.operations_applied || []).forEach((op) => {
+                const chip = document.createElement('span');
+                chip.className = 'applied-chip';
+                chip.textContent = `✓ ${op}`;
+                appliedOperationsChips.appendChild(chip);
+            });
+            if (!summary.operations_applied || summary.operations_applied.length === 0) {
+                appliedOperationsChips.innerHTML = `<span style="color: var(--text-muted); font-size: 12px;">No transformations needed (dataset already clean).</span>`;
+            }
+        }
+    }
+
+    // Explorer Raw vs Clean Toggle
+    if (viewRawDataBtn) {
+        viewRawDataBtn.addEventListener('click', async () => {
+            isViewingCleanedData = false;
+            viewRawDataBtn.classList.add('active');
+            if (viewCleanDataBtn) viewCleanDataBtn.classList.remove('active');
+            currentPage = 1;
+            await loadTablePreview(activeDatasetId, currentPage);
+        });
+    }
+
+    if (viewCleanDataBtn) {
+        viewCleanDataBtn.addEventListener('click', async () => {
+            isViewingCleanedData = true;
+            viewCleanDataBtn.classList.add('active');
+            if (viewRawDataBtn) viewRawDataBtn.classList.remove('active');
+            currentPage = 1;
+            await loadTablePreview(activeDatasetId, currentPage);
+        });
+    }
+
     // Modal Inspector Renderer
     function openColumnModal(colName) {
         const col = allColumnsProfile.find((c) => c.name === colName);
@@ -463,7 +823,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (modalColDtype) modalColDtype.textContent = col.pandas_dtype;
 
         let bodyHtml = `
-            <!-- General Counts Grid -->
             <div>
                 <h4 style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px;">Column Overview</h4>
                 <div class="five-number-grid">
@@ -487,7 +846,6 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
 
-        // Numerical Five-Number & Statistical Summary
         if (colType === 'Numerical' && col.numerical_stats) {
             const ns = col.numerical_stats;
             bodyHtml += `
@@ -541,7 +899,6 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         }
 
-        // Categorical Frequency Distribution Table
         if (colType === 'Categorical' && col.categorical_stats && col.categorical_stats.top_categories) {
             const topCats = col.categorical_stats.top_categories;
             bodyHtml += `
@@ -575,7 +932,6 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         }
 
-        // Datetime Info
         if (colType === 'Datetime' && col.datetime_stats) {
             const ds = col.datetime_stats;
             bodyHtml += `
@@ -599,7 +955,6 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         }
 
-        // Samples Box
         const sampleChips = (col.sample_values || [])
             .map((v) => `<span class="sample-chip" style="max-width: none; font-size: 12px; padding: 4px 10px;">${escapeHtml(v !== null ? v : 'NULL')}</span>`)
             .join('');
@@ -638,7 +993,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 4. Load Paginated Table Preview (Real Data)
+    // 5. Load Paginated Table Preview (Real Data)
     async function loadTablePreview(datasetId, page = 1) {
         try {
             const res = await fetch(`/api/preview/${encodeURIComponent(datasetId)}?page=${page}&page_size=${pageSize}`);
@@ -667,7 +1022,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderTable(columns, rows) {
         if (!tableHead || !tableBody) return;
 
-        // Render Head
         tableHead.innerHTML = `
             <tr>
                 <th style="width: 40px;">#</th>
@@ -675,7 +1029,6 @@ document.addEventListener('DOMContentLoaded', () => {
             </tr>
         `;
 
-        // Render Body
         if (rows.length === 0) {
             tableBody.innerHTML = `<tr><td colspan="${columns.length + 1}" style="text-align: center; color: var(--text-muted); padding: 30px;">No matching records in preview.</td></tr>`;
             return;
@@ -731,9 +1084,467 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // =========================================================================
+    // PHASE 5: STATISTICAL ANALYSIS ENGINE CONTROLLER
+    // =========================================================================
+    async function loadStatisticsData(datasetId) {
+        try {
+            const res = await fetch(`/api/statistics/${encodeURIComponent(datasetId)}`);
+            const data = await res.json();
+            if (res.ok && data.success && data.statistics) {
+                currentStatistics = data.statistics;
+                renderStatisticalAnalysis(currentStatistics);
+            }
+        } catch (e) {
+            console.error('Failed to load statistical analysis:', e);
+        }
+    }
+
+    function renderStatisticalAnalysis(statsData) {
+        if (!statsData) return;
+
+        // 1. Render Quick KPIs
+        const numStats = statsData.numerical_statistics || {};
+        const catStats = statsData.categorical_statistics || {};
+        const dtStats = statsData.datetime_statistics || {};
+        const obs = statsData.statistical_observations || [];
+
+        const numCount = Object.keys(numStats).length;
+        const catCount = Object.keys(catStats).length;
+        const dtCount = Object.keys(dtStats).length;
+
+        // Count outlier features
+        let outlierFeatures = 0;
+        let normalCount = 0;
+        for (const [colName, n] of Object.entries(numStats)) {
+            if (n.outliers && n.outliers.count > 0) outlierFeatures++;
+            if (n.normality && n.normality.is_normal) normalCount++;
+        }
+
+        if (statsKpiNumCount) statsKpiNumCount.textContent = numCount;
+        if (statsKpiCatCount) statsKpiCatCount.textContent = catCount;
+        if (statsKpiDtCount) statsKpiDtCount.textContent = dtCount;
+        if (statsKpiOutliersCount) statsKpiOutliersCount.textContent = `${outlierFeatures} features with outliers`;
+        if (statsKpiNormalCount) statsKpiNormalCount.textContent = `${normalCount} of ${numCount} Gaussian`;
+
+        // 2. Render Statistical Observations
+        renderStatisticalObservations(obs);
+
+        // 3. Render Summary Statistics Table
+        renderSummaryStatisticsTable(numStats);
+
+        // 4. Populate Feature Selector for Distribution Deep Dive
+        if (statsColumnSelector) {
+            statsColumnSelector.innerHTML = '<option value="">-- Choose a Feature to Inspect --</option>';
+
+            // Numerical group
+            if (numCount > 0) {
+                const numGroup = document.createElement('optgroup');
+                numGroup.label = '🔢 Numerical Features';
+                for (const colName of Object.keys(numStats)) {
+                    const opt = document.createElement('option');
+                    opt.value = colName;
+                    opt.textContent = colName;
+                    numGroup.appendChild(opt);
+                }
+                statsColumnSelector.appendChild(numGroup);
+            }
+
+            // Categorical group
+            if (catCount > 0) {
+                const catGroup = document.createElement('optgroup');
+                catGroup.label = '🏷️ Categorical Features';
+                for (const colName of Object.keys(catStats)) {
+                    const opt = document.createElement('option');
+                    opt.value = colName;
+                    opt.textContent = colName;
+                    catGroup.appendChild(opt);
+                }
+                statsColumnSelector.appendChild(catGroup);
+            }
+
+            // Datetime group
+            if (dtCount > 0) {
+                const dtGroup = document.createElement('optgroup');
+                dtGroup.label = '📅 Datetime Features';
+                for (const colName of Object.keys(dtStats)) {
+                    const opt = document.createElement('option');
+                    opt.value = colName;
+                    opt.textContent = colName;
+                    dtGroup.appendChild(opt);
+                }
+                statsColumnSelector.appendChild(dtGroup);
+            }
+
+            // Default select first numerical column
+            const firstNumCol = Object.keys(numStats)[0] || Object.keys(catStats)[0] || Object.keys(dtStats)[0];
+            if (firstNumCol) {
+                statsColumnSelector.value = firstNumCol;
+                renderDistributionDeepDive(statsData, firstNumCol);
+            }
+        }
+    }
+
+    function renderStatisticalObservations(observations) {
+        if (!statsObservationsGrid) return;
+        if (!observations || observations.length === 0) {
+            statsObservationsGrid.innerHTML = `
+                <div class="stats-obs-card info">
+                    <div class="obs-card-header">
+                        <span class="obs-icon">✨</span>
+                        <h4 class="obs-title">Clean Statistical Balance</h4>
+                    </div>
+                    <p class="obs-message">No critical distributional defects, heavy outliers, or extreme skewness were detected.</p>
+                </div>
+            `;
+            return;
+        }
+
+        const icons = {
+            'Quality Warning': '⚠️',
+            'Zero Variance': '⚪',
+            'Distribution Shape': '📊',
+            'Heavy Tails': '📐',
+            'Outlier Alert': '🚨',
+            'High Dispersion': '📈',
+            'Class Imbalance': '⚖️',
+            'High Cardinality': '🏷️',
+            'Temporal Span': '📅',
+            'General Quality': '✨',
+        };
+
+        statsObservationsGrid.innerHTML = observations.map((obs) => {
+            const icon = icons[obs.type] || '🔍';
+            const cardClass = obs.severity === 'high' ? 'high' : (obs.severity === 'warning' ? 'warning' : 'info');
+            return `
+                <div class="stats-obs-card ${cardClass}">
+                    <div class="obs-card-header">
+                        <span class="obs-icon">${icon}</span>
+                        <h4 class="obs-title">${escapeHtml(obs.title)}</h4>
+                    </div>
+                    <p class="obs-message">${escapeHtml(obs.message)}</p>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function renderSummaryStatisticsTable(numStats) {
+        if (!summaryStatisticsTbody) return;
+
+        let entries = Object.entries(numStats || {});
+
+        if (statsSearchQuery) {
+            entries = entries.filter(([colName]) => colName.toLowerCase().includes(statsSearchQuery));
+        }
+
+        if (entries.length === 0) {
+            summaryStatisticsTbody.innerHTML = `<tr><td colspan="15" style="text-align: center; color: var(--text-muted); padding: 30px;">No numerical features matching '${escapeHtml(statsSearchQuery)}'</td></tr>`;
+            return;
+        }
+
+        summaryStatisticsTbody.innerHTML = entries.map(([colName, n], idx) => {
+            const ci = n.confidence_interval || {};
+            const outliers = n.outliers || {};
+            const ciStr = ci.lower !== null && ci.upper !== null ? `[${ci.lower}, ${ci.upper}]` : '--';
+            const rangeStr = n.min !== null && n.max !== null ? `[${n.min}, ${n.max}]` : '--';
+            const iqrBounds = n.q1 !== null && n.q3 !== null ? `${n.iqr} [${n.q1}, ${n.q3}]` : '--';
+
+            // Skewness pill styling
+            let skewPill = `<span class="skew-pill skew-normal">${n.skewness !== null ? n.skewness : '--'}</span>`;
+            if (n.skewness !== null && n.skewness > 1.0) {
+                skewPill = `<span class="skew-pill skew-positive" title="Right Skewed">${n.skewness} ↗</span>`;
+            } else if (n.skewness !== null && n.skewness < -1.0) {
+                skewPill = `<span class="skew-pill skew-negative" title="Left Skewed">${n.skewness} ↖</span>`;
+            }
+
+            // Outlier styling
+            const outlierText = outliers.count > 0 
+                ? `<span style="color: var(--accent-rose); font-weight: 700;">${outliers.count} (${outliers.percentage}%)</span>`
+                : `<span style="color: var(--accent-emerald);">0</span>`;
+
+            return `
+                <tr>
+                    <td style="color: var(--text-muted);">${idx + 1}</td>
+                    <td class="stats-col-name">${escapeHtml(colName)}</td>
+                    <td>${n.valid_count !== undefined ? n.valid_count.toLocaleString() : '--'}</td>
+                    <td style="font-weight: 700; color: var(--accent-indigo);">${n.mean !== null ? n.mean : '--'}</td>
+                    <td>${n.median !== null ? n.median : '--'}</td>
+                    <td style="color: var(--text-secondary);">${n.mode !== null ? n.mode : '--'}</td>
+                    <td>${n.std !== null ? n.std : '--'}</td>
+                    <td>${n.variance !== null ? n.variance : '--'}</td>
+                    <td>${rangeStr}</td>
+                    <td>${n.range !== null ? n.range : '--'}</td>
+                    <td>${iqrBounds}</td>
+                    <td>${skewPill}</td>
+                    <td>${n.kurtosis !== null ? n.kurtosis : '--'}</td>
+                    <td><span class="ci-pill">${ciStr}</span></td>
+                    <td>${outlierText}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function renderDistributionDeepDive(statsData, colName) {
+        if (!distributionDetailsCard || !colName) return;
+
+        const numStats = statsData.numerical_statistics || {};
+        const catStats = statsData.categorical_statistics || {};
+        const dtStats = statsData.datetime_statistics || {};
+
+        if (numStats[colName]) {
+            const n = numStats[colName];
+            const p = n.percentiles || {};
+            const ci = n.confidence_interval || {};
+            const norm = n.normality || {};
+            const disp = n.dispersion_metrics || {};
+            const outliers = n.outliers || {};
+
+            let normBadgeClass = 'normality-normal';
+            if (norm.distribution_shape && norm.distribution_shape.includes('Skewed')) normBadgeClass = 'normality-skewed';
+            if (norm.distribution_shape && norm.distribution_shape.includes('Heavy')) normBadgeClass = 'normality-heavy';
+
+            distributionDetailsCard.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                        <h4 style="font-size: 18px; font-weight: 800; color: var(--text-primary);">${escapeHtml(colName)}</h4>
+                        <span style="font-size: 12px; color: var(--text-muted);">Numerical Feature • ${n.valid_count.toLocaleString()} valid observations (${n.missing_percentage}% missing)</span>
+                    </div>
+                    <div>
+                        <span class="normality-badge ${normBadgeClass}">
+                            <span>●</span>
+                            <span>${norm.distribution_shape || 'Distribution Analysis'}</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="dist-grid-layout">
+                    <!-- Percentiles Matrix -->
+                    <div class="dist-box">
+                        <div class="dist-box-title">Percentiles Spectrum (P1 – P99)</div>
+                        <div class="percentiles-grid">
+                            <div class="percentile-chip">
+                                <div class="percentile-label">P1 (Min Tail)</div>
+                                <div class="percentile-val">${p.p1 !== undefined ? p.p1 : '--'}</div>
+                            </div>
+                            <div class="percentile-chip">
+                                <div class="percentile-label">P5</div>
+                                <div class="percentile-val">${p.p5 !== undefined ? p.p5 : '--'}</div>
+                            </div>
+                            <div class="percentile-chip">
+                                <div class="percentile-label">P10</div>
+                                <div class="percentile-val">${p.p10 !== undefined ? p.p10 : '--'}</div>
+                            </div>
+                            <div class="percentile-chip" style="background: rgba(99, 102, 241, 0.12); border-color: rgba(99, 102, 241, 0.3);">
+                                <div class="percentile-label" style="color: var(--accent-indigo);">P25 (Q1)</div>
+                                <div class="percentile-val" style="color: var(--accent-indigo);">${p.p25 !== undefined ? p.p25 : '--'}</div>
+                            </div>
+                            <div class="percentile-chip" style="background: rgba(99, 102, 241, 0.2); border-color: rgba(99, 102, 241, 0.4);">
+                                <div class="percentile-label" style="color: #fff;">P50 (Median)</div>
+                                <div class="percentile-val" style="color: #fff;">${p.p50 !== undefined ? p.p50 : '--'}</div>
+                            </div>
+                            <div class="percentile-chip" style="background: rgba(99, 102, 241, 0.12); border-color: rgba(99, 102, 241, 0.3);">
+                                <div class="percentile-label" style="color: var(--accent-indigo);">P75 (Q3)</div>
+                                <div class="percentile-val" style="color: var(--accent-indigo);">${p.p75 !== undefined ? p.p75 : '--'}</div>
+                            </div>
+                            <div class="percentile-chip">
+                                <div class="percentile-label">P90</div>
+                                <div class="percentile-val">${p.p90 !== undefined ? p.p90 : '--'}</div>
+                            </div>
+                            <div class="percentile-chip">
+                                <div class="percentile-label">P95</div>
+                                <div class="percentile-val">${p.p95 !== undefined ? p.p95 : '--'}</div>
+                            </div>
+                            <div class="percentile-chip">
+                                <div class="percentile-label">P99 (Max Tail)</div>
+                                <div class="percentile-val">${p.p99 !== undefined ? p.p99 : '--'}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dispersion & Confidence Interval -->
+                    <div class="dist-box">
+                        <div class="dist-box-title">Dispersion & Confidence Bounds</div>
+                        <div style="display: flex; flex-direction: column; gap: 12px; font-size: 13px;">
+                            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px;">
+                                <span style="color: var(--text-secondary);">95% Confidence Interval for Mean:</span>
+                                <strong style="font-family: var(--font-mono); color: var(--accent-indigo);">[${ci.lower}, ${ci.upper}]</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px;">
+                                <span style="color: var(--text-secondary);">Standard Error (SEM):</span>
+                                <strong style="font-family: var(--font-mono);">${disp.sem !== null ? disp.sem : '--'}</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px;">
+                                <span style="color: var(--text-secondary);">Coefficient of Variation (CV):</span>
+                                <strong style="font-family: var(--font-mono);">${disp.cv_percentage !== null ? disp.cv_percentage + '%' : '--'}</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px;">
+                                <span style="color: var(--text-secondary);">Fisher Excess Kurtosis:</span>
+                                <strong style="font-family: var(--font-mono);">${n.kurtosis !== null ? n.kurtosis : '--'}</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: var(--text-secondary);">Fisher-Pearson Skewness:</span>
+                                <strong style="font-family: var(--font-mono);">${n.skewness !== null ? n.skewness : '--'}</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Outlier Analysis Box -->
+                    <div class="dist-box">
+                        <div class="dist-box-title">1.5x IQR Outlier Detection</div>
+                        <div style="display: flex; flex-direction: column; gap: 12px; font-size: 13px;">
+                            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px;">
+                                <span style="color: var(--text-secondary);">Lower Bound (Q1 - 1.5*IQR):</span>
+                                <strong style="font-family: var(--font-mono);">${outliers.lower_bound !== null ? outliers.lower_bound : '--'}</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px;">
+                                <span style="color: var(--text-secondary);">Upper Bound (Q3 + 1.5*IQR):</span>
+                                <strong style="font-family: var(--font-mono);">${outliers.upper_bound !== null ? outliers.upper_bound : '--'}</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px;">
+                                <span style="color: var(--text-secondary);">Detected Outliers:</span>
+                                <strong style="font-family: var(--font-mono); color: ${outliers.count > 0 ? 'var(--accent-rose)' : 'var(--accent-emerald)'};">${outliers.count} (${outliers.percentage}%)</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: var(--text-secondary);">Zeros Count:</span>
+                                <strong style="font-family: var(--font-mono);">${disp.zeros_count} (${disp.zeros_percentage}%)</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else if (catStats[colName]) {
+            const c = catStats[colName];
+            const topCats = c.top_categories || [];
+
+            distributionDetailsCard.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                        <h4 style="font-size: 18px; font-weight: 800; color: var(--text-primary);">${escapeHtml(colName)}</h4>
+                        <span style="font-size: 12px; color: var(--text-muted);">Categorical Feature • ${c.valid_count.toLocaleString()} valid values • ${c.num_categories} distinct categories</span>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <span class="meta-tag">Shannon Entropy: ${c.entropy !== null ? c.entropy : '--'}</span>
+                        <span class="meta-tag">Rare (<1%): ${c.rare_categories_count}</span>
+                    </div>
+                </div>
+
+                <div class="dist-box">
+                    <div class="dist-box-title">Category Percentage Distribution & Cumulative Share</div>
+                    <table class="modal-category-table">
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th style="width: 90px; text-align: right;">Count</th>
+                                <th style="width: 90px; text-align: right;">Frequency</th>
+                                <th style="width: 100px; text-align: right;">Cumulative</th>
+                                <th style="width: 160px;">Share</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${topCats.map((cat) => `
+                                <tr>
+                                    <td style="font-weight: 700; color: var(--text-primary);">${escapeHtml(cat.category)}</td>
+                                    <td style="text-align: right; font-family: var(--font-mono);">${cat.count.toLocaleString()}</td>
+                                    <td style="text-align: right; font-family: var(--font-mono);">${cat.percentage}%</td>
+                                    <td style="text-align: right; font-family: var(--font-mono); color: var(--accent-cyan);">${cat.cumulative_percentage}%</td>
+                                    <td>
+                                        <div class="progress-bar-bg" style="height: 6px;">
+                                            <div class="progress-bar-fill fill-indigo" style="width: ${cat.percentage}%;"></div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        } else if (dtStats[colName]) {
+            const d = dtStats[colName];
+            const months = d.records_by_month || {};
+            const dows = d.records_by_day_of_week || {};
+
+            distributionDetailsCard.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                        <h4 style="font-size: 18px; font-weight: 800; color: var(--text-primary);">${escapeHtml(colName)}</h4>
+                        <span style="font-size: 12px; color: var(--text-muted);">Datetime Feature • ${d.valid_count.toLocaleString()} valid dates • Inferred Cadence: ${d.inferred_frequency}</span>
+                    </div>
+                    <div>
+                        <span class="meta-tag meta-tag-accent">Span: ${d.date_range_formatted}</span>
+                    </div>
+                </div>
+
+                <div class="dist-grid-layout">
+                    <div class="dist-box">
+                        <div class="dist-box-title">Date Span & Boundaries</div>
+                        <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: var(--text-secondary);">Earliest Date:</span>
+                                <strong style="font-family: var(--font-mono);">${d.min_date ? d.min_date.split('T')[0] : '--'}</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: var(--text-secondary);">Latest Date:</span>
+                                <strong style="font-family: var(--font-mono);">${d.max_date ? d.max_date.split('T')[0] : '--'}</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: var(--text-secondary);">Total Elapsed Days:</span>
+                                <strong style="font-family: var(--font-mono); color: var(--accent-cyan);">${d.date_range_days.toLocaleString()} days</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dist-box">
+                        <div class="dist-box-title">Records by Month</div>
+                        <div style="display: flex; flex-direction: column; gap: 6px; max-height: 180px; overflow-y: auto;">
+                            ${Object.entries(months).map(([m, cnt]) => `
+                                <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                                    <span>${m}</span>
+                                    <strong style="font-family: var(--font-mono);">${cnt.toLocaleString()}</strong>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <div class="dist-box">
+                        <div class="dist-box-title">Records by Day of Week</div>
+                        <div style="display: flex; flex-direction: column; gap: 6px; max-height: 180px; overflow-y: auto;">
+                            ${Object.entries(dows).map(([dow, cnt]) => `
+                                <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                                    <span>${dow}</span>
+                                    <strong style="font-family: var(--font-mono);">${cnt.toLocaleString()}</strong>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    // Stats Table Search Handler
+    if (statsTableSearch) {
+        statsTableSearch.addEventListener('input', (e) => {
+            statsSearchQuery = e.target.value.toLowerCase().trim();
+            if (currentStatistics && currentStatistics.numerical_statistics) {
+                renderSummaryStatisticsTable(currentStatistics.numerical_statistics);
+            }
+        });
+    }
+
+    // Feature Selector Change Handler
+    if (statsColumnSelector) {
+        statsColumnSelector.addEventListener('change', (e) => {
+            const selectedCol = e.target.value;
+            if (selectedCol && currentStatistics) {
+                renderDistributionDeepDive(currentStatistics, selectedCol);
+            }
+        });
+    }
+
     // Initial Execution
     (async () => {
         await loadDatasetsList();
         await loadDatasetDashboard(activeDatasetId);
     })();
 });
+
