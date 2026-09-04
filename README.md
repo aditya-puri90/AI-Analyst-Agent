@@ -189,28 +189,33 @@ AI-Data-Analyst-Agent/
   - [x] Flask REST API (`/api/upload`, `/api/datasets`, `/api/profile/<filename>`, `/api/preview/<filename>`).
   - [x] Modern dark-mode dashboard UI with drag-and-drop upload and data explorer.
   - [x] Unit test suite for Phase 1 components.
-- [ ] **Phase 2: Deep Statistical Analysis & Data Quality Grading**
-  - [ ] Descriptive statistics (Mean, Median, Std, IQR, Skewness, Kurtosis, Quantiles).
-  - [ ] Categorical frequency distributions and cardinality profiling.
-  - [ ] Automated Data Quality Score (0-100) and Health Grade (A-F).
-- [ ] **Phase 3: Correlation Analysis, Outlier Detection & Plotly Visualizations**
-  - [ ] Numerical and categorical correlation engines (Pearson, Spearman, Cramér's V).
-  - [ ] Outlier detection algorithms (IQR, Z-Score, Isolation Forest).
-  - [ ] Interactive Plotly chart builders (distributions, heatmaps, box plots, scatter matrices).
-- [x] **Phase 4: Automated Data Quality and Cleaning Engine** *(Current Phase)*
+- [x] **Phase 2: Ingestion & Multi-Layer CSV Validation**
+  - [x] Delimiter sniffing, encoding detection, and file integrity validation.
+  - [x] First 10 rows tabular preview and RAM footprint summary.
+- [x] **Phase 3: Automatic Dataset Profiling Engine**
+  - [x] Automated column data type classification (Numerical, Categorical, Datetime, Boolean, Text/ID).
+  - [x] Five-number summaries, missingness percentages, uniqueness metrics, and distinct sample chips.
+- [x] **Phase 4: Automated Data Quality and Cleaning Engine**
   - [x] 12-point deterministic quality defect inspection (missingness, duplicates, invalid numbers, outliers, whitespace, inconsistent casings, type anomalies).
   - [x] Live transformation preview engine (`Original value → Proposed cleaned value`).
   - [x] Configurable cleaning pipeline (deduplication, median/mode imputation, string casting, outlier capping, column filtering).
   - [x] Strict non-destructive persistence saving processed datasets to `data/processed/`.
   - [x] Comprehensive cleaning summary KPIs (rows before/after, duplicates removed, missing handled, columns converted, values standardized).
   - [x] Cleaned CSV download button and preview toggle in Data Explorer.
-- [ ] **Phase 5: AI Agent Integration, NL Querying & Automated Reports**
-  - [ ] Tool-augmented AI Agent with deterministic tool calling.
-  - [ ] Natural-language Q&A interface for dataset inquiries.
-  - [ ] Executive business insights generator and exportable analytical reports (Markdown/HTML/PDF).
-- [ ] **Phase 6: Optimization, Hardening & Portfolio Polish**
-  - [ ] Performance caching for large datasets.
-  - [ ] End-to-end integration tests and recruiter-ready demo showcase datasets.
+- [x] **Phase 5: Statistical Analysis Engine**
+  - [x] Pure Python parametric and non-parametric calculations (Mean, Median, Mode, Std, Variance, Range, IQR, Skewness, Kurtosis).
+  - [x] Inferential statistics: 95% Confidence Intervals for the Mean via Student's t / normal distributions.
+  - [x] Complete percentiles spectrum ($P_1$ to $P_{99}$) and $1.5 \times \text{IQR}$ outlier detection.
+  - [x] Categorical Shannon entropy and temporal datetime cadence analysis.
+  - [x] Deterministic rule-based statistical observations.
+- [x] **Phase 6: Correlation Analysis Engine & Interactive Plotly Heatmaps**
+  - [x] Automatic numerical column identification and symmetric Pearson correlation matrix.
+  - [x] Resilient pairwise missing value handling and constant zero-variance feature safety.
+  - [x] 5-tier correlation strength classification (`Very strong`, `Strong`, `Moderate`, `Weak`, `Very weak`) and direction (`Positive`, `Negative`, `Neutral`).
+  - [x] Interactive threshold filtering slider ($|r| \ge \tau$) with live DOM reactivity.
+  - [x] Interactive dark-mode Plotly correlation heatmap with in-cell annotations and hover details.
+  - [x] Ranked correlation associations table and **Key Correlations** showcase cards with strict non-causation guidance (*"Correlation does not imply causation"*).
+  - [x] Standalone CLI runner `run_correlation_demo.py` and 67 automated pytest test suites.
 
 ---
 
