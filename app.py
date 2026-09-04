@@ -42,6 +42,13 @@ from analysis.statistics import (
     analyze_datetime_column,
     generate_statistical_observations,
 )
+from analysis.correlation import (
+    CorrelationAnalysisEngine,
+    compute_correlation_analysis,
+    classify_correlation_strength,
+    classify_correlation_direction,
+)
+from visualization.charts import build_correlation_heatmap_spec
 
 # Configure logging
 logging.basicConfig(
@@ -111,7 +118,7 @@ def create_app() -> Flask:
         return jsonify({
             "status": "healthy",
             "service": "AI Data Analyst Agent",
-            "phase": "Phase 5 - Statistical Analysis Engine",
+            "phase": "Phase 5 - Statistical Analysis & Phase 6 - Correlation Analysis Engine",
             "max_upload_mb": Config.MAX_CONTENT_LENGTH / (1024 * 1024),
             "allowed_extensions": list(Config.ALLOWED_EXTENSIONS),
         })
@@ -317,6 +324,59 @@ def create_app() -> Flask:
             "success": True,
             "dataset_id": dataset_id,
             "observations": stats_data.get("statistical_observations", []),
+        })
+
+    # -------------------------------------------------------------
+    # Phase 6: Correlation Analysis API Routes
+    # -------------------------------------------------------------
+    @app.route("/api/correlation/<dataset_id>", methods=["GET"])
+    def get_correlation_analysis_route(dataset_id: str):
+        """
+        Retrieve comprehensive Phase 6 Correlation Analysis:
+        - Numerical features identification
+        - Pearson correlation matrix
+        - Ranked correlation pairs sorted by strength with direction & classification
+        - Key correlations (strongest positive & negative associations)
+        - Interactive Plotly Heatmap JSON specification
+        - Non-causation guidance disclaimer
+        """
+        threshold = request.args.get("threshold", 0.0, type=float)
+        df, error = load_dataset(dataset_id)
+        if error:
+            return jsonify({"success": False, "error": error}), 404
+
+        engine = CorrelationAnalysisEngine(df, dataset_id=dataset_id)
+        corr_data = engine.analyze(threshold=threshold)
+
+        # Generate Plotly heatmap spec
+        heatmap_spec = build_correlation_heatmap_spec(
+            corr_matrix=corr_data.get("correlation_matrix", {}),
+            columns=corr_data.get("numerical_columns", []),
+        )
+
+        return jsonify({
+            "success": True,
+            "correlation": corr_data,
+            "heatmap_spec": heatmap_spec,
+        })
+
+    @app.route("/api/correlation/<dataset_id>/pairs", methods=["GET"])
+    def get_correlation_pairs_route(dataset_id: str):
+        """Retrieve ranked correlation pairs filtered by threshold."""
+        threshold = request.args.get("threshold", 0.0, type=float)
+        df, error = load_dataset(dataset_id)
+        if error:
+            return jsonify({"success": False, "error": error}), 404
+
+        engine = CorrelationAnalysisEngine(df, dataset_id=dataset_id)
+        corr_data = engine.analyze(threshold=threshold)
+
+        return jsonify({
+            "success": True,
+            "dataset_id": dataset_id,
+            "threshold": threshold,
+            "count": len(corr_data.get("ranked_pairs", [])),
+            "pairs": corr_data.get("ranked_pairs", []),
         })
 
     @app.route("/api/sample/<sample_type>", methods=["POST"])
