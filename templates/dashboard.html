@@ -13,6 +13,9 @@
     
     <!-- Core Styles -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    <!-- Plotly.js Interactive Visualization Engine -->
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 </head>
 <body class="dark-theme">
     <!-- Ambient Glows -->
@@ -80,6 +83,9 @@
             </button>
             <button class="studio-tab-btn" id="tab-statistics-btn" data-tab="statistics-view">
                 <span>📈 Statistical Analysis</span>
+            </button>
+            <button class="studio-tab-btn" id="tab-correlation-btn" data-tab="correlation-view">
+                <span>🔗 Correlation Analysis</span>
             </button>
             <button class="studio-tab-btn" id="tab-cleaning-btn" data-tab="cleaning-view">
                 <span>🧹 Data Quality & Cleaning Studio</span>
@@ -679,6 +685,148 @@
                         </div>
                     </div>
                 </section>
+            </div>
+
+            <!-- ========================================================= -->
+            <!-- TAB: CORRELATION ANALYSIS ENGINE (PHASE 6) -->
+            <!-- ========================================================= -->
+            <div class="studio-tab-content hidden" id="correlation-view">
+                
+                <!-- Section Header & Non-Causation Disclaimer -->
+                <section class="corr-header-section">
+                    <div class="section-title-wrap">
+                        <h2 class="section-title">Correlation Analysis</h2>
+                        <span class="section-badge badge-cyan">Pearson Engine</span>
+                    </div>
+                    <p class="section-subtitle">Bivariate linear associations, interactive Plotly heatmap matrix, ranked strength tiers, and key correlation highlights.</p>
+                    
+                    <!-- Non-Causation Scientific Guidance Banner -->
+                    <div class="non-causation-alert">
+                        <div class="alert-icon-wrap">
+                            <span>⚠️</span>
+                        </div>
+                        <div class="alert-text-wrap">
+                            <h4 class="alert-heading">Correlation Does Not Imply Causation</h4>
+                            <p class="alert-desc">Correlation measures the statistical linear association between two numerical features. A high positive or negative correlation does <strong>not</strong> prove that one variable causes changes in the other. Confounding variables, reverse causality, or coincidental trends may be present.</p>
+                        </div>
+                    </div>
+
+                    <!-- Correlation Controls & KPI Summary -->
+                    <div class="corr-controls-bar">
+                        <div class="corr-threshold-control">
+                            <div class="threshold-label-row">
+                                <label for="corr-threshold-slider" class="control-label">
+                                    <span>Correlation Threshold (|r| &ge;):</span>
+                                    <strong class="threshold-badge" id="corr-threshold-display">0.00</strong>
+                                </label>
+                            </div>
+                            <input type="range" id="corr-threshold-slider" class="custom-range-slider" min="0" max="1" step="0.05" value="0.00">
+                            <div class="range-ticks">
+                                <span>0.0 (All)</span>
+                                <span>0.2 (Weak)</span>
+                                <span>0.4 (Mod)</span>
+                                <span>0.6 (Strong)</span>
+                                <span>0.8 (V.Strong)</span>
+                                <span>1.0</span>
+                            </div>
+                        </div>
+
+                        <div class="corr-kpi-group">
+                            <div class="corr-kpi-item">
+                                <span class="corr-kpi-label">Numerical Features</span>
+                                <strong class="corr-kpi-value" id="corr-kpi-num-count">--</strong>
+                            </div>
+                            <div class="corr-kpi-item">
+                                <span class="corr-kpi-label">Analyzed Pairs</span>
+                                <strong class="corr-kpi-value" id="corr-kpi-pairs-count">--</strong>
+                            </div>
+                            <div class="corr-kpi-item">
+                                <span class="corr-kpi-label">Strong / V. Strong (|r| &ge; 0.6)</span>
+                                <strong class="corr-kpi-value" id="corr-kpi-strong-count">--</strong>
+                            </div>
+                            <div class="corr-kpi-item">
+                                <span class="corr-kpi-label">Moderate (|r| &ge; 0.4)</span>
+                                <strong class="corr-kpi-value" id="corr-kpi-mod-count">--</strong>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 1. KEY CORRELATIONS SECTION -->
+                <section class="key-correlations-section">
+                    <div class="section-title-wrap">
+                        <h3 class="subsection-title">Key Correlations</h3>
+                        <span class="section-badge badge-indigo">Prominent Findings</span>
+                    </div>
+                    <p class="section-subtitle">Top positive and inverse statistical associations detected across numerical features (Non-causal statistical associations).</p>
+                    
+                    <div class="key-correlations-grid" id="key-correlations-grid">
+                        <div class="key-corr-empty">
+                            <p>Loading key correlation highlights...</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 2. INTERACTIVE PLOTLY CORRELATION HEATMAP -->
+                <section class="corr-heatmap-section">
+                    <div class="section-header-flex">
+                        <div>
+                            <h3 class="subsection-title">Interactive Correlation Heatmap</h3>
+                            <p class="section-subtitle">Full bivariate Pearson correlation matrix with interactive hover metrics, zoom, and value annotations.</p>
+                        </div>
+                        <div class="heatmap-legend-pills">
+                            <span class="legend-pill pill-neg">Negative (-1.0 to -0.2)</span>
+                            <span class="legend-pill pill-neu">Neutral (-0.2 to +0.2)</span>
+                            <span class="legend-pill pill-pos">Positive (+0.2 to +1.0)</span>
+                        </div>
+                    </div>
+
+                    <div class="heatmap-container-card">
+                        <div id="correlation-heatmap-container" class="plotly-heatmap-wrapper">
+                            <!-- Plotly will render here -->
+                            <div class="heatmap-loading-placeholder">
+                                <div class="spinner"></div>
+                                <p>Generating interactive correlation matrix...</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 3. RANKED CORRELATIONS ASSOCIATION TABLE -->
+                <section class="ranked-correlations-section">
+                    <div class="section-header-flex">
+                        <div>
+                            <h3 class="subsection-title">Ranked Correlations Table</h3>
+                            <p class="section-subtitle">Comprehensive list of variable pairs ranked by absolute correlation strength (|r|).</p>
+                        </div>
+                        <div class="corr-table-search-wrap">
+                            <div class="search-box">
+                                <span class="search-icon">🔎</span>
+                                <input type="text" id="corr-table-search" placeholder="Filter variables in pairs..." class="search-input" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-container corr-table-container">
+                        <table class="data-table corr-table" id="ranked-correlations-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40px;">#</th>
+                                    <th>Variable A</th>
+                                    <th>Variable B</th>
+                                    <th>Pearson Correlation (r)</th>
+                                    <th>Strength Classification</th>
+                                    <th>Direction</th>
+                                    <th>Pairwise Observations (N)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ranked-correlations-tbody">
+                                <!-- Injected via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
             </div>
 
             <!-- ========================================================= -->
