@@ -128,6 +128,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const tableBody = document.getElementById('data-table-body');
     const paginationInfo = document.getElementById('pagination-info');
     const tableSearch = document.getElementById('table-search');
+    const prevPageBtn = document.getElementById('prev-page-btn');
+    const nextPageBtn = document.getElementById('next-page-btn');
 
     // DOM Elements - Phase 5 Statistical Analysis
     let currentStatistics = null;
@@ -142,6 +144,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const summaryStatisticsTbody = document.getElementById('summary-statistics-tbody');
     const statsColumnSelector = document.getElementById('stats-column-selector');
     const distributionDetailsCard = document.getElementById('distribution-details-card');
+
+    // DOM Elements - Phase 6 Correlation Analysis
+    let currentCorrelation = null;
+    let currentHeatmapSpec = null;
+    let currentCorrThreshold = 0.0;
+    let corrSearchQuery = '';
+    const corrThresholdSlider = document.getElementById('corr-threshold-slider');
+    const corrThresholdDisplay = document.getElementById('corr-threshold-display');
+    const corrKpiNumCount = document.getElementById('corr-kpi-num-count');
+    const corrKpiPairsCount = document.getElementById('corr-kpi-pairs-count');
+    const corrKpiStrongCount = document.getElementById('corr-kpi-strong-count');
+    const corrKpiModCount = document.getElementById('corr-kpi-mod-count');
+    const keyCorrelationsGrid = document.getElementById('key-correlations-grid');
+    const correlationHeatmapContainer = document.getElementById('correlation-heatmap-container');
+    const corrTableSearch = document.getElementById('corr-table-search');
+    const rankedCorrelationsTbody = document.getElementById('ranked-correlations-tbody');
 
     // Helper: Format bytes
     function formatBytes(bytes, decimals = 2) {
@@ -176,6 +194,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (targetContent) {
                 targetContent.classList.remove('hidden');
                 targetContent.classList.add('active');
+            }
+
+            // Auto-resize Plotly correlation heatmap when tab becomes visible
+            if (targetTabId === 'correlation-view' && window.Plotly && correlationHeatmapContainer) {
+                setTimeout(() => {
+                    Plotly.Plots.resize(correlationHeatmapContainer);
+                }, 50);
             }
         });
     });
@@ -266,7 +291,10 @@ document.addEventListener('DOMContentLoaded', () => {
             // 3. Fetch Phase 5 Statistical Analysis
             await loadStatisticsData(datasetId);
 
-            // 4. Load table preview (Raw)
+            // 4. Fetch Phase 6 Correlation Analysis
+            await loadCorrelationData(datasetId);
+
+            // 5. Load table preview (Raw)
             isViewingCleanedData = false;
             if (viewRawDataBtn) viewRawDataBtn.classList.add('active');
             if (viewCleanDataBtn) viewCleanDataBtn.classList.remove('active');
@@ -1537,6 +1565,217 @@ document.addEventListener('DOMContentLoaded', () => {
             const selectedCol = e.target.value;
             if (selectedCol && currentStatistics) {
                 renderDistributionDeepDive(currentStatistics, selectedCol);
+            }
+        });
+    }
+
+    // =========================================================================
+    // PHASE 6: CORRELATION ANALYSIS ENGINE CONTROLLER
+    // =========================================================================
+    async function loadCorrelationData(datasetId, threshold = 0.0) {
+        try {
+            const res = await fetch(`/api/correlation/${encodeURIComponent(datasetId)}?threshold=${threshold}`);
+            const data = await res.json();
+            if (res.ok && data.success && data.correlation) {
+                currentCorrelation = data.correlation;
+                currentHeatmapSpec = data.heatmap_spec;
+                renderCorrelationAnalysis(currentCorrelation, currentHeatmapSpec);
+            }
+        } catch (e) {
+            console.error('Failed to load correlation analysis:', e);
+        }
+    }
+
+    function renderCorrelationAnalysis(corrData, heatmapSpec) {
+        if (!corrData) return;
+
+        // 1. Render KPIs
+        const numCount = corrData.total_numerical_columns || 0;
+        const totalPairs = corrData.total_pairs_count || 0;
+        const strCounts = corrData.strength_counts || {};
+        const strongCount = (strCounts.very_strong || 0) + (strCounts.strong || 0);
+        const modCount = strCounts.moderate || 0;
+
+        if (corrKpiNumCount) corrKpiNumCount.textContent = numCount;
+        if (corrKpiPairsCount) corrKpiPairsCount.textContent = totalPairs;
+        if (corrKpiStrongCount) corrKpiStrongCount.textContent = `${strongCount} pairs`;
+        if (corrKpiModCount) corrKpiModCount.textContent = `${modCount} pairs`;
+
+        // 2. Render Key Correlations
+        renderKeyCorrelations(corrData.key_correlations);
+
+        // 3. Render Plotly Heatmap
+        if (heatmapSpec) {
+            renderCorrelationHeatmap(heatmapSpec);
+        }
+
+        // 4. Render Ranked Associations Table
+        renderRankedCorrelationsTable(corrData.all_ranked_pairs || corrData.ranked_pairs || []);
+    }
+
+    function renderKeyCorrelations(keyCorrs) {
+        if (!keyCorrelationsGrid) return;
+        const highlights = keyCorrs && keyCorrs.key_highlights ? keyCorrs.key_highlights : [];
+
+        if (highlights.length === 0) {
+            keyCorrelationsGrid.innerHTML = `
+                <div class="key-corr-empty">
+                    <p>No significant linear correlations (|r| &ge; 0.20) detected between numerical features in this dataset.</p>
+                </div>
+            `;
+            return;
+        }
+
+        keyCorrelationsGrid.innerHTML = highlights.map((h) => {
+            const isPos = h.direction === 'Positive';
+            const cardClass = isPos ? 'positive' : 'negative';
+            const dirIcon = isPos ? '↗' : '↘';
+            const rVal = h.correlation !== null ? Number(h.correlation).toFixed(4) : '--';
+
+            // Strength Badge Class
+            let strClass = 'strength-very-weak';
+            if (h.strength === 'Very strong') strClass = 'strength-very-strong';
+            else if (h.strength === 'Strong') strClass = 'strength-strong';
+            else if (h.strength === 'Moderate') strClass = 'strength-moderate';
+            else if (h.strength === 'Weak') strClass = 'strength-weak';
+
+            return `
+                <div class="key-corr-card ${cardClass}">
+                    <div class="key-corr-header">
+                        <div class="key-corr-pair-title">
+                            <span>${escapeHtml(h.variable_a)}</span>
+                            <span style="color: var(--text-muted); font-size: 13px;">↔</span>
+                            <span>${escapeHtml(h.variable_b)}</span>
+                        </div>
+                        <span class="key-corr-r-pill">r = ${rVal}</span>
+                    </div>
+                    <div class="key-corr-badges-row">
+                        <span class="direction-pill ${isPos ? 'direction-positive' : 'direction-negative'}">
+                            <span>${dirIcon}</span>
+                            <span>${escapeHtml(h.direction)}</span>
+                        </span>
+                        <span class="strength-pill ${strClass}">
+                            <span>${escapeHtml(h.strength)}</span>
+                        </span>
+                    </div>
+                    <div class="key-corr-explanation">
+                        ${escapeHtml(h.explanation)}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function renderCorrelationHeatmap(spec) {
+        if (!correlationHeatmapContainer || !spec) return;
+
+        if (!window.Plotly) {
+            correlationHeatmapContainer.innerHTML = `
+                <div class="heatmap-loading-placeholder">
+                    <p style="color: var(--accent-rose);">Plotly.js library could not be loaded. Please check network connection.</p>
+                </div>
+            `;
+            return;
+        }
+
+        const data = spec.data || [];
+        const layout = spec.layout || {};
+        const config = spec.config || { responsive: true };
+
+        Plotly.react('correlation-heatmap-container', data, layout, config);
+    }
+
+    function renderRankedCorrelationsTable(pairs) {
+        if (!rankedCorrelationsTbody) return;
+
+        let filtered = pairs || [];
+
+        // Apply threshold filter
+        if (currentCorrThreshold > 0) {
+            filtered = filtered.filter((p) => {
+                const absR = p.absolute_correlation !== undefined ? p.absolute_correlation : Math.abs(p.correlation || 0);
+                return absR >= currentCorrThreshold;
+            });
+        }
+
+        // Apply search query filter
+        if (corrSearchQuery) {
+            filtered = filtered.filter((p) => {
+                const a = (p.variable_a || '').toLowerCase();
+                const b = (p.variable_b || '').toLowerCase();
+                const str = (p.strength || '').toLowerCase();
+                const dir = (p.direction || '').toLowerCase();
+                return a.includes(corrSearchQuery) || b.includes(corrSearchQuery) || str.includes(corrSearchQuery) || dir.includes(corrSearchQuery);
+            });
+        }
+
+        if (filtered.length === 0) {
+            rankedCorrelationsTbody.innerHTML = `
+                <tr>
+                    <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                        No correlation pairs matching threshold |r| &ge; ${currentCorrThreshold.toFixed(2)} ${corrSearchQuery ? `and query '${escapeHtml(corrSearchQuery)}'` : ''}
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        rankedCorrelationsTbody.innerHTML = filtered.map((p, idx) => {
+            const rVal = p.correlation !== null ? Number(p.correlation).toFixed(4) : '--';
+            const isPos = p.direction === 'Positive';
+            const isNeg = p.direction === 'Negative';
+            const dirIcon = isPos ? '↗' : (isNeg ? '↘' : '—');
+            const dirClass = isPos ? 'direction-positive' : (isNeg ? 'direction-negative' : 'direction-neutral');
+
+            let strClass = 'strength-very-weak';
+            if (p.strength === 'Very strong') strClass = 'strength-very-strong';
+            else if (p.strength === 'Strong') strClass = 'strength-strong';
+            else if (p.strength === 'Moderate') strClass = 'strength-moderate';
+            else if (p.strength === 'Weak') strClass = 'strength-weak';
+
+            // Color highlight for r value
+            let rColor = 'var(--text-primary)';
+            if (isPos && Math.abs(p.correlation) >= 0.6) rColor = 'var(--accent-emerald)';
+            else if (isNeg && Math.abs(p.correlation) >= 0.6) rColor = 'var(--accent-rose)';
+
+            return `
+                <tr>
+                    <td style="color: var(--text-muted); font-family: var(--font-mono); font-size: 11px;">${idx + 1}</td>
+                    <td style="font-weight: 700; color: var(--text-primary);">${escapeHtml(p.variable_a)}</td>
+                    <td style="font-weight: 700; color: var(--text-primary);">${escapeHtml(p.variable_b)}</td>
+                    <td><strong style="font-family: var(--font-mono); color: ${rColor};">${rVal}</strong></td>
+                    <td><span class="strength-pill ${strClass}">${escapeHtml(p.strength)}</span></td>
+                    <td>
+                        <span class="direction-pill ${dirClass}">
+                            <span>${dirIcon}</span>
+                            <span>${escapeHtml(p.direction)}</span>
+                        </span>
+                    </td>
+                    <td style="font-family: var(--font-mono); color: var(--text-secondary);">${p.sample_size !== undefined ? p.sample_size.toLocaleString() : '--'}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    // Threshold Slider Listener
+    if (corrThresholdSlider) {
+        corrThresholdSlider.addEventListener('input', (e) => {
+            currentCorrThreshold = parseFloat(e.target.value) || 0.0;
+            if (corrThresholdDisplay) {
+                corrThresholdDisplay.textContent = currentCorrThreshold.toFixed(2);
+            }
+            if (currentCorrelation) {
+                renderRankedCorrelationsTable(currentCorrelation.all_ranked_pairs || currentCorrelation.ranked_pairs || []);
+            }
+        });
+    }
+
+    // Correlation Table Search Listener
+    if (corrTableSearch) {
+        corrTableSearch.addEventListener('input', (e) => {
+            corrSearchQuery = e.target.value.toLowerCase().trim();
+            if (currentCorrelation) {
+                renderRankedCorrelationsTable(currentCorrelation.all_ranked_pairs || currentCorrelation.ranked_pairs || []);
             }
         });
     }
