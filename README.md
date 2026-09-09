@@ -216,6 +216,15 @@ AI-Data-Analyst-Agent/
   - [x] Interactive dark-mode Plotly correlation heatmap with in-cell annotations and hover details.
   - [x] Ranked correlation associations table and **Key Correlations** showcase cards with strict non-causation guidance (*"Correlation does not imply causation"*).
   - [x] Standalone CLI runner `run_correlation_demo.py` and 67 automated pytest test suites.
+- [x] **Phase 7: Outlier Detection Engine & Interactive Plotly Charts**
+  - [x] Interquartile Range (IQR / Tukey's Fences - Standard $1.5\times$ and Extreme $3.0\times$), Parametric Z-Score ($3.0\sigma$ and $2.5\sigma$), and Modified Z-Score (MAD).
+  - [x] Column-level outlier analytics: Total observations, Valid N, Outlier count, Outlier percentage, Lower and Upper bounds.
+  - [x] Statistical edge-case detection & warnings: Zero standard deviation ($\sigma = 0$), Zero IQR ($\text{IQR} = 0$), Small sample sizes ($N < 10, N < 30$), and high skewness.
+  - [x] Domain-aware anomaly classification: Clear distinction between **Potential Statistical Outliers** and **Confirmed Data Errors** (sentinel placeholders, negative age/price/quantity, percentage overflow).
+  - [x] Interactive Plotly visualizations: Multi-feature Box Plots with jittered outlier points and Single-Column Distribution Histograms with threshold dashed lines and shaded outlier zones.
+  - [x] Outlier Records Inspector Modal for row-level drill-down review.
+  - [x] Non-destructive remediation operations (`Remove Outlier Rows`, `Cap Outliers to Bounds`, `Remove Data Errors Only`, `Keep All Outliers`) saving separate datasets to `data/processed/` with parent lineage.
+  - [x] Standalone CLI demo `run_outliers_demo.py` and 89 passing automated pytest suites.
 
 ---
 
