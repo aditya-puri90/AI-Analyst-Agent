@@ -21,6 +21,15 @@ from .statistics import (
     generate_statistical_observations,
 )
 
+from .outliers import (
+    OutlierDetectionEngine,
+    detect_dataset_outliers,
+    detect_column_outliers_iqr,
+    detect_column_outliers_zscore,
+    detect_column_outliers_modified_zscore,
+    classify_anomaly_type,
+)
+
 __all__ = [
     "DatasetProfiler",
     "profile_dataset",
@@ -34,4 +43,10 @@ __all__ = [
     "analyze_categorical_column",
     "analyze_datetime_column",
     "generate_statistical_observations",
+    "OutlierDetectionEngine",
+    "detect_dataset_outliers",
+    "detect_column_outliers_iqr",
+    "detect_column_outliers_zscore",
+    "detect_column_outliers_modified_zscore",
+    "classify_anomaly_type",
 ]
