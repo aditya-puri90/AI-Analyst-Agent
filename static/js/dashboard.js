@@ -202,6 +202,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     Plotly.Plots.resize(correlationHeatmapContainer);
                 }, 50);
             }
+
+            // Auto-resize Plotly outlier chart when tab becomes visible
+            if (targetTabId === 'outliers-view' && window.Plotly && document.getElementById('outlier-plotly-chart')) {
+                setTimeout(() => {
+                    Plotly.Plots.resize('outlier-plotly-chart');
+                }, 50);
+            }
         });
     });
 
@@ -294,7 +301,10 @@ document.addEventListener('DOMContentLoaded', () => {
             // 4. Fetch Phase 6 Correlation Analysis
             await loadCorrelationData(datasetId);
 
-            // 5. Load table preview (Raw)
+            // 5. Fetch Phase 7 Outlier Detection
+            await loadOutlierData(datasetId);
+
+            // 6. Load table preview (Raw)
             isViewingCleanedData = false;
             if (viewRawDataBtn) viewRawDataBtn.classList.add('active');
             if (viewCleanDataBtn) viewCleanDataBtn.classList.remove('active');
@@ -1780,10 +1790,520 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // =========================================================
+    // PHASE 7: OUTLIER & ANOMALY DETECTION CONTROLLER
+    // =========================================================
+    let currentOutliers = null;
+    let currentOutlierMethod = 'iqr';
+    let currentOutlierParam = 1.5;
+    let currentOutlierVizMode = 'boxplot'; // 'boxplot' | 'distribution'
+    let currentOutlierSelectedCol = '';
+    let outlierTableSearchQuery = '';
+    let currentBoxplotSpec = null;
+
+    const outliersCountBadge = document.getElementById('outliers-count-badge');
+    const outlierMethodSelect = document.getElementById('outlier-method-select');
+    const outlierParamInput = document.getElementById('outlier-param-input');
+    const outlierParamLabel = document.getElementById('outlier-param-label');
+    const btnRecalcOutliers = document.getElementById('btn-recalc-outliers');
+
+    const outliersKpiNumCount = document.getElementById('outliers-kpi-num-count');
+    const outliersKpiAffectedCols = document.getElementById('outliers-kpi-affected-cols');
+    const outliersKpiTotalCount = document.getElementById('outliers-kpi-total-count');
+    const outliersKpiErrorCount = document.getElementById('outliers-kpi-error-count');
+    const outliersKpiPotentialCount = document.getElementById('outliers-kpi-potential-count');
+    const outliersKpiCleanCount = document.getElementById('outliers-kpi-clean-count');
+    const outliersWarningsContainer = document.getElementById('outliers-warnings-container');
+
+    const viewOutlierBoxplotBtn = document.getElementById('view-outlier-boxplot-btn');
+    const viewOutlierDistBtn = document.getElementById('view-outlier-dist-btn');
+    const outlierDistSelectWrap = document.getElementById('outlier-dist-select-wrap');
+    const outlierDistColSelect = document.getElementById('outlier-dist-col-select');
+    const outlierPlotlyChart = document.getElementById('outlier-plotly-chart');
+
+    const outlierTableSearch = document.getElementById('outlier-table-search');
+    const outliersSummaryTbody = document.getElementById('outliers-summary-tbody');
+
+    const btnOutliersKeep = document.getElementById('btn-outliers-keep');
+    const btnOutliersRemove = document.getElementById('btn-outliers-remove');
+    const btnOutliersCap = document.getElementById('btn-outliers-cap');
+    const btnOutliersRemoveErrors = document.getElementById('btn-outliers-remove-errors');
+
+    const outlierInspectorModal = document.getElementById('outlier-inspector-modal');
+    const modalOutlierTitle = document.getElementById('modal-outlier-title');
+    const modalOutlierMeta = document.getElementById('modal-outlier-meta');
+    const modalOutlierTbody = document.getElementById('modal-outlier-tbody');
+    const modalOutlierCloseBtn = document.getElementById('modal-outlier-close-btn');
+
+    async function loadOutlierData(datasetId, method = currentOutlierMethod, param = currentOutlierParam) {
+        if (!datasetId) return;
+
+        try {
+            const url = `/api/outliers/${encodeURIComponent(datasetId)}?method=${encodeURIComponent(method)}&param=${encodeURIComponent(param)}`;
+            const res = await fetch(url);
+            const data = await res.json();
+
+            if (!res.ok || !data.success) {
+                console.warn('Outlier detection API returned non-success:', data);
+                return;
+            }
+
+            currentOutliers = data.outliers;
+            currentBoxplotSpec = data.boxplot_spec;
+
+            // 1. Update KPI Summary
+            renderOutlierKPIs(currentOutliers);
+
+            // 2. Update Tab Badge Counter
+            if (outliersCountBadge) {
+                outliersCountBadge.textContent = (currentOutliers.total_outlier_instances || 0).toLocaleString();
+            }
+
+            // 3. Render Statistical Warnings Banner
+            renderOutlierWarnings(currentOutliers.warnings || []);
+
+            // 4. Populate Feature Distribution Selector Dropdown
+            populateOutlierColumnSelector();
+
+            // 5. Render Outlier Summary Table
+            renderOutliersSummaryTable();
+
+            // 6. Render Active Visualization Chart
+            renderOutlierVisualization();
+
+        } catch (err) {
+            console.error('Failed to load outlier detection data:', err);
+        }
+    }
+
+    function renderOutlierKPIs(outliers) {
+        if (!outliers) return;
+
+        if (outliersKpiNumCount) outliersKpiNumCount.textContent = (outliers.numerical_columns_count || 0).toLocaleString();
+        if (outliersKpiAffectedCols) outliersKpiAffectedCols.textContent = (outliers.columns_with_outliers_count || 0).toLocaleString();
+        if (outliersKpiTotalCount) outliersKpiTotalCount.textContent = (outliers.total_outlier_instances || 0).toLocaleString();
+        if (outliersKpiErrorCount) outliersKpiErrorCount.textContent = (outliers.total_confirmed_errors || 0).toLocaleString();
+        if (outliersKpiPotentialCount) outliersKpiPotentialCount.textContent = (outliers.total_potential_outliers || 0).toLocaleString();
+        if (outliersKpiCleanCount) outliersKpiCleanCount.textContent = (outliers.clean_columns_count || 0).toLocaleString();
+    }
+
+    function renderOutlierWarnings(warnings) {
+        if (!outliersWarningsContainer) return;
+
+        if (!warnings || warnings.length === 0) {
+            outliersWarningsContainer.innerHTML = '';
+            outliersWarningsContainer.classList.add('hidden');
+            return;
+        }
+
+        outliersWarningsContainer.classList.remove('hidden');
+        outliersWarningsContainer.innerHTML = warnings.map((w) => {
+            let cardClass = 'outlier-warning-card';
+            let icon = '⚠️';
+
+            if (w.toLowerCase().includes('zero standard deviation') || w.toLowerCase().includes('zero variance')) {
+                cardClass += ' warning-zero-std';
+                icon = '🛑';
+            } else if (w.toLowerCase().includes('zero iqr')) {
+                cardClass += ' warning-zero-iqr';
+                icon = '📉';
+            } else if (w.toLowerCase().includes('small sample size') || w.toLowerCase().includes('small dataset')) {
+                icon = '🔬';
+            }
+
+            return `
+                <div class="${cardClass}">
+                    <span class="outlier-warning-icon">${icon}</span>
+                    <div class="outlier-warning-text">
+                        <strong>Statistical Edge Case:</strong> ${escapeHtml(w)}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function populateOutlierColumnSelector() {
+        if (!outlierDistColSelect || !currentOutliers) return;
+
+        const summaryTable = currentOutliers.summary_table || [];
+        outlierDistColSelect.innerHTML = '<option value="">Select feature to inspect distribution...</option>';
+
+        summaryTable.forEach((item) => {
+            const opt = document.createElement('option');
+            opt.value = item.column_name;
+            const errStr = item.confirmed_error_count > 0 ? ` (${item.confirmed_error_count} errors)` : '';
+            opt.textContent = `${item.column_name} [${item.outlier_count} outliers${errStr}]`;
+            outlierDistColSelect.appendChild(opt);
+        });
+
+        if (!currentOutlierSelectedCol && summaryTable.length > 0) {
+            // Default to first column with outliers, or first column overall
+            const withOutliers = summaryTable.find((c) => c.outlier_count > 0);
+            currentOutlierSelectedCol = withOutliers ? withOutliers.column_name : summaryTable[0].column_name;
+            outlierDistColSelect.value = currentOutlierSelectedCol;
+        } else if (currentOutlierSelectedCol) {
+            outlierDistColSelect.value = currentOutlierSelectedCol;
+        }
+    }
+
+    function renderOutliersSummaryTable() {
+        if (!outliersSummaryTbody || !currentOutliers) return;
+
+        let rows = currentOutliers.summary_table || [];
+
+        if (outlierTableSearchQuery) {
+            rows = rows.filter((r) => {
+                const name = (r.column_name || '').toLowerCase();
+                const status = (r.status || '').toLowerCase();
+                return name.includes(outlierTableSearchQuery) || status.includes(outlierTableSearchQuery);
+            });
+        }
+
+        if (rows.length === 0) {
+            outliersSummaryTbody.innerHTML = `
+                <tr>
+                    <td colspan="11" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                        No numerical columns found matching search query '${escapeHtml(outlierTableSearchQuery)}'.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        outliersSummaryTbody.innerHTML = rows.map((r, idx) => {
+            const isClean = (r.outlier_count || 0) === 0;
+            const hasErrors = (r.confirmed_error_count || 0) > 0;
+            const outlierPct = r.outlier_percentage !== undefined ? Number(r.outlier_percentage).toFixed(2) : '0.00';
+            const lowerVal = r.lower_threshold !== null && r.lower_threshold !== undefined ? Number(r.lower_threshold).toFixed(2) : '--';
+            const upperVal = r.upper_threshold !== null && r.upper_threshold !== undefined ? Number(r.upper_threshold).toFixed(2) : '--';
+
+            // Diagnosis badge
+            let diagBadge = '';
+            if (isClean) {
+                diagBadge = '<span class="diag-badge diag-badge-clean">✓ Clean</span>';
+            } else if (hasErrors) {
+                diagBadge = `<span class="diag-badge diag-badge-error">⚠️ ${r.confirmed_error_count} Data Error${r.confirmed_error_count > 1 ? 's' : ''}</span>`;
+            } else if (r.outlier_percentage > 5.0) {
+                diagBadge = `<span class="diag-badge diag-badge-error">⚡ ${r.outlier_count} High Outliers</span>`;
+            } else {
+                diagBadge = `<span class="diag-badge diag-badge-potential">⚡ ${r.outlier_count} Outliers</span>`;
+            }
+
+            // Warnings badge
+            let warnBadge = '<span style="color: var(--text-muted); font-size: 11px;">None</span>';
+            if (r.warnings_count > 0) {
+                const firstWarn = r.warnings && r.warnings[0] ? r.warnings[0] : 'Warning detected';
+                warnBadge = `<span class="diag-badge diag-badge-warning" title="${escapeHtml(firstWarn)}">⚠️ ${r.warnings_count} Alert${r.warnings_count > 1 ? 's' : ''}</span>`;
+            }
+
+            // Action buttons
+            const inspectDisabled = isClean ? 'disabled' : '';
+            const actionButtons = `
+                <div style="display: flex; gap: 6px;">
+                    <button class="btn btn-outline btn-xs btn-inspect-outliers" data-col="${escapeHtml(r.column_name)}" ${inspectDisabled}>
+                        🔍 Review (${r.outlier_count})
+                    </button>
+                    <button class="btn btn-outline btn-xs btn-view-outlier-chart" data-col="${escapeHtml(r.column_name)}">
+                        📊 Chart
+                    </button>
+                </div>
+            `;
+
+            return `
+                <tr>
+                    <td style="color: var(--text-muted); font-family: var(--font-mono); font-size: 11px;">${idx + 1}</td>
+                    <td style="font-weight: 700; color: var(--text-primary);">${escapeHtml(r.column_name)}</td>
+                    <td><code style="font-size: 11px; background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px;">${escapeHtml(r.method || 'IQR')}</code></td>
+                    <td style="font-family: var(--font-mono);">${(r.valid_observations || 0).toLocaleString()}</td>
+                    <td><strong style="font-family: var(--font-mono); color: ${isClean ? 'var(--accent-emerald)' : 'var(--accent-rose)'};">${(r.outlier_count || 0).toLocaleString()}</strong></td>
+                    <td style="font-family: var(--font-mono); color: ${isClean ? 'var(--text-muted)' : 'var(--accent-rose)'};">${outlierPct}%</td>
+                    <td style="font-family: var(--font-mono); color: var(--text-secondary);">${lowerVal}</td>
+                    <td style="font-family: var(--font-mono); color: var(--text-secondary);">${upperVal}</td>
+                    <td>${diagBadge}</td>
+                    <td>${warnBadge}</td>
+                    <td>${actionButtons}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    async function renderOutlierVisualization() {
+        if (!outlierPlotlyChart) return;
+
+        if (!window.Plotly) {
+            outlierPlotlyChart.innerHTML = `
+                <div class="chart-loading-placeholder">
+                    <p style="color: var(--accent-rose);">Plotly.js library unavailable.</p>
+                </div>
+            `;
+            return;
+        }
+
+        if (currentOutlierVizMode === 'boxplot') {
+            if (currentBoxplotSpec) {
+                Plotly.react('outlier-plotly-chart', currentBoxplotSpec.data || [], currentBoxplotSpec.layout || {}, currentBoxplotSpec.config || { responsive: true });
+            }
+        } else {
+            // Distribution mode for selected column
+            if (!currentOutlierSelectedCol && currentOutliers && currentOutliers.summary_table && currentOutliers.summary_table.length > 0) {
+                currentOutlierSelectedCol = currentOutliers.summary_table[0].column_name;
+            }
+
+            if (currentOutlierSelectedCol) {
+                try {
+                    const url = `/api/outliers/${encodeURIComponent(activeDatasetId)}/column/${encodeURIComponent(currentOutlierSelectedCol)}?method=${encodeURIComponent(currentOutlierMethod)}&param=${encodeURIComponent(currentOutlierParam)}`;
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    if (res.ok && data.success && data.distribution_spec) {
+                        Plotly.react('outlier-plotly-chart', data.distribution_spec.data || [], data.distribution_spec.layout || {}, data.distribution_spec.config || { responsive: true });
+                    }
+                } catch (err) {
+                    console.error('Failed to render distribution chart for column:', currentOutlierSelectedCol, err);
+                }
+            }
+        }
+    }
+
+    function openOutlierInspectorModal(colName) {
+        if (!outlierInspectorModal || !currentOutliers) return;
+
+        const colDetails = (currentOutliers.column_details && currentOutliers.column_details[colName]) || null;
+        if (!colDetails) {
+            alert(`No outlier details available for column '${colName}'.`);
+            return;
+        }
+
+        const outliers = colDetails.outliers || [];
+
+        if (modalOutlierTitle) {
+            modalOutlierTitle.textContent = `Outlier Records Drill-Down: ${colName}`;
+        }
+        if (modalOutlierMeta) {
+            modalOutlierMeta.textContent = `${outliers.length} Flagged Observations | Lower: ${colDetails.lower_threshold} | Upper: ${colDetails.upper_threshold}`;
+        }
+
+        if (modalOutlierTbody) {
+            if (outliers.length === 0) {
+                modalOutlierTbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">
+                            No outlier records found in column '${escapeHtml(colName)}'.
+                        </td>
+                    </tr>
+                `;
+            } else {
+                modalOutlierTbody.innerHTML = outliers.map((o) => {
+                    const isError = o.is_data_error;
+                    const tagClass = isError ? 'class-tag-error' : 'class-tag-potential';
+                    const boundVi = o.direction === 'below_lower' ? 'Below Lower Bound' : 'Above Upper Bound';
+                    const threshVal = o.direction === 'below_lower' ? o.lower_threshold : o.upper_threshold;
+
+                    return `
+                        <tr>
+                            <td style="font-family: var(--font-mono); font-weight: 700; color: var(--text-primary);">${o.row_index}</td>
+                            <td><strong style="font-family: var(--font-mono); color: ${isError ? 'var(--accent-rose)' : 'var(--accent-amber)'}; font-size: 13px;">${o.value}</strong></td>
+                            <td style="font-size: 12px; color: var(--text-secondary);">${boundVi}</td>
+                            <td style="font-family: var(--font-mono); font-size: 12px;">${threshVal !== null ? Number(threshVal).toFixed(2) : '--'}</td>
+                            <td style="font-family: var(--font-mono); font-size: 12px; color: var(--accent-rose);">+${o.deviation_from_threshold !== null ? Number(o.deviation_from_threshold).toFixed(2) : '--'}</td>
+                            <td><span class="class-tag ${tagClass}">${escapeHtml(o.classification || (isError ? 'Confirmed Data Error' : 'Potential Outlier'))}</span></td>
+                            <td style="font-size: 12px; color: var(--text-secondary); line-height: 1.4;">${escapeHtml(o.rationale || '')}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        }
+
+        outlierInspectorModal.classList.remove('hidden');
+    }
+
+    async function executeOutlierRemediation(action) {
+        if (!activeDatasetId) {
+            alert('Please select an active dataset first.');
+            return;
+        }
+
+        let confirmMsg = '';
+        if (action === 'remove') {
+            confirmMsg = 'Are you sure you want to remove all rows containing outliers?\n\nThis creates a separate new dataset in data/processed/. Your original raw CSV will not be modified.';
+        } else if (action === 'remove_errors_only') {
+            confirmMsg = 'Are you sure you want to remove rows with confirmed data errors?\n\nLegitimate statistical outliers will be kept. Creates a new dataset in data/processed/.';
+        } else if (action === 'cap') {
+            confirmMsg = 'Are you sure you want to cap/winsorize extreme outliers to the boundary thresholds?\n\nNo rows will be dropped. Creates a new dataset in data/processed/.';
+        }
+
+        if (!confirm(confirmMsg)) return;
+
+        try {
+            const res = await fetch(`/api/outliers/remediate/${encodeURIComponent(activeDatasetId)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: action,
+                    method: currentOutlierMethod,
+                    param: currentOutlierParam,
+                }),
+            });
+
+            const data = await res.json();
+            if (res.ok && data.success) {
+                alert(`✓ Outlier remediation complete!\n\n${data.message}\nSaved as processed dataset: ${data.processed_id}`);
+                // Refresh datasets list & reload dashboard
+                await loadDatasetsList();
+                if (activeDatasetStatus) {
+                    activeDatasetStatus.classList.remove('hidden');
+                    activeDatasetStatus.textContent = 'Cleaned & Processed Dataset Available';
+                }
+            } else {
+                alert(`Error applying remediation: ${data.error || 'Operation failed.'}`);
+            }
+        } catch (err) {
+            alert(`Remediation request failed: ${err.message}`);
+        }
+    }
+
+    // Event: Outlier Method Selection
+    if (outlierMethodSelect) {
+        outlierMethodSelect.addEventListener('change', (e) => {
+            const val = e.target.value;
+            if (val === 'iqr') {
+                currentOutlierMethod = 'iqr';
+                currentOutlierParam = 1.5;
+                if (outlierParamLabel) outlierParamLabel.textContent = 'IQR Multiplier:';
+            } else if (val === 'iqr_extreme') {
+                currentOutlierMethod = 'iqr';
+                currentOutlierParam = 3.0;
+                if (outlierParamLabel) outlierParamLabel.textContent = 'IQR Multiplier:';
+            } else if (val === 'zscore') {
+                currentOutlierMethod = 'zscore';
+                currentOutlierParam = 3.0;
+                if (outlierParamLabel) outlierParamLabel.textContent = 'Z-Score (σ):';
+            } else if (val === 'zscore_sensitive') {
+                currentOutlierMethod = 'zscore';
+                currentOutlierParam = 2.5;
+                if (outlierParamLabel) outlierParamLabel.textContent = 'Z-Score (σ):';
+            } else if (val === 'modified_zscore') {
+                currentOutlierMethod = 'modified_zscore';
+                currentOutlierParam = 3.5;
+                if (outlierParamLabel) outlierParamLabel.textContent = 'MAD Threshold:';
+            }
+
+            if (outlierParamInput) outlierParamInput.value = currentOutlierParam;
+            loadOutlierData(activeDatasetId, currentOutlierMethod, currentOutlierParam);
+        });
+    }
+
+    // Event: Recalculate Outlier Bounds
+    if (btnRecalcOutliers) {
+        btnRecalcOutliers.addEventListener('click', () => {
+            if (outlierParamInput) {
+                currentOutlierParam = parseFloat(outlierParamInput.value) || 1.5;
+            }
+            loadOutlierData(activeDatasetId, currentOutlierMethod, currentOutlierParam);
+        });
+    }
+
+    // Event: Toggle Visualizations
+    if (viewOutlierBoxplotBtn) {
+        viewOutlierBoxplotBtn.addEventListener('click', () => {
+            currentOutlierVizMode = 'boxplot';
+            viewOutlierBoxplotBtn.classList.add('active');
+            if (viewOutlierDistBtn) viewOutlierDistBtn.classList.remove('active');
+            if (outlierDistSelectWrap) outlierDistSelectWrap.classList.add('hidden');
+            renderOutlierVisualization();
+        });
+    }
+
+    if (viewOutlierDistBtn) {
+        viewOutlierDistBtn.addEventListener('click', () => {
+            currentOutlierVizMode = 'distribution';
+            viewOutlierDistBtn.classList.add('active');
+            if (viewOutlierBoxplotBtn) viewOutlierBoxplotBtn.classList.remove('active');
+            if (outlierDistSelectWrap) outlierDistSelectWrap.classList.remove('hidden');
+            renderOutlierVisualization();
+        });
+    }
+
+    if (outlierDistColSelect) {
+        outlierDistColSelect.addEventListener('change', (e) => {
+            currentOutlierSelectedCol = e.target.value;
+            renderOutlierVisualization();
+        });
+    }
+
+    // Event: Outlier Table Search Filter
+    if (outlierTableSearch) {
+        outlierTableSearch.addEventListener('input', (e) => {
+            outlierTableSearchQuery = e.target.value.toLowerCase().trim();
+            renderOutliersSummaryTable();
+        });
+    }
+
+    // Event Delegation: Outlier Table Actions (Inspect & Chart buttons)
+    if (outliersSummaryTbody) {
+        outliersSummaryTbody.addEventListener('click', (e) => {
+            const inspectBtn = e.target.closest('.btn-inspect-outliers');
+            if (inspectBtn) {
+                const colName = inspectBtn.getAttribute('data-col');
+                if (colName) openOutlierInspectorModal(colName);
+                return;
+            }
+
+            const chartBtn = e.target.closest('.btn-view-outlier-chart');
+            if (chartBtn) {
+                const colName = chartBtn.getAttribute('data-col');
+                if (colName) {
+                    currentOutlierSelectedCol = colName;
+                    currentOutlierVizMode = 'distribution';
+                    if (viewOutlierDistBtn) viewOutlierDistBtn.classList.add('active');
+                    if (viewOutlierBoxplotBtn) viewOutlierBoxplotBtn.classList.remove('active');
+                    if (outlierDistSelectWrap) outlierDistSelectWrap.classList.remove('hidden');
+                    if (outlierDistColSelect) outlierDistColSelect.value = colName;
+                    renderOutlierVisualization();
+
+                    // Smooth scroll to chart
+                    const chartCard = document.querySelector('.outliers-viz-section');
+                    if (chartCard) chartCard.scrollIntoView({ behavior: 'smooth' });
+                }
+            }
+        });
+    }
+
+    // Modal Close Events
+    if (modalOutlierCloseBtn && outlierInspectorModal) {
+        modalOutlierCloseBtn.addEventListener('click', () => {
+            outlierInspectorModal.classList.add('hidden');
+        });
+        outlierInspectorModal.addEventListener('click', (e) => {
+            if (e.target === outlierInspectorModal) {
+                outlierInspectorModal.classList.add('hidden');
+            }
+        });
+    }
+
+    // Remediation Buttons
+    if (btnOutliersKeep) {
+        btnOutliersKeep.addEventListener('click', () => {
+            alert('✓ Outliers retained. All extreme observations marked as valid domain data.');
+        });
+    }
+
+    if (btnOutliersRemoveErrors) {
+        btnOutliersRemoveErrors.addEventListener('click', () => executeOutlierRemediation('remove_errors_only'));
+    }
+
+    if (btnOutliersCap) {
+        btnOutliersCap.addEventListener('click', () => executeOutlierRemediation('cap'));
+    }
+
+    if (btnOutliersRemove) {
+        btnOutliersRemove.addEventListener('click', () => executeOutlierRemediation('remove'));
+    }
+
     // Initial Execution
     (async () => {
         await loadDatasetsList();
         await loadDatasetDashboard(activeDatasetId);
     })();
 });
+
 
