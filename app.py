@@ -48,7 +48,19 @@ from analysis.correlation import (
     classify_correlation_strength,
     classify_correlation_direction,
 )
-from visualization.charts import build_correlation_heatmap_spec
+from analysis.outliers import (
+    OutlierDetectionEngine,
+    detect_dataset_outliers,
+    detect_column_outliers_iqr,
+    detect_column_outliers_zscore,
+    detect_column_outliers_modified_zscore,
+    classify_anomaly_type,
+)
+from visualization.charts import (
+    build_correlation_heatmap_spec,
+    build_outlier_boxplot_spec,
+    build_outlier_distribution_spec,
+)
 
 # Configure logging
 logging.basicConfig(
@@ -378,6 +390,163 @@ def create_app() -> Flask:
             "count": len(corr_data.get("ranked_pairs", [])),
             "pairs": corr_data.get("ranked_pairs", []),
         })
+
+    # -------------------------------------------------------------
+    # Phase 7: Outlier & Anomaly Detection API Routes
+    # -------------------------------------------------------------
+    @app.route("/api/outliers/<dataset_id>", methods=["GET"])
+    def get_dataset_outliers_route(dataset_id: str):
+        """
+        Retrieve comprehensive Phase 7 Outlier Detection analysis:
+        - Method selection (IQR standard 1.5x / extreme 3.0x, Z-Score, Modified Z-Score)
+        - Column metrics (Total N, Valid N, Outlier count, Outlier percentage, Lower/Upper bounds)
+        - Edge-case statistical warnings (Zero std, Zero IQR, Small sample size)
+        - Confirmed data errors vs potential statistical outliers breakdown
+        - Multi-column Box Plot Plotly specification
+        """
+        method = request.args.get("method", "iqr").strip().lower()
+        param_val = request.args.get("param", None, type=float)
+        if param_val is None:
+            param_val = request.args.get("multiplier", None, type=float)
+            if param_val is None:
+                param_val = request.args.get("threshold", None, type=float)
+
+        col_filter = request.args.get("column", "").strip() or None
+
+        df, error = load_dataset(dataset_id)
+        if error:
+            return jsonify({"success": False, "error": error}), 404
+
+        engine = OutlierDetectionEngine(df, dataset_id=dataset_id)
+        outlier_data = engine.analyze(method=method, param=param_val, column=col_filter)
+
+        # Generate multi-feature Box Plot specification
+        num_cols = engine.get_numerical_columns()
+        boxplot_spec = build_outlier_boxplot_spec(df, columns=num_cols[:10])
+
+        return jsonify({
+            "success": True,
+            "outliers": outlier_data,
+            "boxplot_spec": boxplot_spec,
+        })
+
+    @app.route("/api/outliers/<dataset_id>/column/<column_name>", methods=["GET"])
+    def get_column_outliers_route(dataset_id: str, column_name: str):
+        """
+        Retrieve detailed outlier analysis and interactive charts for an individual column:
+        - Specific threshold bounds & moments
+        - Row-level outlier instances with Confirmed Data Error vs Potential Outlier classification
+        - Plotly Distribution Histogram & Boundary chart specification
+        - Plotly Single-Column Box Plot specification
+        """
+        method = request.args.get("method", "iqr").strip().lower()
+        param_val = request.args.get("param", None, type=float)
+        if param_val is None:
+            param_val = request.args.get("multiplier", None, type=float)
+            if param_val is None:
+                param_val = request.args.get("threshold", None, type=float)
+
+        df, error = load_dataset(dataset_id)
+        if error:
+            return jsonify({"success": False, "error": error}), 404
+
+        if column_name not in df.columns:
+            return jsonify({
+                "success": False,
+                "error": f"Column '{column_name}' not found in dataset '{dataset_id}'. Available columns: {list(df.columns)}",
+            }), 404
+
+        series = df[column_name]
+        if method == "zscore":
+            col_res = detect_column_outliers_zscore(series, col_name=column_name, threshold=param_val or 3.0)
+        elif method == "modified_zscore":
+            col_res = detect_column_outliers_modified_zscore(series, col_name=column_name, threshold=param_val or 3.5)
+        else:
+            col_res = detect_column_outliers_iqr(series, col_name=column_name, multiplier=param_val or 1.5)
+
+        # Generate distribution and boxplot specs
+        dist_spec = build_outlier_distribution_spec(
+            series=series,
+            col_name=column_name,
+            lower_thresh=col_res.get("lower_threshold"),
+            upper_thresh=col_res.get("upper_threshold"),
+            method_name=col_res.get("method", "IQR"),
+        )
+        box_spec = build_outlier_boxplot_spec(df, columns=[column_name])
+
+        return jsonify({
+            "success": True,
+            "dataset_id": dataset_id,
+            "column_name": column_name,
+            "result": col_res,
+            "distribution_spec": dist_spec,
+            "boxplot_spec": box_spec,
+        })
+
+    @app.route("/api/outliers/<dataset_id>/chart/boxplot", methods=["GET"])
+    def get_outlier_boxplot_chart_route(dataset_id: str):
+        """Generate custom multi-feature Box Plot specification."""
+        cols_param = request.args.get("columns", "").strip()
+        df, error = load_dataset(dataset_id)
+        if error:
+            return jsonify({"success": False, "error": error}), 404
+
+        columns = [c.strip() for c in cols_param.split(",") if c.strip()] if cols_param else None
+        boxplot_spec = build_outlier_boxplot_spec(df, columns=columns)
+
+        return jsonify({
+            "success": True,
+            "dataset_id": dataset_id,
+            "boxplot_spec": boxplot_spec,
+        })
+
+    @app.route("/api/outliers/remediate/<dataset_id>", methods=["POST"])
+    def remediate_dataset_outliers_route(dataset_id: str):
+        """
+        Execute non-destructive outlier remediation on a raw dataset:
+        - Actions: 'remove' (drop rows with outliers), 'cap' (winsorize bounds), 'remove_errors_only'
+        - Creates a new distinct processed dataset in data/processed/ with lineage tracking
+        - Original raw upload in data/uploads/ is NEVER modified
+        """
+        df, error = load_dataset(dataset_id, is_processed=False)
+        if error:
+            return jsonify({"success": False, "error": error}), 404
+
+        req_json = request.get_json() or {}
+        action = req_json.get("action", "remove")
+        columns = req_json.get("columns", None)
+        method = req_json.get("method", "iqr")
+        param = req_json.get("param", None)
+
+        engine = OutlierDetectionEngine(df, dataset_id=dataset_id)
+        clean_df, summary = engine.remediate_outliers(
+            action=action,
+            columns=columns,
+            method=method,
+            param=param,
+        )
+
+        # Save to data/processed/ non-destructively
+        proc_id, saved_path, save_err = save_processed_dataset(
+            clean_df,
+            original_dataset_id=dataset_id,
+            cleaning_summary={"outlier_remediation": summary},
+        )
+        if save_err:
+            return jsonify({"success": False, "error": save_err}), 500
+
+        head_records = clean_df.head(10).replace({np.nan: None}).to_dict(orient="records")
+        clean_head = [{k: _safe_json_value(v) for k, v in row.items()} for row in head_records]
+
+        return jsonify({
+            "success": True,
+            "message": f"Outlier remediation '{action}' applied successfully. Saved as new processed dataset.",
+            "dataset_id": dataset_id,
+            "processed_id": proc_id,
+            "summary": summary,
+            "preview_head": clean_head,
+            "download_url": f"/api/cleaning/download/{dataset_id}",
+        }), 200
 
     @app.route("/api/sample/<sample_type>", methods=["POST"])
     def load_sample_dataset(sample_type: str):
