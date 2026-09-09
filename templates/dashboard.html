@@ -87,6 +87,10 @@
             <button class="studio-tab-btn" id="tab-correlation-btn" data-tab="correlation-view">
                 <span>🔗 Correlation Analysis</span>
             </button>
+            <button class="studio-tab-btn" id="tab-outliers-btn" data-tab="outliers-view">
+                <span>🎯 Outlier Detection</span>
+                <span class="badge-counter" id="outliers-count-badge">0</span>
+            </button>
             <button class="studio-tab-btn" id="tab-cleaning-btn" data-tab="cleaning-view">
                 <span>🧹 Data Quality & Cleaning Studio</span>
                 <span class="badge-counter" id="cleaning-issues-badge">0</span>
@@ -830,6 +834,208 @@
             </div>
 
             <!-- ========================================================= -->
+            <!-- TAB: OUTLIER & ANOMALY DETECTION ENGINE (PHASE 7) -->
+            <!-- ========================================================= -->
+            <div class="studio-tab-content hidden" id="outliers-view">
+                
+                <!-- Section Header & Method Selector Bar -->
+                <section class="outliers-header-section">
+                    <div class="section-title-wrap">
+                        <h2 class="section-title">Outlier & Anomaly Detection</h2>
+                        <span class="section-badge badge-rose">Statistical Detection Engine</span>
+                    </div>
+                    <p class="section-subtitle">Identify numerical outliers, calculate threshold bounds via IQR / Z-Score, distinguish potential extreme values from confirmed data errors, and remediate non-destructively.</p>
+                    
+                    <!-- Method Selector & Controls -->
+                    <div class="outliers-controls-bar">
+                        <div class="method-control-group">
+                            <label for="outlier-method-select" class="control-label">Detection Method:</label>
+                            <select id="outlier-method-select" class="custom-select custom-select-sm">
+                                <option value="iqr" selected>IQR Method (Tukey's Fences - 1.5x IQR)</option>
+                                <option value="iqr_extreme">IQR Extreme Fences (3.0x IQR)</option>
+                                <option value="zscore">Z-Score Method (3.0 Standard Deviations)</option>
+                                <option value="zscore_sensitive">Z-Score Sensitive (2.5 Standard Deviations)</option>
+                                <option value="modified_zscore">Modified Z-Score (3.5 Median Absolute Deviation)</option>
+                            </select>
+                        </div>
+
+                        <div class="param-control-group">
+                            <label for="outlier-param-input" class="control-label" id="outlier-param-label">Multiplier / Threshold:</label>
+                            <div class="input-with-btn">
+                                <input type="number" id="outlier-param-input" class="custom-input custom-input-sm" value="1.5" step="0.1" min="0.1" max="10.0">
+                                <button class="btn btn-outline btn-sm" id="btn-recalc-outliers">
+                                    <span>🔄 Recalculate</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="outliers-kpi-bar">
+                            <div class="outlier-kpi-item">
+                                <span class="outlier-kpi-label">Features Analyzed</span>
+                                <strong class="outlier-kpi-value" id="outliers-kpi-num-count">--</strong>
+                            </div>
+                            <div class="outlier-kpi-item">
+                                <span class="outlier-kpi-label">Columns with Outliers</span>
+                                <strong class="outlier-kpi-value text-rose" id="outliers-kpi-affected-cols">--</strong>
+                            </div>
+                            <div class="outlier-kpi-item">
+                                <span class="outlier-kpi-label">Total Outliers</span>
+                                <strong class="outlier-kpi-value text-rose" id="outliers-kpi-total-count">--</strong>
+                            </div>
+                            <div class="outlier-kpi-item">
+                                <span class="outlier-kpi-label">Confirmed Data Errors</span>
+                                <strong class="outlier-kpi-value text-danger" id="outliers-kpi-error-count">--</strong>
+                            </div>
+                            <div class="outlier-kpi-item">
+                                <span class="outlier-kpi-label">Potential Outliers</span>
+                                <strong class="outlier-kpi-value text-amber" id="outliers-kpi-potential-count">--</strong>
+                            </div>
+                            <div class="outlier-kpi-item">
+                                <span class="outlier-kpi-label">Clean Columns</span>
+                                <strong class="outlier-kpi-value text-emerald" id="outliers-kpi-clean-count">--</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Edge-Case Warnings Container -->
+                    <div class="outliers-warnings-container hidden" id="outliers-warnings-container">
+                        <!-- Injected via JS -->
+                    </div>
+                </section>
+
+                <!-- 1. INTERACTIVE PLOTLY VISUALIZATIONS SECTION -->
+                <section class="outliers-viz-section">
+                    <div class="section-header-flex">
+                        <div>
+                            <h3 class="subsection-title">Interactive Visualizations</h3>
+                            <p class="section-subtitle">Multi-feature box plots and single-column distribution histograms with threshold boundary zones.</p>
+                        </div>
+                        <div class="viz-view-toggle-bar">
+                            <button class="viz-toggle-btn active" id="view-outlier-boxplot-btn">
+                                <span>📦 Multi-Feature Box Plots</span>
+                            </button>
+                            <button class="viz-toggle-btn" id="view-outlier-dist-btn">
+                                <span>📊 Distribution & Threshold Bounds</span>
+                            </button>
+                            <div class="inline-col-select-wrap hidden" id="outlier-dist-select-wrap">
+                                <select id="outlier-dist-col-select" class="custom-select custom-select-sm">
+                                    <option value="">Select feature to inspect distribution...</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="outlier-chart-card">
+                        <div id="outlier-plotly-chart" class="plotly-chart-wrapper">
+                            <!-- Plotly will render here -->
+                            <div class="chart-loading-placeholder">
+                                <div class="spinner"></div>
+                                <p>Generating interactive outlier visualizations...</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 2. OUTLIER SUMMARY TABLE -->
+                <section class="outliers-summary-section">
+                    <div class="section-header-flex">
+                        <div>
+                            <h3 class="subsection-title">Outlier Summary Table</h3>
+                            <p class="section-subtitle">Column-by-column metrics: Total observations, outlier count, percentage, lower/upper boundaries, and error classification.</p>
+                        </div>
+                        <div class="outlier-table-search-wrap">
+                            <div class="search-box">
+                                <span class="search-icon">🔎</span>
+                                <input type="text" id="outlier-table-search" placeholder="Filter numerical features..." class="search-input" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-container outliers-table-container">
+                        <table class="data-table outliers-table" id="outliers-summary-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40px;">#</th>
+                                    <th>Feature</th>
+                                    <th>Method</th>
+                                    <th>Valid N</th>
+                                    <th>Outlier Count</th>
+                                    <th>Outlier %</th>
+                                    <th>Lower Threshold</th>
+                                    <th>Upper Threshold</th>
+                                    <th>Diagnosis</th>
+                                    <th>Warnings</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="outliers-summary-tbody">
+                                <!-- Injected via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- 3. NON-DESTRUCTIVE REMEDIATION TOOLBAR -->
+                <section class="outliers-remediation-section">
+                    <div class="remediation-card">
+                        <div class="remediation-header">
+                            <div class="remediation-title-wrap">
+                                <span class="remediation-icon">🛡️</span>
+                                <div>
+                                    <h4 class="remediation-title">Outlier Remediation Operations</h4>
+                                    <p class="remediation-subtitle">Outliers are <strong>never automatically deleted</strong>. Any remediation operation produces a new dataset in <code>data/processed/</code>, leaving the raw uploaded CSV completely untouched.</p>
+                                </div>
+                            </div>
+                            <div class="remediation-badge">Non-Destructive Lineage</div>
+                        </div>
+
+                        <div class="remediation-actions-grid">
+                            <div class="remediation-action-item">
+                                <div class="action-item-text">
+                                    <strong>Keep All Outliers (No Removal)</strong>
+                                    <p>Retain all extreme observations as valid domain records. No file created.</p>
+                                </div>
+                                <button class="btn btn-outline" id="btn-outliers-keep">
+                                    <span>✓ Keep All Outliers</span>
+                                </button>
+                            </div>
+
+                            <div class="remediation-action-item">
+                                <div class="action-item-text">
+                                    <strong>Remove Confirmed Data Errors Only</strong>
+                                    <p>Drops rows with impossible sentinel codes, negative ages/prices, etc., while retaining legitimate extreme values.</p>
+                                </div>
+                                <button class="btn btn-warning" id="btn-outliers-remove-errors">
+                                    <span>🧹 Remove Data Errors Only</span>
+                                </button>
+                            </div>
+
+                            <div class="remediation-action-item">
+                                <div class="action-item-text">
+                                    <strong>Cap / Winsorize Outliers to Bounds</strong>
+                                    <p>Clamps extreme values to the lower and upper threshold fences without dropping any rows.</p>
+                                </div>
+                                <button class="btn btn-secondary" id="btn-outliers-cap">
+                                    <span>📏 Cap Outliers to Bounds</span>
+                                </button>
+                            </div>
+
+                            <div class="remediation-action-item">
+                                <div class="action-item-text">
+                                    <strong>Remove All Outlier Rows</strong>
+                                    <p>Drops all observational rows that violate lower or upper thresholds across numerical features.</p>
+                                </div>
+                                <button class="btn btn-danger" id="btn-outliers-remove">
+                                    <span>🗑️ Remove All Outlier Rows</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+
+            <!-- ========================================================= -->
             <!-- TAB 3: DATASET PREVIEW & EXPLORER -->
             <!-- ========================================================= -->
             <div class="studio-tab-content hidden" id="preview-view">
@@ -874,6 +1080,40 @@
 
         </div>
     </main>
+
+    <!-- Outlier Records Drill-Down Inspector Modal -->
+    <div class="modal-backdrop hidden" id="outlier-inspector-modal">
+        <div class="modal-dialog modal-dialog-lg">
+            <div class="modal-header">
+                <div class="modal-title-wrap">
+                    <span class="modal-type-badge badge-rose" id="modal-outlier-badge">Outliers Review</span>
+                    <h3 class="modal-title" id="modal-outlier-title">Column Outlier Inspection</h3>
+                    <code class="modal-dtype" id="modal-outlier-meta">-- records flagged</code>
+                </div>
+                <button class="modal-close-btn" id="modal-outlier-close-btn">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-outlier-body">
+                <div class="modal-table-container">
+                    <table class="data-table modal-data-table">
+                        <thead>
+                            <tr>
+                                <th>Row #</th>
+                                <th>Observed Value</th>
+                                <th>Bound Violated</th>
+                                <th>Threshold</th>
+                                <th>Deviation</th>
+                                <th>Classification</th>
+                                <th>Analytical Rationale</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modal-outlier-tbody">
+                            <!-- Injected dynamically via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Column Deep Inspection Modal -->
     <div class="modal-backdrop hidden" id="column-modal-backdrop">
