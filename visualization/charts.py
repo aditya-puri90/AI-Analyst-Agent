@@ -147,9 +147,307 @@ def build_correlation_heatmap_spec(
     }
 
 
+def build_outlier_boxplot_spec(
+    df: pd.DataFrame,
+    columns: Optional[List[str]] = None,
+    height: int = 420,
+) -> Dict[str, Any]:
+    """
+    Construct a high-performance, dark-theme Plotly multi-column Box Plot JSON specification.
+    Displays median, quartiles, fences, and individual jittered outlier points.
+    """
+    if df.empty:
+        return {
+            "data": [],
+            "layout": {
+                "title": {"text": "No Data Available for Box Plot", "font": {"color": "#94a3b8"}},
+                "paper_bgcolor": "rgba(0,0,0,0)",
+                "plot_bgcolor": "rgba(0,0,0,0)",
+            },
+            "config": {"responsive": True, "displayModeBar": False},
+        }
+
+    # Select numerical columns
+    if not columns:
+        columns = [str(c) for c in df.select_dtypes(include=[np.number]).columns]
+
+    if not columns:
+        return {
+            "data": [],
+            "layout": {
+                "title": {"text": "No Numerical Features Available for Box Plot", "font": {"color": "#94a3b8"}},
+                "paper_bgcolor": "rgba(0,0,0,0)",
+                "plot_bgcolor": "rgba(0,0,0,0)",
+            },
+            "config": {"responsive": True, "displayModeBar": False},
+        }
+
+    traces = []
+    # Color palette for multiple box traces
+    palette = [
+        {"fill": "rgba(99, 102, 241, 0.25)", "line": "#818cf8"},
+        {"fill": "rgba(16, 185, 129, 0.25)", "line": "#34d399"},
+        {"fill": "rgba(6, 182, 212, 0.25)", "line": "#22d3ee"},
+        {"fill": "rgba(245, 158, 11, 0.25)", "line": "#fbbf24"},
+        {"fill": "rgba(168, 85, 247, 0.25)", "line": "#c084fc"},
+        {"fill": "rgba(236, 72, 153, 0.25)", "line": "#f472b6"},
+    ]
+
+    for i, col in enumerate(columns[:12]):  # Limit to 12 columns for visual clarity
+        if col not in df.columns:
+            continue
+        series = pd.to_numeric(df[col], errors="coerce").dropna()
+        if len(series) == 0:
+            continue
+
+        color_item = palette[i % len(palette)]
+        # Sample for display if extremely massive dataset
+        sample_s = series if len(series) <= 5000 else series.sample(5000, random_state=42)
+
+        traces.append({
+            "type": "box",
+            "y": sample_s.tolist(),
+            "name": str(col),
+            "boxpoints": "outliers",
+            "jitter": 0.35,
+            "pointpos": -1.8,
+            "fillcolor": color_item["fill"],
+            "line": {"color": color_item["line"], "width": 2},
+            "marker": {
+                "size": 5,
+                "color": "#f43f5e",
+                "outliercolor": "#fb7185",
+                "line": {"color": "#f43f5e", "width": 1},
+            },
+            "boxmean": True,
+            "hoverinfo": "y+name",
+        })
+
+    layout = {
+        "paper_bgcolor": "rgba(0,0,0,0)",
+        "plot_bgcolor": "rgba(0,0,0,0)",
+        "height": max(height, 380),
+        "margin": {"l": 60, "r": 40, "t": 30, "b": 80, "pad": 4},
+        "font": {"family": "Plus Jakarta Sans, sans-serif", "color": "#cbd5e1"},
+        "showlegend": False,
+        "xaxis": {
+            "tickangle": -35 if len(traces) > 4 else 0,
+            "tickfont": {"color": "#cbd5e1", "size": 11},
+            "gridcolor": "rgba(255,255,255,0.04)",
+            "zeroline": False,
+        },
+        "yaxis": {
+            "tickfont": {"color": "#cbd5e1", "size": 11, "family": "JetBrains Mono"},
+            "gridcolor": "rgba(255,255,255,0.06)",
+            "zeroline": False,
+        },
+    }
+
+    config = {
+        "responsive": True,
+        "displayModeBar": True,
+        "displaylogo": False,
+        "modeBarButtonsToRemove": ["lasso2d", "select2d"],
+    }
+
+    return {
+        "data": traces,
+        "layout": layout,
+        "config": config,
+    }
+
+
+def build_outlier_distribution_spec(
+    series: pd.Series,
+    col_name: str,
+    lower_thresh: Optional[float],
+    upper_thresh: Optional[float],
+    method_name: str = "IQR",
+    height: int = 380,
+) -> Dict[str, Any]:
+    """
+    Construct a high-performance Plotly Distribution Histogram & Boundary Chart for a single column.
+    Renders data histogram, threshold boundary dashed lines, and shaded outlier danger zones.
+    """
+    clean_s = pd.to_numeric(series, errors="coerce").dropna()
+
+    if len(clean_s) == 0:
+        return {
+            "data": [],
+            "layout": {
+                "title": {"text": f"No valid numerical data in '{col_name}'", "font": {"color": "#94a3b8"}},
+                "paper_bgcolor": "rgba(0,0,0,0)",
+                "plot_bgcolor": "rgba(0,0,0,0)",
+            },
+            "config": {"responsive": True, "displayModeBar": False},
+        }
+
+    min_val = float(clean_s.min())
+    max_val = float(clean_s.max())
+    span = max_val - min_val if max_val > min_val else 1.0
+    pad = span * 0.08
+
+    # Primary histogram trace
+    traces = [
+        {
+            "type": "histogram",
+            "x": clean_s.tolist(),
+            "name": f"{col_name} Distribution",
+            "marker": {
+                "color": "rgba(99, 102, 241, 0.55)",
+                "line": {"color": "#818cf8", "width": 1.5},
+            },
+            "opacity": 0.85,
+            "nbinsx": min(35, max(12, int(len(clean_s) ** 0.5))),
+            "hoverinfo": "x+y",
+        }
+    ]
+
+    # Outlier points strip trace
+    outliers_mask = pd.Series(False, index=clean_s.index)
+    if lower_thresh is not None:
+        outliers_mask |= (clean_s < lower_thresh)
+    if upper_thresh is not None:
+        outliers_mask |= (clean_s > upper_thresh)
+
+    outlier_points = clean_s[outliers_mask]
+    if len(outlier_points) > 0:
+        traces.append({
+            "type": "scatter",
+            "x": outlier_points.tolist(),
+            "y": [0.5] * len(outlier_points),
+            "mode": "markers",
+            "name": f"Outliers ({len(outlier_points)})",
+            "marker": {
+                "color": "#f43f5e",
+                "size": 8,
+                "symbol": "diamond",
+                "line": {"color": "#ffffff", "width": 1},
+            },
+            "hoverinfo": "x+name",
+        })
+
+    shapes = []
+    annotations = []
+
+    # Lower Threshold Line & Zone
+    if lower_thresh is not None and not math.isnan(lower_thresh):
+        # Shaded lower zone
+        if min_val < lower_thresh:
+            shapes.append({
+                "type": "rect",
+                "x0": min_val - pad,
+                "x1": lower_thresh,
+                "y0": 0,
+                "y1": 1,
+                "yref": "paper",
+                "fillcolor": "rgba(244, 63, 94, 0.12)",
+                "line": {"width": 0},
+            })
+        # Threshold line
+        shapes.append({
+            "type": "line",
+            "x0": lower_thresh,
+            "x1": lower_thresh,
+            "y0": 0,
+            "y1": 1,
+            "yref": "paper",
+            "line": {"color": "#f43f5e", "width": 2, "dash": "dash"},
+        })
+        annotations.append({
+            "x": lower_thresh,
+            "y": 1.04,
+            "yref": "paper",
+            "text": f"Lower ({lower_thresh:.2f})",
+            "showarrow": False,
+            "font": {"color": "#f43f5e", "size": 10, "family": "JetBrains Mono", "weight": "bold"},
+            "bgcolor": "rgba(30, 41, 59, 0.8)",
+            "borderpad": 2,
+        })
+
+    # Upper Threshold Line & Zone
+    if upper_thresh is not None and not math.isnan(upper_thresh):
+        # Shaded upper zone
+        if max_val > upper_thresh:
+            shapes.append({
+                "type": "rect",
+                "x0": upper_thresh,
+                "x1": max_val + pad,
+                "y0": 0,
+                "y1": 1,
+                "yref": "paper",
+                "fillcolor": "rgba(244, 63, 94, 0.12)",
+                "line": {"width": 0},
+            })
+        # Threshold line
+        shapes.append({
+            "type": "line",
+            "x0": upper_thresh,
+            "x1": upper_thresh,
+            "y0": 0,
+            "y1": 1,
+            "yref": "paper",
+            "line": {"color": "#f43f5e", "width": 2, "dash": "dash"},
+        })
+        annotations.append({
+            "x": upper_thresh,
+            "y": 1.04,
+            "yref": "paper",
+            "text": f"Upper ({upper_thresh:.2f})",
+            "showarrow": False,
+            "font": {"color": "#f43f5e", "size": 10, "family": "JetBrains Mono", "weight": "bold"},
+            "bgcolor": "rgba(30, 41, 59, 0.8)",
+            "borderpad": 2,
+        })
+
+    layout = {
+        "paper_bgcolor": "rgba(0,0,0,0)",
+        "plot_bgcolor": "rgba(0,0,0,0)",
+        "height": height,
+        "margin": {"l": 50, "r": 40, "t": 40, "b": 60, "pad": 4},
+        "font": {"family": "Plus Jakarta Sans, sans-serif", "color": "#cbd5e1"},
+        "showlegend": True,
+        "legend": {
+            "orientation": "h",
+            "y": -0.22,
+            "x": 0.5,
+            "xanchor": "center",
+            "font": {"size": 11, "color": "#94a3b8"},
+        },
+        "xaxis": {
+            "title": {"text": col_name, "font": {"color": "#cbd5e1", "size": 12}},
+            "tickfont": {"color": "#94a3b8", "size": 10, "family": "JetBrains Mono"},
+            "gridcolor": "rgba(255,255,255,0.05)",
+            "zeroline": False,
+        },
+        "yaxis": {
+            "title": {"text": "Count / Frequency", "font": {"color": "#cbd5e1", "size": 12}},
+            "tickfont": {"color": "#94a3b8", "size": 10, "family": "JetBrains Mono"},
+            "gridcolor": "rgba(255,255,255,0.05)",
+            "zeroline": False,
+        },
+        "shapes": shapes,
+        "annotations": annotations,
+    }
+
+    config = {
+        "responsive": True,
+        "displayModeBar": True,
+        "displaylogo": False,
+        "modeBarButtonsToRemove": ["lasso2d", "select2d"],
+    }
+
+    return {
+        "data": traces,
+        "layout": layout,
+        "config": config,
+    }
+
+
 def generate_summary_charts(df: pd.DataFrame) -> List[Dict[str, Any]]:
     """
     Generate standard exploratory charts for the dashboard.
     """
     return []
+
 
