@@ -91,6 +91,10 @@
                 <span>🎯 Outlier Detection</span>
                 <span class="badge-counter" id="outliers-count-badge">0</span>
             </button>
+            <button class="studio-tab-btn" id="tab-visualization-btn" data-tab="visualization-view">
+                <span>📈 Visualizations</span>
+                <span class="badge-counter" id="viz-count-badge">0</span>
+            </button>
             <button class="studio-tab-btn" id="tab-cleaning-btn" data-tab="cleaning-view">
                 <span>🧹 Data Quality & Cleaning Studio</span>
                 <span class="badge-counter" id="cleaning-issues-badge">0</span>
@@ -1028,6 +1032,170 @@
                                 <button class="btn btn-danger" id="btn-outliers-remove">
                                     <span>🗑️ Remove All Outlier Rows</span>
                                 </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+
+            <!-- ========================================================= -->
+            <!-- TAB: AUTOMATIC VISUALIZATION ENGINE (PHASE 8) -->
+            <!-- ========================================================= -->
+            <div class="studio-tab-content hidden" id="visualization-view">
+                
+                <!-- Section Header Banner -->
+                <section class="viz-header-section">
+                    <div class="section-title-wrap">
+                        <h2 class="section-title">Automatic Visualization Engine</h2>
+                        <span class="section-badge badge-indigo">Plotly Recommendation Engine</span>
+                    </div>
+                    <p class="section-subtitle">Intelligent chart recommendations based on column semantics, distributions, pairwise associations, temporal patterns, and an interactive custom chart builder studio.</p>
+                    
+                    <!-- Visualization Quick KPIs -->
+                    <div class="viz-kpi-bar" id="viz-kpi-bar">
+                        <div class="viz-kpi-item">
+                            <span class="viz-kpi-label">Recommended Charts</span>
+                            <strong class="viz-kpi-value text-indigo" id="viz-kpi-total-count">--</strong>
+                        </div>
+                        <div class="viz-kpi-item">
+                            <span class="viz-kpi-label">Distributions</span>
+                            <strong class="viz-kpi-value" id="viz-kpi-dist-count">--</strong>
+                        </div>
+                        <div class="viz-kpi-item">
+                            <span class="viz-kpi-label">Bivariate Relationships</span>
+                            <strong class="viz-kpi-value" id="viz-kpi-rel-count">--</strong>
+                        </div>
+                        <div class="viz-kpi-item">
+                            <span class="viz-kpi-label">Categorical Breakdown</span>
+                            <strong class="viz-kpi-value" id="viz-kpi-cat-count">--</strong>
+                        </div>
+                        <div class="viz-kpi-item">
+                            <span class="viz-kpi-label">Temporal Trends</span>
+                            <strong class="viz-kpi-value text-cyan" id="viz-kpi-trend-count">--</strong>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 1. RECOMMENDED VISUALIZATIONS SECTION -->
+                <section class="recommended-viz-section">
+                    <div class="section-header-flex">
+                        <div>
+                            <h3 class="subsection-title">Recommended Visualizations</h3>
+                            <p class="section-subtitle">Ranked by data relevance, statistical correlation, and feature distribution entropy.</p>
+                        </div>
+                        <!-- Recommendation Filter Pills -->
+                        <div class="viz-filter-group" id="viz-filter-group">
+                            <button class="viz-filter-btn active" data-filter="all">All Charts (<span id="rec-filter-all-count">0</span>)</button>
+                            <button class="viz-filter-btn" data-filter="Distributions">Distributions</button>
+                            <button class="viz-filter-btn" data-filter="Relationships">Relationships</button>
+                            <button class="viz-filter-btn" data-filter="Categorical">Categorical</button>
+                            <button class="viz-filter-btn" data-filter="Trends">Time Trends</button>
+                        </div>
+                    </div>
+
+                    <!-- Recommended Charts Grid -->
+                    <div class="recommended-charts-grid" id="recommended-charts-grid">
+                        <div class="viz-loading-placeholder">
+                            <div class="spinner"></div>
+                            <p>Analyzing column schemas and generating intelligent Plotly chart recommendations...</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 2. BUILD YOUR OWN CHART SECTION -->
+                <section class="custom-chart-builder-section">
+                    <div class="section-header-flex">
+                        <div>
+                            <h3 class="subsection-title">Build Your Own Chart</h3>
+                            <p class="section-subtitle">Select custom X and Y dimensions, color groupings, chart types, and aggregations for on-demand analysis.</p>
+                        </div>
+                        <span class="section-badge badge-cyan">Interactive Workbench</span>
+                    </div>
+
+                    <div class="chart-builder-card">
+                        <!-- Controls Toolbar Form -->
+                        <div class="builder-controls-grid">
+                            <!-- X Column -->
+                            <div class="builder-control-item">
+                                <label for="builder-x-col" class="control-label">X-Axis Column <span class="required-star">*</span></label>
+                                <select id="builder-x-col" class="custom-select custom-select-sm">
+                                    <option value="">Select X Column...</option>
+                                </select>
+                            </div>
+
+                            <!-- Y Column -->
+                            <div class="builder-control-item">
+                                <label for="builder-y-col" class="control-label">Y-Axis Column <span class="optional-label">(Optional)</span></label>
+                                <select id="builder-y-col" class="custom-select custom-select-sm">
+                                    <option value="">None / Frequency Count</option>
+                                </select>
+                            </div>
+
+                            <!-- Chart Type -->
+                            <div class="builder-control-item">
+                                <label for="builder-chart-type" class="control-label">Chart Type</label>
+                                <select id="builder-chart-type" class="custom-select custom-select-sm">
+                                    <option value="bar" selected>Bar Chart (Grouped / Frequency)</option>
+                                    <option value="line">Line Chart (Trend / Time Series)</option>
+                                    <option value="scatter">Scatter Plot (Correlation)</option>
+                                    <option value="histogram">Histogram (Distribution)</option>
+                                    <option value="box">Box Plot (Quartile Spread)</option>
+                                    <option value="pie">Donut / Pie Chart (Proportions)</option>
+                                    <option value="area">Area Chart (Filled Series)</option>
+                                </select>
+                            </div>
+
+                            <!-- Aggregation -->
+                            <div class="builder-control-item">
+                                <label for="builder-aggregation" class="control-label">Aggregation Function</label>
+                                <select id="builder-aggregation" class="custom-select custom-select-sm">
+                                    <option value="none" selected>None (Raw / Automatic)</option>
+                                    <option value="mean">Mean (Average)</option>
+                                    <option value="sum">Sum (Total)</option>
+                                    <option value="median">Median</option>
+                                    <option value="count">Count of Records</option>
+                                    <option value="min">Minimum Value</option>
+                                    <option value="max">Maximum Value</option>
+                                    <option value="std">Standard Deviation</option>
+                                </select>
+                            </div>
+
+                            <!-- Group / Color Column -->
+                            <div class="builder-control-item">
+                                <label for="builder-color-col" class="control-label">Group / Color <span class="optional-label">(Optional)</span></label>
+                                <select id="builder-color-col" class="custom-select custom-select-sm">
+                                    <option value="">No Grouping</option>
+                                </select>
+                            </div>
+
+                            <!-- Custom Title -->
+                            <div class="builder-control-item">
+                                <label for="builder-chart-title" class="control-label">Custom Chart Title</label>
+                                <input type="text" id="builder-chart-title" class="custom-input custom-input-sm" placeholder="e.g. Sales by Department" />
+                            </div>
+                        </div>
+
+                        <!-- Builder Action Buttons -->
+                        <div class="builder-actions-bar">
+                            <button class="btn btn-primary" id="btn-generate-custom-chart">
+                                <span class="btn-icon">⚡</span>
+                                <span>Generate / Update Chart</span>
+                            </button>
+                            <button class="btn btn-outline btn-sm" id="btn-reset-custom-chart">
+                                <span>↺ Reset Controls</span>
+                            </button>
+                            <span class="builder-hint-text">Charts render dynamically with interactive zoom, hover tooltips, and PNG export.</span>
+                        </div>
+
+                        <!-- Live Plotly Canvas -->
+                        <div class="custom-chart-canvas-wrap">
+                            <div id="custom-plotly-canvas" class="plotly-chart-wrapper">
+                                <div class="builder-empty-placeholder">
+                                    <span class="empty-icon">📊</span>
+                                    <h4>Custom Chart Workbench Ready</h4>
+                                    <p>Select your X and Y columns above and click "Generate / Update Chart" to render an interactive visualization.</p>
+                                </div>
                             </div>
                         </div>
                     </div>

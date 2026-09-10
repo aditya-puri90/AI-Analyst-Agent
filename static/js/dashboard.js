@@ -161,6 +161,31 @@ document.addEventListener('DOMContentLoaded', () => {
     const corrTableSearch = document.getElementById('corr-table-search');
     const rankedCorrelationsTbody = document.getElementById('ranked-correlations-tbody');
 
+    // DOM Elements - Phase 8 Automatic Visualization Engine
+    let allRecommendations = [];
+    let activeVizFilter = 'all';
+    let vizSchema = null;
+    const vizCountBadge = document.getElementById('viz-count-badge');
+    const vizKpiTotalCount = document.getElementById('viz-kpi-total-count');
+    const vizKpiDistCount = document.getElementById('viz-kpi-dist-count');
+    const vizKpiRelCount = document.getElementById('viz-kpi-rel-count');
+    const vizKpiCatCount = document.getElementById('viz-kpi-cat-count');
+    const vizKpiTrendCount = document.getElementById('viz-kpi-trend-count');
+    const recFilterAllCount = document.getElementById('rec-filter-all-count');
+    const recommendedChartsGrid = document.getElementById('recommended-charts-grid');
+    const vizFilterBtns = document.querySelectorAll('.viz-filter-btn');
+
+    // Custom Chart Builder DOM Elements
+    const builderXCol = document.getElementById('builder-x-col');
+    const builderYCol = document.getElementById('builder-y-col');
+    const builderChartType = document.getElementById('builder-chart-type');
+    const builderAggregation = document.getElementById('builder-aggregation');
+    const builderColorCol = document.getElementById('builder-color-col');
+    const builderChartTitle = document.getElementById('builder-chart-title');
+    const btnGenerateCustomChart = document.getElementById('btn-generate-custom-chart');
+    const btnResetCustomChart = document.getElementById('btn-reset-custom-chart');
+    const customPlotlyCanvas = document.getElementById('custom-plotly-canvas');
+
     // Helper: Format bytes
     function formatBytes(bytes, decimals = 2) {
         if (!bytes || bytes === 0) return '0 B';
@@ -207,6 +232,21 @@ document.addEventListener('DOMContentLoaded', () => {
             if (targetTabId === 'outliers-view' && window.Plotly && document.getElementById('outlier-plotly-chart')) {
                 setTimeout(() => {
                     Plotly.Plots.resize('outlier-plotly-chart');
+                }, 50);
+            }
+
+            // Auto-resize Plotly visualization charts when tab becomes visible
+            if (targetTabId === 'visualization-view' && window.Plotly) {
+                setTimeout(() => {
+                    allRecommendations.forEach((rec) => {
+                        const elId = `plotly-rec-${rec.id}`;
+                        if (document.getElementById(elId)) {
+                            Plotly.Plots.resize(elId);
+                        }
+                    });
+                    if (customPlotlyCanvas) {
+                        Plotly.Plots.resize('custom-plotly-canvas');
+                    }
                 }, 50);
             }
         });
@@ -304,7 +344,10 @@ document.addEventListener('DOMContentLoaded', () => {
             // 5. Fetch Phase 7 Outlier Detection
             await loadOutlierData(datasetId);
 
-            // 6. Load table preview (Raw)
+            // 6. Fetch Phase 8 Automatic Visualization Engine
+            await loadVisualizationData(datasetId);
+
+            // 7. Load table preview (Raw)
             isViewingCleanedData = false;
             if (viewRawDataBtn) viewRawDataBtn.classList.add('active');
             if (viewCleanDataBtn) viewCleanDataBtn.classList.remove('active');
@@ -2297,6 +2340,275 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (btnOutliersRemove) {
         btnOutliersRemove.addEventListener('click', () => executeOutlierRemediation('remove'));
+    }
+
+    // =========================================================================
+    // PHASE 8: AUTOMATIC VISUALIZATION ENGINE & CUSTOM CHART BUILDER
+    // =========================================================================
+
+    async function loadVisualizationData(datasetId) {
+        if (!datasetId) return;
+        try {
+            const res = await fetch(`/api/visualization/recommendations/${encodeURIComponent(datasetId)}?limit=12`);
+            const data = await res.json();
+            if (res.ok && data.success) {
+                allRecommendations = data.recommendations || [];
+                vizSchema = data.schema || {};
+
+                // Update badge counter
+                if (vizCountBadge) vizCountBadge.textContent = allRecommendations.length;
+                if (recFilterAllCount) recFilterAllCount.textContent = allRecommendations.length;
+
+                // Compute breakdown KPIs
+                let distCount = 0, relCount = 0, catCount = 0, trendCount = 0;
+                allRecommendations.forEach((r) => {
+                    const cat = (r.category || '').toLowerCase();
+                    if (cat.includes('dist')) distCount++;
+                    else if (cat.includes('rel')) relCount++;
+                    else if (cat.includes('cat')) catCount++;
+                    else if (cat.includes('trend')) trendCount++;
+                });
+
+                if (vizKpiTotalCount) vizKpiTotalCount.textContent = allRecommendations.length;
+                if (vizKpiDistCount) vizKpiDistCount.textContent = distCount;
+                if (vizKpiRelCount) vizKpiRelCount.textContent = relCount;
+                if (vizKpiCatCount) vizKpiCatCount.textContent = catCount;
+                if (vizKpiTrendCount) vizKpiTrendCount.textContent = trendCount;
+
+                renderRecommendedCharts();
+                populateCustomChartControls(allColumnsProfile, vizSchema);
+            }
+        } catch (err) {
+            console.error('Failed to load visualization data:', err);
+        }
+    }
+
+    function renderRecommendedCharts() {
+        if (!recommendedChartsGrid) return;
+
+        const filtered = activeVizFilter === 'all'
+            ? allRecommendations
+            : allRecommendations.filter((r) => (r.category || '').toLowerCase() === activeVizFilter.toLowerCase());
+
+        if (filtered.length === 0) {
+            recommendedChartsGrid.innerHTML = `
+                <div class="viz-empty-card">
+                    <span class="empty-icon">📊</span>
+                    <h4>No Recommended Visualizations in this Category</h4>
+                    <p>Try switching filter tabs or use "Build Your Own Chart" below to create custom visualizations.</p>
+                </div>
+            `;
+            return;
+        }
+
+        recommendedChartsGrid.innerHTML = '';
+
+        filtered.forEach((rec, idx) => {
+            const card = document.createElement('div');
+            card.className = 'rec-chart-card';
+
+            const priorityBadgeClass = rec.priority === 'High' ? 'badge-rose' : 'badge-cyan';
+            const chartId = `plotly-rec-${rec.id}`;
+
+            card.innerHTML = `
+                <div class="rec-chart-header">
+                    <div class="rec-title-wrap">
+                        <div class="rec-badges-row">
+                            <span class="rec-rank-badge">#${idx + 1}</span>
+                            <span class="modal-type-badge ${priorityBadgeClass}">${escapeHtml(rec.priority)} Priority</span>
+                            <span class="rec-type-badge">${escapeHtml((rec.chart_type || '').toUpperCase())}</span>
+                            <span class="rec-category-badge">${escapeHtml(rec.category || '')}</span>
+                        </div>
+                        <h4 class="rec-chart-title">${escapeHtml(rec.title)}</h4>
+                    </div>
+                </div>
+                
+                <div class="rec-rationale-box">
+                    <span class="rationale-icon">💡</span>
+                    <p class="rationale-text">${escapeHtml(rec.rationale)}</p>
+                </div>
+
+                <div class="rec-plotly-container" id="${chartId}">
+                    <div class="chart-loading-placeholder">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
+
+                <div class="rec-chart-footer">
+                    <div class="rec-cols-used">
+                        <span class="cols-label">Features:</span>
+                        ${(rec.columns_used || []).map(c => `<code class="col-pill">${escapeHtml(c)}</code>`).join(' ')}
+                    </div>
+                </div>
+            `;
+
+            recommendedChartsGrid.appendChild(card);
+
+            if (window.Plotly && rec.plotly_spec) {
+                setTimeout(() => {
+                    const el = document.getElementById(chartId);
+                    if (el) {
+                        Plotly.newPlot(chartId, rec.plotly_spec.data || [], rec.plotly_spec.layout || {}, rec.plotly_spec.config || PLOTLY_CONFIG);
+                    }
+                }, 40);
+            }
+        });
+    }
+
+    function populateCustomChartControls(columns, schema) {
+        if (!builderXCol || !builderYCol || !builderColorCol) return;
+
+        const colNames = (columns || []).map(c => (typeof c === 'object' && c !== null ? c.name : c)).filter(Boolean);
+
+        const prevX = builderXCol.value;
+        const prevY = builderYCol.value;
+        const prevColor = builderColorCol.value;
+
+        builderXCol.innerHTML = '<option value="">Select X Column...</option>';
+        builderYCol.innerHTML = '<option value="">None / Frequency Count</option>';
+        builderColorCol.innerHTML = '<option value="">No Grouping</option>';
+
+        colNames.forEach((col) => {
+            const optX = document.createElement('option');
+            optX.value = col;
+            optX.textContent = col;
+            if (col === prevX) optX.selected = true;
+            builderXCol.appendChild(optX);
+
+            const optY = document.createElement('option');
+            optY.value = col;
+            optY.textContent = col;
+            if (col === prevY) optY.selected = true;
+            builderYCol.appendChild(optY);
+
+            const optColor = document.createElement('option');
+            optColor.value = col;
+            optColor.textContent = col;
+            if (col === prevColor) optColor.selected = true;
+            builderColorCol.appendChild(optColor);
+        });
+
+        if (!builderXCol.value && colNames.length > 0) {
+            builderXCol.value = colNames[0];
+            if (colNames.length > 1) {
+                builderYCol.value = colNames[1];
+            }
+        }
+    }
+
+    async function executeGenerateCustomChart() {
+        if (!activeDatasetId) return;
+
+        const xCol = builderXCol ? builderXCol.value : '';
+        if (!xCol) {
+            alert('Please select an X-Axis column.');
+            return;
+        }
+
+        const yCol = builderYCol ? builderYCol.value : '';
+        const chartType = builderChartType ? builderChartType.value : 'bar';
+        const aggregation = builderAggregation ? builderAggregation.value : 'none';
+        const colorCol = builderColorCol ? builderColorCol.value : '';
+        const title = builderChartTitle ? builderChartTitle.value.trim() : '';
+
+        if (customPlotlyCanvas) {
+            customPlotlyCanvas.innerHTML = `
+                <div class="chart-loading-placeholder">
+                    <div class="spinner"></div>
+                    <p>Generating custom ${escapeHtml(chartType)} chart specification...</p>
+                </div>
+            `;
+        }
+
+        try {
+            const res = await fetch(`/api/visualization/custom/${encodeURIComponent(activeDatasetId)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chart_type: chartType,
+                    x_col: xCol,
+                    y_col: yCol || null,
+                    color_col: colorCol || null,
+                    aggregation: aggregation,
+                    title: title || null,
+                }),
+            });
+
+            const data = await res.json();
+            if (res.ok && data.success && data.spec && customPlotlyCanvas) {
+                customPlotlyCanvas.innerHTML = '';
+                Plotly.newPlot(
+                    'custom-plotly-canvas',
+                    data.spec.data || [],
+                    data.spec.layout || {},
+                    data.spec.config || PLOTLY_CONFIG
+                );
+            } else {
+                if (customPlotlyCanvas) {
+                    customPlotlyCanvas.innerHTML = `
+                        <div class="builder-empty-placeholder text-rose">
+                            <span class="empty-icon">⚠️</span>
+                            <h4>Chart Generation Error</h4>
+                            <p>${escapeHtml(data.error || 'Could not generate custom chart.')}</p>
+                        </div>
+                    `;
+                }
+            }
+        } catch (err) {
+            console.error('Failed to generate custom chart:', err);
+            if (customPlotlyCanvas) {
+                customPlotlyCanvas.innerHTML = `
+                    <div class="builder-empty-placeholder text-rose">
+                        <span class="empty-icon">⚠️</span>
+                        <h4>Chart Generation Request Failed</h4>
+                        <p>${escapeHtml(err.message)}</p>
+                    </div>
+                `;
+            }
+        }
+    }
+
+    // Event: Visualization Filter Buttons
+    vizFilterBtns.forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const filterVal = btn.getAttribute('data-filter') || 'all';
+            activeVizFilter = filterVal;
+            vizFilterBtns.forEach((b) => b.classList.remove('active'));
+            btn.classList.add('active');
+            renderRecommendedCharts();
+        });
+    });
+
+    // Event: Generate Custom Chart Button
+    if (btnGenerateCustomChart) {
+        btnGenerateCustomChart.addEventListener('click', () => {
+            executeGenerateCustomChart();
+        });
+    }
+
+    // Event: Reset Custom Chart Button
+    if (btnResetCustomChart) {
+        btnResetCustomChart.addEventListener('click', () => {
+            if (builderChartType) builderChartType.value = 'bar';
+            if (builderAggregation) builderAggregation.value = 'none';
+            if (builderColorCol) builderColorCol.value = '';
+            if (builderChartTitle) builderChartTitle.value = '';
+            if (allColumnsProfile && allColumnsProfile.length > 0) {
+                if (builderXCol) builderXCol.value = allColumnsProfile[0].name || '';
+                if (builderYCol && allColumnsProfile.length > 1) {
+                    builderYCol.value = allColumnsProfile[1].name || '';
+                }
+            }
+            if (customPlotlyCanvas) {
+                customPlotlyCanvas.innerHTML = `
+                    <div class="builder-empty-placeholder">
+                        <span class="empty-icon">📊</span>
+                        <h4>Custom Chart Workbench Ready</h4>
+                        <p>Select your X and Y columns above and click "Generate / Update Chart" to render an interactive visualization.</p>
+                    </div>
+                `;
+            }
+        });
     }
 
     // Initial Execution

@@ -60,6 +60,10 @@ from visualization.charts import (
     build_correlation_heatmap_spec,
     build_outlier_boxplot_spec,
     build_outlier_distribution_spec,
+    ChartRecommendationEngine,
+    recommend_charts,
+    build_custom_chart_spec,
+    inspect_column_types,
 )
 
 # Configure logging
@@ -130,7 +134,7 @@ def create_app() -> Flask:
         return jsonify({
             "status": "healthy",
             "service": "AI Data Analyst Agent",
-            "phase": "Phase 5 - Statistical Analysis & Phase 6 - Correlation Analysis Engine",
+            "phase": "Phase 5 - Statistical Analysis & Phase 6 - Correlation & Phase 7 - Outliers & Phase 8 - Automatic Visualization Engine",
             "max_upload_mb": Config.MAX_CONTENT_LENGTH / (1024 * 1024),
             "allowed_extensions": list(Config.ALLOWED_EXTENSIONS),
         })
@@ -746,6 +750,94 @@ def create_app() -> Flask:
             download_name=download_filename,
             mimetype="text/csv",
         )
+
+    # -------------------------------------------------------------
+    # Phase 8: Automatic Visualization Engine API Routes
+    # -------------------------------------------------------------
+    @app.route("/api/visualization/recommendations/<dataset_id>", methods=["GET"])
+    def get_visualization_recommendations_route(dataset_id: str):
+        """
+        Retrieve automated, ranked, non-redundant chart recommendations:
+        - Evaluates single numerical (histograms, box plots), single categorical (bars, donuts),
+          bivariate numerical (scatter with trend & r), datetime + numerical (time series),
+          categorical + numerical (aggregated bars), and datetime + categorical (temporal distributions).
+        - Prunes useless combinations (IDs, 0-variance).
+        - Returns Plotly dark-theme JSON specs and analytical rationales.
+        """
+        limit = request.args.get("limit", 12, type=int)
+        category_filter = request.args.get("category", "").strip() or None
+
+        df, error = load_dataset(dataset_id)
+        if error:
+            return jsonify({"success": False, "error": error}), 404
+
+        engine = ChartRecommendationEngine(df, dataset_id=dataset_id)
+        recommendations = engine.recommend(limit=limit, category_filter=category_filter)
+
+        return jsonify({
+            "success": True,
+            "dataset_id": dataset_id,
+            "count": len(recommendations),
+            "schema": engine.schema,
+            "recommendations": recommendations,
+        })
+
+    @app.route("/api/visualization/custom/<dataset_id>", methods=["POST"])
+    def generate_custom_chart_route(dataset_id: str):
+        """
+        Generate an interactive Plotly chart specification from user-selected parameters:
+        - Supports Chart Types: bar, line, scatter, histogram, box, pie/donut, area
+        - Supports Aggregations: none, mean, sum, median, count, min, max, std
+        - Supports X, Y, Color grouping, and custom titles.
+        """
+        df, error = load_dataset(dataset_id)
+        if error:
+            return jsonify({"success": False, "error": error}), 404
+
+        req_json = request.get_json() or {}
+        chart_type = req_json.get("chart_type", "bar")
+        x_col = req_json.get("x_col", "")
+        y_col = req_json.get("y_col", None)
+        color_col = req_json.get("color_col", None)
+        aggregation = req_json.get("aggregation", "none")
+        title = req_json.get("title", None)
+
+        if not x_col:
+            return jsonify({"success": False, "error": "Parameter 'x_col' is required."}), 400
+
+        spec = build_custom_chart_spec(
+            df=df,
+            chart_type=chart_type,
+            x_col=x_col,
+            y_col=y_col,
+            color_col=color_col,
+            aggregation=aggregation,
+            title=title,
+        )
+
+        return jsonify({
+            "success": True,
+            "dataset_id": dataset_id,
+            "chart_type": chart_type,
+            "spec": spec,
+        })
+
+    @app.route("/api/visualization/schema/<dataset_id>", methods=["GET"])
+    def get_visualization_schema_route(dataset_id: str):
+        """
+        Retrieve column role classification and available features for chart building.
+        """
+        df, error = load_dataset(dataset_id)
+        if error:
+            return jsonify({"success": False, "error": error}), 404
+
+        schema = inspect_column_types(df)
+        return jsonify({
+            "success": True,
+            "dataset_id": dataset_id,
+            "columns": list(df.columns),
+            "schema": schema,
+        })
 
     return app
 
