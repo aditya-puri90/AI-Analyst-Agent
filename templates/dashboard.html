@@ -76,9 +76,12 @@
             </div>
         </section>
 
-        <!-- Studio Main View Switcher Tabs -->
-        <section class="studio-tab-bar">
-            <button class="studio-tab-btn active" id="tab-profiler-btn" data-tab="profiler-view">
+            <button class="studio-tab-btn studio-tab-btn-ai" id="tab-insights-btn" data-tab="insights-view">
+                <span class="ai-sparkle">✨</span>
+                <span>AI Insights Engine</span>
+                <span class="badge-pill-ai" id="insights-ready-badge">Ready</span>
+            </button>
+            <button class="studio-tab-btn" id="tab-profiler-btn" data-tab="profiler-view">
                 <span>📊 Dataset Profiler & Overview</span>
             </button>
             <button class="studio-tab-btn" id="tab-statistics-btn" data-tab="statistics-view">
@@ -1244,10 +1247,249 @@
                         </table>
                     </div>
                 </section>
+            <!-- ========================================================= -->
+            <!-- TAB 4: AI INSIGHTS ENGINE VIEW (Phase 9) -->
+            <!-- ========================================================= -->
+            <div class="studio-tab-content hidden" id="insights-view">
+                <!-- AI Insights Header & Control Toolbar -->
+                <section class="insights-toolbar-section">
+                    <div class="insights-header-wrap">
+                        <div class="insights-title-box">
+                            <div class="insights-logo-badge">
+                                <span class="badge-icon">✨</span>
+                                <span>Phase 9 AI Insight Engine</span>
+                            </div>
+                            <h2 class="section-title">Automated Executive Intelligence Report</h2>
+                            <p class="section-subtitle">Natural-language strategic insights synthesized directly from verified Python statistical, quality, correlation, and anomaly engines.</p>
+                        </div>
+                        <div class="insights-grounding-pill">
+                            <span class="grounding-dot"></span>
+                            <span class="grounding-text">Deterministic Grounding: Zero Hallucination Mandate</span>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Generation Toolbar -->
+                    <div class="insights-controls-card">
+                        <div class="insights-controls-left">
+                            <div class="control-group">
+                                <label for="ai-provider-select" class="control-label">AI Engine Provider</label>
+                                <select id="ai-provider-select" class="custom-select custom-select-sm">
+                                    <option value="gemini">Google Gemini (Default)</option>
+                                    <option value="openai">OpenAI (GPT-4o)</option>
+                                    <option value="anthropic">Anthropic Claude (3.5 Sonnet)</option>
+                                    <option value="deterministic_fallback">Deterministic Fallback (No Key)</option>
+                                </select>
+                            </div>
+                            <div class="control-group">
+                                <label for="ai-model-select" class="control-label">Model Target</label>
+                                <select id="ai-model-select" class="custom-select custom-select-sm">
+                                    <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+                                    <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+                                    <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+                                </select>
+                            </div>
+                            <div class="provider-status-badge" id="ai-provider-status-badge">
+                                <span class="status-indicator"></span>
+                                <span id="ai-provider-status-text">Provider Ready</span>
+                            </div>
+                        </div>
+
+                        <div class="insights-controls-right">
+                            <button class="btn btn-primary" id="btn-generate-insights">
+                                <span class="btn-icon">⚡</span>
+                                <span id="btn-generate-text">Generate AI Insights</span>
+                            </button>
+                            <button class="btn btn-outline btn-sm" id="btn-copy-insights">
+                                <span class="btn-icon">📋</span>
+                                <span>Copy Report</span>
+                            </button>
+                            <button class="btn btn-outline btn-sm" id="btn-view-raw-context">
+                                <span class="btn-icon">🔍</span>
+                                <span>Python Context</span>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Insights Loading State -->
+                <div class="insights-loading hidden" id="insights-loading">
+                    <div class="ai-pulse-spinner">
+                        <div class="pulse-ring"></div>
+                        <div class="pulse-core">✨</div>
+                    </div>
+                    <h3 class="loading-title">Synthesizing Dataset Intelligence...</h3>
+                    <p class="loading-desc" id="insights-loading-step">Assembling structured analysis results from Python profiler, statistics, and correlation engines...</p>
+                </div>
+
+                <!-- Insights Results Container -->
+                <div class="insights-container" id="insights-container">
+                    <!-- 1. Executive Summary Hero Banner -->
+                    <section class="insights-hero-card" id="card-executive-summary">
+                        <div class="hero-card-header">
+                            <div class="hero-title-group">
+                                <span class="section-num-badge">01</span>
+                                <div>
+                                    <h3 class="hero-card-title">Executive Summary</h3>
+                                    <p class="hero-card-subtitle">Strategic overview of dataset volume, business health, and structural integrity</p>
+                                </div>
+                            </div>
+                            <div class="hero-tags">
+                                <span class="meta-pill pill-indigo" id="pill-dataset-dims">-- Rows × -- Cols</span>
+                                <span class="meta-pill pill-emerald" id="pill-dataset-health">Health Grade --</span>
+                                <span class="meta-pill pill-cyan" id="pill-engine-provider">Provider: --</span>
+                            </div>
+                        </div>
+                        <div class="hero-card-body markdown-rendered" id="content-executive-summary">
+                            <p class="placeholder-text">Click "Generate AI Insights" above to synthesize an executive overview of this dataset.</p>
+                        </div>
+                    </section>
+
+                    <!-- 2. Structured Section Grid (7 remaining sections) -->
+                    <div class="insights-sections-grid">
+                        
+                        <!-- Section 2: Key Findings -->
+                        <div class="insight-card" id="card-key-findings">
+                            <div class="insight-card-header">
+                                <div class="header-left">
+                                    <span class="card-icon-wrap icon-blue">🎯</span>
+                                    <div>
+                                        <h4 class="card-title">Key Findings</h4>
+                                        <span class="card-badge">Section 02 • Statistical Highlights</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="insight-card-body markdown-rendered" id="content-key-findings">
+                                <p class="placeholder-text">Loading key statistical highlights...</p>
+                            </div>
+                        </div>
+
+                        <!-- Section 3: Important Trends -->
+                        <div class="insight-card" id="card-important-trends">
+                            <div class="insight-card-header">
+                                <div class="header-left">
+                                    <span class="card-icon-wrap icon-cyan">📈</span>
+                                    <div>
+                                        <h4 class="card-title">Important Trends</h4>
+                                        <span class="card-badge">Section 03 • Distributions & Dynamics</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="insight-card-body markdown-rendered" id="content-important-trends">
+                                <p class="placeholder-text">Loading distribution and temporal trends...</p>
+                            </div>
+                        </div>
+
+                        <!-- Section 4: Important Relationships -->
+                        <div class="insight-card" id="card-important-relationships">
+                            <div class="insight-card-header">
+                                <div class="header-left">
+                                    <span class="card-icon-wrap icon-purple">🔗</span>
+                                    <div>
+                                        <h4 class="card-title">Important Relationships</h4>
+                                        <span class="card-badge">Section 04 • Correlation & Association</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="non-causation-alert">
+                                <span class="alert-icon">ℹ️</span>
+                                <span>Note: Statistical correlation indicates co-movement and does not establish causation.</span>
+                            </div>
+                            <div class="insight-card-body markdown-rendered" id="content-important-relationships">
+                                <p class="placeholder-text">Loading correlation and relationship insights...</p>
+                            </div>
+                        </div>
+
+                        <!-- Section 5: Data Quality Concerns -->
+                        <div class="insight-card" id="card-data-quality-concerns">
+                            <div class="insight-card-header">
+                                <div class="header-left">
+                                    <span class="card-icon-wrap icon-amber">🛡️</span>
+                                    <div>
+                                        <h4 class="card-title">Data Quality Concerns</h4>
+                                        <span class="card-badge">Section 05 • Integrity & Cleanliness</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="insight-card-body markdown-rendered" id="content-data-quality-concerns">
+                                <p class="placeholder-text">Loading data quality audit concerns...</p>
+                            </div>
+                        </div>
+
+                        <!-- Section 6: Potential Outlier Findings -->
+                        <div class="insight-card" id="card-potential-outliers">
+                            <div class="insight-card-header">
+                                <div class="header-left">
+                                    <span class="card-icon-wrap icon-rose">⚠️</span>
+                                    <div>
+                                        <h4 class="card-title">Potential Outlier Findings</h4>
+                                        <span class="card-badge">Section 06 • Anomalies & Extreme Tails</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="insight-card-body markdown-rendered" id="content-potential-outliers">
+                                <p class="placeholder-text">Loading outlier and anomaly findings...</p>
+                            </div>
+                        </div>
+
+                        <!-- Section 7: Business Recommendations -->
+                        <div class="insight-card insight-card-accent" id="card-business-recommendations">
+                            <div class="insight-card-header">
+                                <div class="header-left">
+                                    <span class="card-icon-wrap icon-emerald">💡</span>
+                                    <div>
+                                        <h4 class="card-title">Business & Data Recommendations</h4>
+                                        <span class="card-badge">Section 07 • Actionable Strategy</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="insight-card-body markdown-rendered" id="content-business-recommendations">
+                                <p class="placeholder-text">Loading strategic business and data recommendations...</p>
+                            </div>
+                        </div>
+
+                        <!-- Section 8: Suggested Follow-up Analysis -->
+                        <div class="insight-card insight-card-accent" id="card-suggested-follow-up">
+                            <div class="insight-card-header">
+                                <div class="header-left">
+                                    <span class="card-icon-wrap icon-indigo">🔬</span>
+                                    <div>
+                                        <h4 class="card-title">Suggested Follow-up Analysis</h4>
+                                        <span class="card-badge">Section 08 • Recommended Deep-Dives</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="insight-card-body markdown-rendered" id="content-suggested-follow-up">
+                                <p class="placeholder-text">Loading suggested analytical next steps...</p>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
             </div>
 
         </div>
     </main>
+
+    <!-- Raw Grounding Python Context Modal (Phase 9) -->
+    <div class="modal-backdrop hidden" id="raw-context-modal">
+        <div class="modal-dialog modal-dialog-lg">
+            <div class="modal-header">
+                <div class="modal-title-wrap">
+                    <span class="modal-type-badge badge-indigo">Zero Hallucination Audit</span>
+                    <h3 class="modal-title">Structured Python Analysis Context</h3>
+                    <code class="modal-dtype">Exact JSON Ground Truth fed to AI</code>
+                </div>
+                <button class="modal-close-btn" id="modal-raw-context-close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-intro-text">This JSON payload was deterministically computed by our Python profiler, quality auditor, statistical engine, correlation analyzer, and anomaly detector. Every insight generated by the AI is strictly grounded in these exact values.</p>
+                <div class="code-viewer-container">
+                    <pre><code class="json-code-block" id="raw-context-json-content">Loading structured context...</code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
 
     <!-- Outlier Records Drill-Down Inspector Modal -->
     <div class="modal-backdrop hidden" id="outlier-inspector-modal">

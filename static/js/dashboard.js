@@ -186,6 +186,43 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnResetCustomChart = document.getElementById('btn-reset-custom-chart');
     const customPlotlyCanvas = document.getElementById('custom-plotly-canvas');
 
+    // DOM Elements - Phase 9 AI Insight Engine
+    let currentInsights = null;
+    let configuredAiProviders = {};
+    const tabInsightsBtn = document.getElementById('tab-insights-btn');
+    const insightsReadyBadge = document.getElementById('insights-ready-badge');
+    const aiProviderSelect = document.getElementById('ai-provider-select');
+    const aiModelSelect = document.getElementById('ai-model-select');
+    const aiProviderStatusBadge = document.getElementById('ai-provider-status-badge');
+    const aiProviderStatusText = document.getElementById('ai-provider-status-text');
+    const btnGenerateInsights = document.getElementById('btn-generate-insights');
+    const btnGenerateText = document.getElementById('btn-generate-text');
+    const btnCopyInsights = document.getElementById('btn-copy-insights');
+    const btnViewRawContext = document.getElementById('btn-view-raw-context');
+    const insightsLoading = document.getElementById('insights-loading');
+    const insightsLoadingStep = document.getElementById('insights-loading-step');
+    const insightsContainer = document.getElementById('insights-container');
+
+    // Card & Hero Content Bodies
+    const contentExecutiveSummary = document.getElementById('content-executive-summary');
+    const contentKeyFindings = document.getElementById('content-key-findings');
+    const contentImportantTrends = document.getElementById('content-important-trends');
+    const contentImportantRelationships = document.getElementById('content-important-relationships');
+    const contentDataQualityConcerns = document.getElementById('content-data-quality-concerns');
+    const contentPotentialOutliers = document.getElementById('content-potential-outliers');
+    const contentBusinessRecommendations = document.getElementById('content-business-recommendations');
+    const contentSuggestedFollowUp = document.getElementById('content-suggested-follow-up');
+
+    // Hero Meta Pills
+    const pillDatasetDims = document.getElementById('pill-dataset-dims');
+    const pillDatasetHealth = document.getElementById('pill-dataset-health');
+    const pillEngineProvider = document.getElementById('pill-engine-provider');
+
+    // Raw Grounding Python Context Modal
+    const rawContextModal = document.getElementById('raw-context-modal');
+    const modalRawContextCloseBtn = document.getElementById('modal-raw-context-close-btn');
+    const rawContextJsonContent = document.getElementById('raw-context-json-content');
+
     // Helper: Format bytes
     function formatBytes(bytes, decimals = 2) {
         if (!bytes || bytes === 0) return '0 B';
@@ -353,6 +390,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (viewCleanDataBtn) viewCleanDataBtn.classList.remove('active');
             currentPage = 1;
             await loadTablePreview(datasetId, currentPage);
+
+            // 8. Fetch Phase 9 AI Insights
+            await loadAiProviders();
+            await loadDatasetInsights(datasetId);
 
             if (loadingState) loadingState.classList.add('hidden');
             if (contentState) contentState.classList.remove('hidden');
@@ -2611,11 +2652,338 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // =========================================================================
+    // PHASE 9: AI INSIGHT ENGINE CONTROLLER
+    // =========================================================================
+
+    function renderMarkdownToHtml(md) {
+        if (!md) return '<p class="placeholder-text">No insights generated for this section.</p>';
+        let html = escapeHtml(md);
+
+        // Code blocks
+        html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+        // Inline code
+        html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+        // Bold
+        html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+        // Italics
+        html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+        const lines = html.split('\n');
+        let inList = false;
+        let processed = [];
+
+        lines.forEach((line) => {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+                if (!inList) {
+                    processed.push('<ul>');
+                    inList = true;
+                }
+                processed.push(`<li>${trimmed.substring(2)}</li>`);
+            } else {
+                if (inList) {
+                    processed.push('</ul>');
+                    inList = false;
+                }
+                if (trimmed.startsWith('### ')) {
+                    processed.push(`<h4>${trimmed.substring(4)}</h4>`);
+                } else if (trimmed.startsWith('## ')) {
+                    processed.push(`<h3>${trimmed.substring(3)}</h3>`);
+                } else if (trimmed.startsWith('# ')) {
+                    processed.push(`<h2>${trimmed.substring(2)}</h2>`);
+                } else if (trimmed.length > 0) {
+                    processed.push(`<p>${trimmed}</p>`);
+                }
+            }
+        });
+
+        if (inList) {
+            processed.push('</ul>');
+        }
+
+        return processed.join('\n');
+    }
+
+    async function loadAiProviders() {
+        try {
+            const res = await fetch('/api/insights/providers');
+            const data = await res.json();
+            if (res.ok && data.success && data.providers) {
+                configuredAiProviders = data.providers;
+                const activeProv = data.active_provider || 'gemini';
+
+                if (aiProviderSelect) {
+                    aiProviderSelect.innerHTML = '';
+                    Object.entries(data.providers).forEach(([key, prov]) => {
+                        const opt = document.createElement('option');
+                        opt.value = key;
+                        const statusLabel = prov.configured ? '✓ Ready' : 'Key missing (Fallback)';
+                        opt.textContent = `${prov.name} (${statusLabel})`;
+                        if (key === activeProv) opt.selected = true;
+                        aiProviderSelect.appendChild(opt);
+                    });
+                }
+
+                updateAiModelOptions(activeProv);
+            }
+        } catch (e) {
+            console.error('Failed to load AI providers:', e);
+        }
+    }
+
+    function updateAiModelOptions(providerKey) {
+        if (!aiModelSelect) return;
+        aiModelSelect.innerHTML = '';
+        const prov = configuredAiProviders[providerKey] || {};
+        const models = prov.models || ['default'];
+        models.forEach((m) => {
+            const opt = document.createElement('option');
+            opt.value = m;
+            opt.textContent = m;
+            if (m === prov.default_model) opt.selected = true;
+            aiModelSelect.appendChild(opt);
+        });
+
+        if (aiProviderStatusText && aiProviderStatusBadge) {
+            if (prov.configured) {
+                aiProviderStatusText.textContent = `${prov.name} Ready`;
+                aiProviderStatusBadge.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+                aiProviderStatusBadge.style.color = '#6ee7b7';
+            } else {
+                aiProviderStatusText.textContent = `${prov.name} (Deterministic Fallback)`;
+                aiProviderStatusBadge.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+                aiProviderStatusBadge.style.color = '#fde68a';
+            }
+        }
+    }
+
+    async function loadDatasetInsights(datasetId, forceRefresh = false) {
+        if (!datasetId) return;
+
+        if (insightsLoading) insightsLoading.classList.remove('hidden');
+        if (insightsContainer) insightsContainer.classList.add('hidden');
+        if (btnGenerateText) btnGenerateText.textContent = 'Synthesizing...';
+
+        try {
+            const url = `/api/insights/${encodeURIComponent(datasetId)}${forceRefresh ? '?refresh=true' : ''}`;
+            const res = await fetch(url);
+            const data = await res.json();
+
+            if (res.ok && data.success && data.insights) {
+                currentInsights = data.insights;
+                renderInsightsPayload(data.insights);
+            } else {
+                renderInsightsError(data.error || 'Failed to generate insights.');
+            }
+        } catch (err) {
+            console.error('Failed to load insights:', err);
+            renderInsightsError(err.message);
+        } finally {
+            if (insightsLoading) insightsLoading.classList.add('hidden');
+            if (insightsContainer) insightsContainer.classList.remove('hidden');
+            if (btnGenerateText) btnGenerateText.textContent = 'Generate / Refresh Insights';
+        }
+    }
+
+    async function executeGenerateInsights() {
+        if (!activeDatasetId) return;
+
+        const provider = aiProviderSelect ? aiProviderSelect.value : null;
+        const model = aiModelSelect ? aiModelSelect.value : null;
+
+        if (insightsLoading) insightsLoading.classList.remove('hidden');
+        if (insightsContainer) insightsContainer.classList.add('hidden');
+        if (btnGenerateText) btnGenerateText.textContent = 'Synthesizing LLM Insights...';
+
+        // Step animation progression
+        if (insightsLoadingStep) {
+            insightsLoadingStep.textContent = 'Assembling structured metrics from Python profiler, statistics, correlation, and outlier engines...';
+            setTimeout(() => {
+                if (insightsLoadingStep) {
+                    insightsLoadingStep.textContent = 'Synthesizing natural-language strategic report via AI engine...';
+                }
+            }, 600);
+        }
+
+        try {
+            const res = await fetch(`/api/insights/generate/${encodeURIComponent(activeDatasetId)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ provider, model }),
+            });
+            const data = await res.json();
+
+            if (res.ok && data.success && data.insights) {
+                currentInsights = data.insights;
+                renderInsightsPayload(data.insights);
+            } else {
+                renderInsightsError(data.error || 'Failed to generate AI insights.');
+            }
+        } catch (err) {
+            console.error('Failed to trigger AI insight generation:', err);
+            renderInsightsError(err.message);
+        } finally {
+            if (insightsLoading) insightsLoading.classList.add('hidden');
+            if (insightsContainer) insightsContainer.classList.remove('hidden');
+            if (btnGenerateText) btnGenerateText.textContent = 'Generate / Refresh Insights';
+        }
+    }
+
+    function renderInsightsPayload(insightsData) {
+        const sections = insightsData.sections || {};
+        const meta = insightsData.metadata || {};
+        const ctx = insightsData.context_summary || {};
+
+        // 1. Executive Summary
+        if (contentExecutiveSummary) {
+            contentExecutiveSummary.innerHTML = renderMarkdownToHtml(sections.executive_summary);
+        }
+
+        // Meta Pills
+        if (pillDatasetDims) {
+            pillDatasetDims.textContent = `${ctx.total_rows || '--'} Rows × ${ctx.total_columns || '--'} Columns`;
+        }
+        if (pillDatasetHealth) {
+            pillDatasetHealth.textContent = `Grade ${ctx.health_grade || 'A'} (${ctx.health_score || '--'}/100)`;
+        }
+        if (pillEngineProvider) {
+            const modeText = meta.generation_mode === 'llm' ? 'Live LLM' : 'Verified Deterministic';
+            pillEngineProvider.textContent = `${meta.provider || 'AI'} • ${modeText}`;
+        }
+
+        // Remaining 7 sections
+        if (contentKeyFindings) {
+            contentKeyFindings.innerHTML = renderMarkdownToHtml(sections.key_findings);
+        }
+        if (contentImportantTrends) {
+            contentImportantTrends.innerHTML = renderMarkdownToHtml(sections.important_trends);
+        }
+        if (contentImportantRelationships) {
+            contentImportantRelationships.innerHTML = renderMarkdownToHtml(sections.important_relationships);
+        }
+        if (contentDataQualityConcerns) {
+            contentDataQualityConcerns.innerHTML = renderMarkdownToHtml(sections.data_quality_concerns);
+        }
+        if (contentPotentialOutliers) {
+            contentPotentialOutliers.innerHTML = renderMarkdownToHtml(sections.potential_outlier_findings);
+        }
+        if (contentBusinessRecommendations) {
+            contentBusinessRecommendations.innerHTML = renderMarkdownToHtml(sections.business_recommendations);
+        }
+        if (contentSuggestedFollowUp) {
+            contentSuggestedFollowUp.innerHTML = renderMarkdownToHtml(sections.suggested_follow_up);
+        }
+
+        // Update ready badge
+        if (insightsReadyBadge) {
+            insightsReadyBadge.textContent = '8 Sections Ready';
+        }
+    }
+
+    function renderInsightsError(errorMsg) {
+        if (contentExecutiveSummary) {
+            contentExecutiveSummary.innerHTML = `
+                <div class="builder-empty-placeholder text-rose">
+                    <span class="empty-icon">⚠️</span>
+                    <h4>AI Insight Engine Notice</h4>
+                    <p>${escapeHtml(errorMsg)}</p>
+                </div>
+            `;
+        }
+    }
+
+    function copyInsightsReport() {
+        if (!currentInsights || !currentInsights.raw_markdown) {
+            alert('No insights available to copy. Please generate insights first.');
+            return;
+        }
+
+        navigator.clipboard.writeText(currentInsights.raw_markdown).then(() => {
+            if (btnCopyInsights) {
+                const originalHtml = btnCopyInsights.innerHTML;
+                btnCopyInsights.innerHTML = '<span class="btn-icon">✓</span><span>Copied!</span>';
+                btnCopyInsights.classList.add('btn-success');
+                setTimeout(() => {
+                    btnCopyInsights.innerHTML = originalHtml;
+                    btnCopyInsights.classList.remove('btn-success');
+                }, 2000);
+            }
+        }).catch((err) => {
+            console.error('Failed to copy to clipboard:', err);
+            alert('Failed to copy report to clipboard.');
+        });
+    }
+
+    async function showRawContextModal(datasetId) {
+        if (!datasetId) return;
+
+        if (rawContextModal) rawContextModal.classList.remove('hidden');
+        if (rawContextJsonContent) rawContextJsonContent.textContent = 'Loading Python engine context...';
+
+        try {
+            const res = await fetch(`/api/insights/context/${encodeURIComponent(datasetId)}`);
+            const data = await res.json();
+            if (res.ok && data.success && data.analysis_context) {
+                if (rawContextJsonContent) {
+                    rawContextJsonContent.textContent = JSON.stringify(data.analysis_context, null, 2);
+                }
+            } else {
+                if (rawContextJsonContent) {
+                    rawContextJsonContent.textContent = 'Error loading analysis context.';
+                }
+            }
+        } catch (e) {
+            if (rawContextJsonContent) {
+                rawContextJsonContent.textContent = `Error: ${e.message}`;
+            }
+        }
+    }
+
+    // Event Listeners - Phase 9
+    if (aiProviderSelect) {
+        aiProviderSelect.addEventListener('change', () => {
+            updateAiModelOptions(aiProviderSelect.value);
+        });
+    }
+
+    if (btnGenerateInsights) {
+        btnGenerateInsights.addEventListener('click', () => {
+            executeGenerateInsights();
+        });
+    }
+
+    if (btnCopyInsights) {
+        btnCopyInsights.addEventListener('click', () => {
+            copyInsightsReport();
+        });
+    }
+
+    if (btnViewRawContext) {
+        btnViewRawContext.addEventListener('click', () => {
+            showRawContextModal(activeDatasetId);
+        });
+    }
+
+    if (modalRawContextCloseBtn && rawContextModal) {
+        modalRawContextCloseBtn.addEventListener('click', () => {
+            rawContextModal.classList.add('hidden');
+        });
+    }
+
+    // Modal backdrop click close
+    if (rawContextModal) {
+        rawContextModal.addEventListener('click', (e) => {
+            if (e.target === rawContextModal) {
+                rawContextModal.classList.add('hidden');
+            }
+        });
+    }
+
     // Initial Execution
     (async () => {
         await loadDatasetsList();
         await loadDatasetDashboard(activeDatasetId);
     })();
 });
-
 
