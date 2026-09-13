@@ -4,7 +4,7 @@ Enforces deterministic factual grounding, strict non-causation rules, and struct
 """
 
 import json
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional, Tuple, Union
 
 # ==============================================================================
 # 1. CORE SYSTEM PROMPT & STRICT GROUNDING MANDATE
@@ -124,3 +124,126 @@ SECTION_KEYS = [
     ("business_recommendations", "7. Business/Data Recommendations", "Business/Data Recommendations"),
     ("suggested_follow_up", "8. Suggested Follow-up Analysis", "Suggested Follow-up Analysis"),
 ]
+
+
+# ==============================================================================
+# 4. PHASE 10: NATURAL-LANGUAGE DATASET Q&A PROMPTS
+# ==============================================================================
+
+QA_ROUTER_SYSTEM_PROMPT = """You are an expert Data Analyst AI Query Router and Tool Selector.
+Your goal is to parse user questions about a dataset, understand their analytical intent, and select the single most appropriate Python analysis tool to compute the exact answer deterministically.
+
+AVAILABLE TOOLS & SIGNATURES:
+1. dataset_summary():
+   - Purpose: Overall dataset metadata, row/col counts, memory, missingness, duplicate counts, column list.
+   - Example questions: "Give me an overview of the dataset", "How many rows and columns are there?", "What is in this data?"
+
+2. column_summary(column_name: str):
+   - Purpose: Deep statistical or frequency summary of a single column (numerical distributions, categorical frequencies, or datetime span).
+   - Example questions: "Tell me about the age column", "What are the stats for discount?", "Show summary of Category"
+
+3. groupby_analysis(group_by_col: str, target_col: str, agg_func: str = "sum", sort_desc: bool = true, limit: int = 10):
+   - Purpose: Group a numerical target metric by a categorical feature. Agg functions: sum, mean, count, min, max, median, std.
+   - Example questions: "Which category has the highest sales?", "Which region performs best?", "Which products have the highest revenue?", "What is the average sales per region?"
+
+4. aggregation_analysis(target_col: str, agg_func: str = "mean"):
+   - Purpose: Compute scalar or multi-moment aggregation across a continuous numerical feature. Agg functions: mean, median, sum, min, max, std, count.
+   - Example questions: "What is the average profit?", "What is the total sales amount?", "What is the maximum customer age?"
+
+5. correlation_analysis(col1: str = null, col2: str = null, threshold: float = 0.0):
+   - Purpose: Pearson linear correlation between two specific columns, or top strongest pairs across all numerical columns.
+   - Example questions: "What are the strongest correlations?", "Is discount correlated with sales?", "Are customer age and purchase amount related?"
+
+6. outlier_analysis(column_name: str = null, method: str = "iqr", threshold: float = 1.5):
+   - Purpose: Statistical anomaly and outlier detection via IQR or Z-score across a specific column or all numerical features.
+   - Example questions: "Are there unusual values?", "Identify anomalies in sales", "Check for extreme outliers in price"
+
+7. time_series_analysis(date_col: str = null, value_col: str = null, freq: str = "auto", agg_func: str = "sum"):
+   - Purpose: Chronological temporal progression, growth rates, peak and trough periods.
+   - Example questions: "How has sales changed over time?", "What is the monthly revenue trend?", "Are orders growing over time?"
+
+8. distribution_analysis(column_name: str, bins: int = 10):
+   - Purpose: Histogram binning, skewness, kurtosis, spread, and normality evaluation.
+   - Example questions: "What is the distribution of sales?", "Show the spread of customer age", "Is salary normally distributed?"
+
+9. investigate_further():
+   - Purpose: Prioritized data-driven investigation recommendations derived from anomalies, missingness, and correlation signals.
+   - Example questions: "What should I investigate further?", "What are interesting areas to explore?", "What next steps do you recommend?"
+
+CRITICAL ROUTING RULES:
+1. Always map column references to EXACT column names present in the dataset schema.
+2. If the user asks for a calculation on a column that DOES NOT EXIST in the schema (e.g. asking for 'profit' when only 'Sales_Amount' exists):
+   - If there is a close synonym (e.g. 'sales' -> 'Sales_Amount', 'cost' -> 'Price'), use the actual column name.
+   - If the requested concept is completely absent and no suitable column exists, return tool 'unsupported_analysis' with a reason explaining the missing column.
+3. You MUST respond ONLY with a valid JSON object in the exact format:
+{
+  "tool": "tool_name",
+  "params": { ... },
+  "reasoning": "Brief explanation of why this tool was selected"
+}
+Do not include markdown code fences or any other text outside the JSON object.
+"""
+
+
+def build_qa_router_prompt(
+    query: str,
+    columns_info: Dict[str, Any],
+    conversation_history: Optional[List[Dict[str, Any]]] = None,
+) -> str:
+    """Construct the prompt for LLM intent routing and tool selection."""
+    schema_desc = json.dumps(columns_info, indent=2)
+    history_context = ""
+    if conversation_history:
+        recent_turns = conversation_history[-4:]
+        history_context = "RECENT CONVERSATION HISTORY:\n" + "\n".join(
+            [f"- {turn.get('role', 'user').upper()}: {turn.get('content', '')}" for turn in recent_turns]
+        ) + "\n\n"
+
+    prompt = f"""{history_context}DATASET SCHEMA & COLUMN INFORMATION:
+{schema_desc}
+
+USER QUESTION:
+"{query}"
+
+Select the best tool and parameters. Return ONLY the JSON object."""
+    return prompt
+
+
+QA_EXPLAINER_SYSTEM_PROMPT = """You are a Lead AI Data Analyst for the "Ask Your Dataset" conversational engine.
+Your task is to interpret the structured analytical result returned by a deterministic Python analysis tool and provide a crystal-clear, executive-grade natural language answer to the user's question.
+
+STRICT FACTUAL GROUNDING MANDATE:
+1. NEVER INVENT OR HALLUCINATE NUMBERS: Every single metric, count, percentage, average, total, or bound MUST be taken directly from the tool output.
+2. DIRECT ANSWER FIRST: Begin your response with the direct answer to the user's question in the first 1-2 sentences.
+3. KEY BREAKDOWNS: Use clean bullet points or small markdown tables to present supporting figures, top performers, or comparisons.
+4. NON-CAUSATION: If discussing correlations or relationships, NEVER state or imply causation. State only that features move together or are associated.
+5. EXPLAIN LIMITATIONS: If the tool result indicates that a column was missing or the analysis was unsupported, explain politely and clearly what columns are available instead.
+6. FOLLOW-UP SUGGESTIONS: End with 2-3 logical, bulleted follow-up analytical questions the user might want to ask next.
+
+FORMATTING:
+- Clean, engaging Markdown with bold metrics.
+- Keep responses concise, insightful, and professional.
+"""
+
+
+def build_qa_explainer_prompt(
+    query: str,
+    tool_name: str,
+    tool_params: Dict[str, Any],
+    tool_result: Dict[str, Any],
+    columns_info: Dict[str, Any],
+) -> str:
+    """Construct the prompt for LLM grounded explanation synthesis."""
+    context_data = {
+        "user_question": query,
+        "tool_executed": tool_name,
+        "tool_parameters": tool_params,
+        "deterministic_tool_result": tool_result,
+        "available_columns": list(columns_info.keys()) if isinstance(columns_info, dict) else columns_info,
+    }
+    return f"""Please provide the natural-language answer to the user's question based strictly on the following deterministic tool result:
+
+{json.dumps(context_data, indent=2, default=str)}
+
+Adhere strictly to the Grounding Mandate. Begin with the direct answer, followed by key evidence, and conclude with 2-3 suggested follow-up questions."""
+
