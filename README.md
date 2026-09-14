@@ -226,6 +226,23 @@ AI-Data-Analyst-Agent/
   - [x] Non-destructive remediation operations (`Remove Outlier Rows`, `Cap Outliers to Bounds`, `Remove Data Errors Only`, `Keep All Outliers`) saving separate datasets to `data/processed/` with parent lineage.
   - [x] Standalone CLI demo `run_outliers_demo.py` and 89 passing automated pytest suites.
 
+- [x] **Phase 8: Automatic Visualization Engine & Chart Recommendation System**
+  - [x] Schema-aware heuristic chart recommender (Categorical vs Numerical -> Bar, Temporal vs Numerical -> Line, Numerical Distribution -> Histogram, Anomaly -> Box Plot, Feature Pairs -> Correlation Heatmap).
+  - [x] Dynamic Plotly JSON chart specifications with responsive dark-glassmorphic styling.
+- [x] **Phase 9: AI Insight Engine & Executive Summary Synthesis**
+  - [x] Deterministic context builder aggregating statistical moments, correlation networks, outlier thresholds, and quality scores.
+  - [x] Multi-provider LLM integration (Google Gemini, OpenAI GPT-4o, Anthropic Claude 3.5 Sonnet) with zero-key offline deterministic fallback.
+  - [x] 8-section grounded executive report synthesis (Executive Summary, Quality Audit, Key Findings, Anomalies, Correlations, Risk Flags, Strategic Recommendations, Methodological Notes).
+  - [x] Standalone CLI runner `run_insights_demo.py` and regression test suite.
+- [x] **Phase 10: Natural-Language Dataset Q&A ("Ask Your Dataset")**
+  - [x] Conversational analytics layer routing plain-English queries to 9 safe deterministic Python analysis tools.
+  - [x] Safe tools: `dataset_summary()`, `column_summary()`, `groupby_analysis()`, `aggregation_analysis()`, `correlation_analysis()`, `outlier_analysis()`, `time_series_analysis()`, `distribution_analysis()`, `investigate_further()`.
+  - [x] Strict factual grounding: zero numerical hallucinations with every figure directly computed on Pandas DataFrames.
+  - [x] Resilient schema & missing column handling: gracefully explains unsupported queries and suggests valid candidate columns.
+  - [x] Interactive Plotly visualization spec generation matched to tool output (bar, line, heatmap, boxplot, histogram).
+  - [x] Full "Ask Your Dataset" conversational workspace (`/chat`) with session memory, tool badges, JSON inspector drawer, quick prompt chips, and transcript export.
+  - [x] Standalone CLI demo `run_qa_demo.py` and 166 passing automated pytest test cases.
+
 ---
 
 ## 🚀 Installation & Setup
@@ -276,7 +293,22 @@ The application will be accessible at:
 ### Available Pages:
 - **`http://127.0.0.1:5000/`** - Home & CSV Upload Zone
 - **`http://127.0.0.1:5000/dashboard`** - Analytics Dashboard, Profiler & Data Cleaning Studio
-- **`http://127.0.0.1:5000/chat`** - AI Agent Conversational Interface
+- **`http://127.0.0.1:5000/chat`** - "Ask Your Dataset" AI Conversational Workspace
+
+### Standalone CLI Runners:
+```bash
+# Phase 6 Correlation Analysis Demo
+python run_correlation_demo.py
+
+# Phase 7 Outlier & Anomaly Detection Demo
+python run_outliers_demo.py
+
+# Phase 9 AI Insight Engine Demo
+python run_insights_demo.py
+
+# Phase 10 Natural-Language Dataset Q&A Demo
+python run_qa_demo.py
+```
 
 ---
 
@@ -294,6 +326,12 @@ The application will be accessible at:
 | `/api/cleaning/preview/<dataset_id>` | `GET` | Generate before-and-after transformation preview pairs |
 | `/api/cleaning/apply/<dataset_id>` | `POST` | Execute configurable cleaning pipeline & persist to `data/processed/` |
 | `/api/cleaning/download/<dataset_id>` | `GET` | Download cleaned CSV file from `data/processed/` |
+| `/api/insights/<dataset_id>` | `POST` | Generate grounded 8-section AI executive summary report |
+| `/api/chat/ask` | `POST` | Ask natural language question, execute tool, and get grounded answer |
+| `/api/chat/history/<dataset_id>` | `GET` | Retrieve multi-turn conversation history for active dataset |
+| `/api/chat/clear/<dataset_id>` | `POST` | Clear conversation history for active dataset |
+| `/api/chat/suggested-questions/<dataset_id>` | `GET` | Dynamically generated schema-tailored question chips |
+| `/api/chat/tools` | `GET` | List available safe deterministic analysis tools |
 
 ---
 
@@ -301,5 +339,7 @@ The application will be accessible at:
 
 Run the automated test suite with `pytest`:
 ```bash
-python -m pytest -v tests/
+python -m pytest -v
 ```
+
+All **166 test cases** across all phases pass with 100% test coverage.
