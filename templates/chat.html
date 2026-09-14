@@ -3,19 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="AI Data Analyst Agent - Natural language dataset analysis and business insight queries.">
-    <title>AI Analyst Chat | AI Data Analyst Agent</title>
+    <meta name="description" content="Ask Your Dataset - Natural language AI data analyst Q&A with deterministic Python calculations, fact-grounded explanations, and interactive visualizations.">
+    <title>Ask Your Dataset | AI Data Analyst Agent</title>
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     
     <!-- Core Styles -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    <!-- Plotly.js for interactive embedded chart rendering -->
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 </head>
 <body class="dark-theme">
-    <!-- Ambient Glows -->
+    <!-- Ambient Background Glows -->
     <div class="ambient-glow glow-1"></div>
     <div class="ambient-glow glow-2"></div>
     
@@ -33,88 +36,146 @@
             <nav class="nav-links">
                 <a href="/" class="nav-link">Home</a>
                 <a href="/dashboard{% if dataset_id %}?dataset_id={{ dataset_id }}{% endif %}" class="nav-link" id="nav-dashboard">Dashboard</a>
-                <a href="/chat" class="nav-link active" id="nav-chat">AI Analyst</a>
+                <a href="/chat{% if dataset_id %}?dataset_id={{ dataset_id }}{% endif %}" class="nav-link active" id="nav-chat">Ask Your Dataset</a>
                 <div class="system-status-pill">
                     <span class="status-dot"></span>
-                    <span>Phase 1 Foundation</span>
+                    <span>Phase 10 Q&amp;A Active</span>
                 </div>
             </nav>
         </div>
     </header>
 
-    <!-- Main Chat Container -->
+    <!-- Main Chat Workspace -->
     <main class="container chat-main">
         <div class="chat-layout">
             
-            <!-- Left Sidebar: Dataset Context & Preset Prompts -->
+            <!-- Left Sidebar: Dataset Context, Columns & Sample Prompts -->
             <aside class="chat-sidebar">
+                
+                <!-- Dataset Selector & Info Card -->
                 <div class="sidebar-card">
-                    <h3>Active Dataset Context</h3>
-                    <div class="context-box">
+                    <div class="sidebar-header-row">
+                        <h3>Active Dataset</h3>
+                        <a href="/dashboard{% if dataset_id %}?dataset_id={{ dataset_id }}{% endif %}" class="sidebar-dash-link">View Dashboard &rarr;</a>
+                    </div>
+                    
+                    <div class="dataset-switcher-box">
+                        <select id="dataset-switcher-select" class="dataset-select-dropdown">
+                            <option value="{{ dataset_id if dataset_id else '' }}">
+                                {{ dataset_id if dataset_id else '-- Loading datasets... --' }}
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="context-box mt-2">
                         <span class="context-icon">📊</span>
                         <div class="context-text">
-                            <span class="context-id" id="chat-dataset-id">{{ dataset_id if dataset_id else 'No dataset selected' }}</span>
+                            <span class="context-id" id="chat-dataset-id">{{ dataset_id if dataset_id else 'Select a dataset' }}</span>
                             <span class="context-sub">Deterministic Python Execution</span>
                         </div>
                     </div>
                 </div>
 
+                <!-- Available Features Explorer -->
                 <div class="sidebar-card">
-                    <h3>Sample Analytical Prompts</h3>
-                    <div class="prompt-suggestions">
-                        <button class="prompt-chip" onclick="setPrompt('What are the key statistical drivers and distributions in this dataset?')">
-                            📈 "What are the key statistical drivers?"
+                    <h3>Available Features</h3>
+                    <p class="sidebar-tip-text">Click any column chip to ask about it:</p>
+                    <div class="sidebar-columns-container" id="sidebar-columns-list">
+                        <span class="loading-placeholder">Loading column schema...</span>
+                    </div>
+                </div>
+
+                <!-- Sample Analytical Prompts (From User Requirements) -->
+                <div class="sidebar-card">
+                    <div class="sidebar-header-row">
+                        <h3>Sample Analytical Prompts</h3>
+                        <span class="pill-spark">⚡ Click to Ask</span>
+                    </div>
+                    <div class="prompt-suggestions" id="suggested-prompts-container">
+                        <button class="prompt-chip" onclick="askPresetPrompt('Which category has the highest sales?')">
+                            <span class="chip-spark">🏆</span> "Which category has the highest sales?"
                         </button>
-                        <button class="prompt-chip" onclick="setPrompt('Identify any severe outliers or anomalies in numerical columns.')">
-                            ⚠️ "Detect severe outliers or anomalies."
+                        <button class="prompt-chip" onclick="askPresetPrompt('What is the average profit?')">
+                            <span class="chip-spark">💰</span> "What is the average profit?"
                         </button>
-                        <button class="prompt-chip" onclick="setPrompt('What data quality issues exist and what cleaning steps do you recommend?')">
-                            🧹 "Recommend data cleaning actions."
+                        <button class="prompt-chip" onclick="askPresetPrompt('Which region performs best?')">
+                            <span class="chip-spark">🌍</span> "Which region performs best?"
                         </button>
-                        <button class="prompt-chip" onclick="setPrompt('Generate an executive business summary of this dataset.')">
-                            📑 "Generate an executive business summary."
+                        <button class="prompt-chip" onclick="askPresetPrompt('What are the strongest correlations?')">
+                            <span class="chip-spark">🔗</span> "What are the strongest correlations?"
+                        </button>
+                        <button class="prompt-chip" onclick="askPresetPrompt('Are there unusual values?')">
+                            <span class="chip-spark">⚠️</span> "Are there unusual values?"
+                        </button>
+                        <button class="prompt-chip" onclick="askPresetPrompt('How has sales changed over time?')">
+                            <span class="chip-spark">📈</span> "How has sales changed over time?"
+                        </button>
+                        <button class="prompt-chip" onclick="askPresetPrompt('Which products have the highest revenue?')">
+                            <span class="chip-spark">📦</span> "Which products have the highest revenue?"
+                        </button>
+                        <button class="prompt-chip" onclick="askPresetPrompt('What should I investigate further?')">
+                            <span class="chip-spark">🔍</span> "What should I investigate further?"
                         </button>
                     </div>
                 </div>
 
+                <!-- Session Actions -->
+                <div class="sidebar-card action-sidebar-card">
+                    <h3>Session Controls</h3>
+                    <div class="sidebar-btn-grid">
+                        <button class="btn btn-secondary btn-sm" id="clear-chat-btn" title="Clear current conversation history">
+                            <span>🗑️ Clear Chat</span>
+                        </button>
+                        <button class="btn btn-secondary btn-sm" id="export-chat-btn" title="Export conversation transcript as Markdown">
+                            <span>📥 Export Transcript</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Factual Grounding Guarantee -->
                 <div class="sidebar-card info-card">
-                    <h4>🔒 Factual Grounding Notice</h4>
-                    <p>The AI Analyst will never hallucinate or invent statistical figures. All metrics will be retrieved through deterministic Python tools in Phase 5.</p>
+                    <h4>🔒 Factual Grounding Guarantee</h4>
+                    <p>All quantitative calculations, group aggregations, and outlier metrics are computed deterministically via Python on pandas DataFrames before the AI explains the findings.</p>
                 </div>
             </aside>
 
-            <!-- Right Area: Conversational Stream & Input -->
+            <!-- Main Conversational Stream & Input Area -->
             <section class="chat-stream-card">
+                
+                <!-- Chat Stream Top Header -->
                 <div class="chat-header">
-                    <div class="agent-avatar">🤖</div>
-                    <div>
-                        <h2>AI Data Analyst Agent</h2>
-                        <span class="agent-status-tag">Phase 5 Integration Preview</span>
+                    <div class="agent-avatar-wrap">
+                        <div class="agent-avatar">🤖</div>
+                        <div class="agent-avatar-pulse"></div>
                     </div>
-                </div>
-
-                <!-- Messages Stream -->
-                <div class="messages-container" id="messages-container">
-                    <div class="message-bubble assistant">
-                        <div class="message-avatar">🤖</div>
-                        <div class="message-content">
-                            <p>Hello! I am your <strong>AI Data Analyst Agent</strong>.</p>
-                            <p>In <strong>Phase 1</strong>, the foundational architecture, secure ingestion pipeline, and dataset profiling engine are active.</p>
-                            <p>In upcoming phases, you will be able to ask me complex natural-language questions about your uploaded datasets, request anomaly detection, and get instant executive reports powered by verified Python computations.</p>
-                            {% if dataset_id %}
-                            <div class="message-action-tip">
-                                👉 Your active dataset is <code>{{ dataset_id }}</code>. You can explore its full schema in the <a href="/dashboard?dataset_id={{ dataset_id }}" class="link-highlight">Dashboard &rarr;</a>
-                            </div>
-                            {% endif %}
+                    <div class="chat-title-group">
+                        <div class="chat-title-row">
+                            <h2>Ask Your Dataset</h2>
+                            <span class="agent-status-tag">Deterministic Python Router</span>
                         </div>
+                        <span class="chat-subtitle">Ask anything in natural language &bull; Automatic tool selection &bull; Zero statistical hallucinations</span>
                     </div>
                 </div>
 
-                <!-- Input Box -->
+                <!-- Messages Stream Container -->
+                <div class="messages-container" id="messages-container">
+                    <!-- Dynamic message bubbles will be appended here by static/js/chat.js -->
+                </div>
+
+                <!-- Bottom Input Bar -->
                 <div class="chat-input-bar">
-                    <input type="text" id="chat-input" class="chat-input" placeholder="Ask a question about the dataset (Enabled in Phase 5)..." />
-                    <button class="btn btn-primary" id="chat-send-btn">
+                    <div class="input-container-rel">
+                        <input 
+                            type="text" 
+                            id="chat-input" 
+                            class="chat-input" 
+                            placeholder="Ask a question about this dataset (e.g. 'Which category has highest sales?', 'Are there outliers?')..." 
+                            autocomplete="off"
+                        />
+                    </div>
+                    <button class="btn btn-primary send-action-btn" id="chat-send-btn">
                         <span>Send</span>
+                        <span class="send-arrow">&rarr;</span>
                     </button>
                 </div>
             </section>
@@ -126,53 +187,17 @@
         <div class="container footer-content">
             <div class="footer-left">
                 <span class="footer-title">AI Data Analyst Agent</span>
-                <span class="footer-desc">Production-grade portfolio system for Data Analysts & AI Engineers.</span>
+                <span class="footer-desc">Phase 10: Natural-Language Dataset Q&amp;A ("Ask Your Dataset")</span>
             </div>
             <div class="footer-right">
-                <span>Phase 1: Architecture & Foundation</span>
+                <span>Deterministic Python Execution</span>
                 <span>•</span>
-                <span>Python / Flask / Pandas / Plotly</span>
+                <span>Pandas / Plotly / Flask</span>
             </div>
         </div>
     </footer>
 
-    <script>
-        function setPrompt(text) {
-            const input = document.getElementById('chat-input');
-            if (input) input.value = text;
-        }
-
-        document.getElementById('chat-send-btn')?.addEventListener('click', () => {
-            const input = document.getElementById('chat-input');
-            if (!input || !input.value.trim()) return;
-            const container = document.getElementById('messages-container');
-            
-            // Append user bubble
-            const userBubble = document.createElement('div');
-            userBubble.className = 'message-bubble user';
-            userBubble.innerHTML = `<div class="message-content"><p>${escapeHtml(input.value)}</p></div>`;
-            container.appendChild(userBubble);
-            
-            // Append assistant response
-            const responseBubble = document.createElement('div');
-            responseBubble.className = 'message-bubble assistant';
-            responseBubble.innerHTML = `
-                <div class="message-avatar">🤖</div>
-                <div class="message-content">
-                    <p><em>Query received: "${escapeHtml(input.value)}"</em></p>
-                    <p>⚡ The AI Agent Tool-Calling layer and NL Query Router will be activated in <strong>Phase 5</strong> with full LLM API grounding.</p>
-                </div>
-            `;
-            container.appendChild(responseBubble);
-            input.value = '';
-            container.scrollTop = container.scrollHeight;
-        });
-
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-    </script>
+    <!-- Chat JavaScript Controller -->
+    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
 </body>
 </html>

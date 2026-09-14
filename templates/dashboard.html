@@ -36,7 +36,7 @@
             <nav class="nav-links">
                 <a href="/" class="nav-link">Home</a>
                 <a href="/dashboard" class="nav-link active" id="nav-dashboard">Dashboard</a>
-                <a href="/chat{% if dataset_id %}?dataset_id={{ dataset_id }}{% endif %}" class="nav-link" id="nav-chat">AI Analyst</a>
+                <a href="/chat{% if dataset_id %}?dataset_id={{ dataset_id }}{% endif %}" class="nav-link" id="nav-chat">Ask Your Dataset</a>
                 <div class="system-status-pill">
                     <span class="status-dot"></span>
                     <span>Phase 4 Cleaning Engine Active</span>
@@ -71,7 +71,7 @@
                     <span>+ Upload CSV</span>
                 </a>
                 <a href="/chat{% if dataset_id %}?dataset_id={{ dataset_id }}{% endif %}" class="btn btn-primary" id="open-chat-btn">
-                    <span>💬 Ask AI Analyst</span>
+                    <span>💬 Ask Your Dataset</span>
                 </a>
             </div>
         </section>
