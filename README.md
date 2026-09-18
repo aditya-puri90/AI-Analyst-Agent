@@ -117,17 +117,19 @@ AI-Data-Analyst-Agent/
 │   ├── cleaning.py             # (Phase 4) Deduplication, imputation, type casting
 │   ├── statistics.py           # (Phase 2) Parametric & non-parametric statistics
 │   ├── correlation.py          # (Phase 3) Pearson, Spearman, Cramér's V
-│   └── outliers.py             # (Phase 3) IQR, Z-Score, Isolation Forest
+│   ├── outliers.py             # (Phase 3) IQR, Z-Score, Isolation Forest
+│   └── tool_registry.py        # (Phase 11) Controlled tool registry & execution sandbox
 │
 ├── visualization/              # Dynamic Chart Generation
 │   ├── __init__.py
-│   └── charts.py               # (Phase 3) Plotly JSON chart specifications
+│   └── charts.py               # (Phase 3 & 8) Plotly JSON chart specifications
 │
 ├── agent/                      # AI Agent & Natural Language Interface
 │   ├── __init__.py
-│   ├── analyst_agent.py        # (Phase 5) LLM agent with deterministic tool binding
-│   ├── question_router.py      # (Phase 5) Intent classification & tool dispatching
-│   └── prompts.py              # (Phase 5) Analytical prompt templates
+│   ├── analyst_agent.py        # (Phase 5 & 9) LLM agent with deterministic tool binding
+│   ├── question_router.py      # (Phase 5 & 10) Intent classification & tool dispatching
+│   ├── planner.py              # (Phase 11) Step-by-step analysis planner & chart decision engine
+│   └── prompts.py              # Analytical prompt templates & instructions
 │
 ├── reports/                    # Automated Reporting
 │   └── report_generator.py     # (Phase 5) Markdown / HTML / PDF executive reports
@@ -241,7 +243,15 @@ AI-Data-Analyst-Agent/
   - [x] Resilient schema & missing column handling: gracefully explains unsupported queries and suggests valid candidate columns.
   - [x] Interactive Plotly visualization spec generation matched to tool output (bar, line, heatmap, boxplot, histogram).
   - [x] Full "Ask Your Dataset" conversational workspace (`/chat`) with session memory, tool badges, JSON inspector drawer, quick prompt chips, and transcript export.
-  - [x] Standalone CLI demo `run_qa_demo.py` and 166 passing automated pytest test cases.
+- [x] **Phase 11: Intelligent Analysis Planning and Chart Generation**
+  - [x] Strict security sandbox: LLM is strictly prohibited from executing arbitrary Python code; all executions pass through a verified `ToolRegistry` with signature checking and AST inspection.
+  - [x] Intelligent `AnalysisPlanner` synthesizing ordered multi-step execution plans (steps 1, 2, 3...) prior to tool dispatch.
+  - [x] Smart Visualization Decision Engine (`requires_visualization: True / False`) recommending optimal chart types (`line`, `scatter`, `bar`, `box`, `histogram`, `heatmap`, `none`).
+  - [x] Reference Analytical Workflow 1: Temporal Trend (*"How have sales changed over time?"* -> Detect date -> Detect sales -> Time aggregation -> Line chart -> Explain trend).
+  - [x] Reference Analytical Workflow 2: Linear Correlation (*"Is advertising spend related to revenue?"* -> Identify ad spend -> Identify revenue -> Pearson correlation -> Scatter plot -> Explain relationship without claiming causation).
+  - [x] Reference Analytical Workflow 3: Category Leaderboard (*"Which category has the highest revenue?"* -> Identify category -> Identify revenue -> Group by category -> Aggregate revenue -> Sort descending -> Bar chart -> Explain result).
+  - [x] UI Execution Plan Stepper with interactive progress cards, step badges, and plan drawer in `/chat`.
+  - [x] Standalone CLI runner `run_planning_demo.py` and 183 automated pytest test cases passing.
 
 ---
 
@@ -308,6 +318,9 @@ python run_insights_demo.py
 
 # Phase 10 Natural-Language Dataset Q&A Demo
 python run_qa_demo.py
+
+# Phase 11 Intelligent Analysis Planning & Chart Generation Demo
+python run_planning_demo.py
 ```
 
 ---
@@ -327,11 +340,12 @@ python run_qa_demo.py
 | `/api/cleaning/apply/<dataset_id>` | `POST` | Execute configurable cleaning pipeline & persist to `data/processed/` |
 | `/api/cleaning/download/<dataset_id>` | `GET` | Download cleaned CSV file from `data/processed/` |
 | `/api/insights/<dataset_id>` | `POST` | Generate grounded 8-section AI executive summary report |
-| `/api/chat/ask` | `POST` | Ask natural language question, execute tool, and get grounded answer |
+| `/api/chat/ask` | `POST` | Ask natural language question, plan steps, execute safe tool, and generate chart |
+| `/api/chat/plan` | `POST` | Preview structured multi-step execution plan and chart decision for a query |
 | `/api/chat/history/<dataset_id>` | `GET` | Retrieve multi-turn conversation history for active dataset |
 | `/api/chat/clear/<dataset_id>` | `POST` | Clear conversation history for active dataset |
 | `/api/chat/suggested-questions/<dataset_id>` | `GET` | Dynamically generated schema-tailored question chips |
-| `/api/chat/tools` | `GET` | List available safe deterministic analysis tools |
+| `/api/chat/tools` | `GET` | List verified registered analysis tools from Tool Registry |
 
 ---
 
@@ -342,4 +356,4 @@ Run the automated test suite with `pytest`:
 python -m pytest -v
 ```
 
-All **166 test cases** across all phases pass with 100% test coverage.
+All **183 test cases** across all phases pass with 100% test coverage.

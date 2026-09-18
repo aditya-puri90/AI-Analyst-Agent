@@ -21,7 +21,9 @@ from analysis.profiler import infer_column_type, _safe_json_value
 from analysis.statistics import StatisticalAnalysisEngine
 from analysis.correlation import CorrelationAnalysisEngine
 from analysis.outliers import OutlierDetectionEngine
-from visualization.charts import inspect_column_types
+from analysis.tool_registry import registry, RegisteredTool
+from agent.planner import AnalysisPlanner, AnalysisPlan
+from visualization.charts import inspect_column_types, build_correlation_heatmap_spec
 from agent.prompts import (
     QA_ROUTER_SYSTEM_PROMPT,
     QA_EXPLAINER_SYSTEM_PROMPT,
@@ -39,7 +41,9 @@ logger = logging.getLogger(__name__)
 
 COMMON_COLUMN_ALIASES = {
     "sales": ["sales", "sales_amount", "revenue", "turnover", "total_sales", "sale_amount", "gross_sales"],
-    "revenue": ["revenue", "sales_amount", "sales", "total_revenue", "gross_revenue", "income"],
+    "revenue": ["revenue", "sales_amount", "sales", "total_revenue", "gross_revenue", "income", "turnover", "total_sales"],
+    "advertising_spend": ["advertising_spend", "ad_spend", "advertising", "ad_spend_amount", "marketing_spend", "marketing_budget", "marketing", "promotion_spend", "ads", "advertising_cost", "campaign_cost", "campaign_spend"],
+    "marketing_spend": ["marketing_spend", "advertising_spend", "ad_spend", "marketing_budget", "marketing", "promotion_spend"],
     "profit": ["profit", "net_profit", "margin", "net_margin", "operating_profit", "earnings"],
     "discount": ["discount", "discount_pct", "discount_amount", "discount_percentage", "rebate"],
     "quantity": ["quantity", "qty", "volume", "units", "units_sold", "count", "items_count"],
@@ -558,6 +562,8 @@ def correlation_analysis(
         "strongest_positive": top_pos,
         "strongest_negative": top_neg,
         "top_correlated_pairs": ranked_pairs[:6],
+        "correlation_matrix": corr_results.get("correlation_matrix", {}),
+        "numerical_columns": corr_results.get("numerical_columns", []),
         "non_causation_notice": "All observed correlations describe statistical associations and do not represent causal relationships.",
     }
 
@@ -947,11 +953,31 @@ def route_query_deterministic(query: str, df: pd.DataFrame) -> Dict[str, Any]:
         return {"tool": "outlier_analysis", "params": {"column_name": target_col}}
 
     # 4. Correlation / relationship intent
-    if any(k in q for k in ("correlation", "correlate", "relationship", "relate", "association", "linked with", "depend on", "co-movement")):
+    if any(k in q for k in ("correlation", "correlate", "relationship", "relate", "related", "association", "linked with", "depend on", "co-movement")):
         matched_cols = []
         for col in df.columns:
             if normalize_token(col) in normalize_token(q) or col.lower() in q:
-                matched_cols.append(col)
+                if col not in matched_cols:
+                    matched_cols.append(col)
+
+        # Also check common semantic concept aliases
+        if len(matched_cols) < 2:
+            for alias_key in ("advertising_spend", "marketing_spend", "revenue", "sales", "profit", "discount", "price", "quantity", "age"):
+                if alias_key.replace("_", " ") in q or alias_key in q:
+                    res_c = resolve_column_name(df, alias_key)
+                    if res_c and res_c not in matched_cols:
+                        matched_cols.append(res_c)
+
+        # Extraction fallback for "Is X related to Y?"
+        if len(matched_cols) == 0 and ("related" in q or "correlation" in q or "correlate" in q):
+            rel_match = re.search(r"is\s+(.*?)\s+(?:related to|correlated with|linked to|associated with)\s+(.*?)(?:\?|$)", q)
+            if rel_match:
+                cand1 = rel_match.group(1).strip()
+                cand2 = rel_match.group(2).strip()
+                c1 = resolve_column_name(df, cand1) or cand1
+                c2 = resolve_column_name(df, cand2) or cand2
+                return {"tool": "correlation_analysis", "params": {"col1": c1, "col2": c2}}
+
         c1 = matched_cols[0] if len(matched_cols) > 0 else None
         c2 = matched_cols[1] if len(matched_cols) > 1 else None
         return {"tool": "correlation_analysis", "params": {"col1": c1, "col2": c2}}
@@ -1481,29 +1507,42 @@ def build_qa_visualization_spec(
         return {"data": data, "layout": layout, "chart_type": "line"}
 
     # 3. Correlation Analysis -> Scatter with trendline or Heatmap
-    if tool_name == "correlation_analysis" and tool_result.get("analysis_type") == "pairwise":
-        c1 = tool_result.get("column_1")
-        c2 = tool_result.get("column_2")
-        if c1 in df.columns and c2 in df.columns:
-            clean_df = df[[c1, c2]].dropna().head(300)
-            data = [{
-                "type": "scatter",
-                "mode": "markers",
-                "x": clean_df[c1].tolist(),
-                "y": clean_df[c2].tolist(),
-                "marker": {
-                    "color": "#818cf8",
-                    "size": 7,
-                    "opacity": 0.7,
-                    "line": {"color": "rgba(255, 255, 255, 0.3)", "width": 1},
-                },
-                "hovertemplate": f"{c1}: %{{x}}<br>{c2}: %{{y}}<extra></extra>",
-            }]
-            layout = dict(DARK_LAYOUT)
-            layout["title"] = f"Correlation: {c1} vs {c2} (r = {tool_result.get('correlation_coefficient')})"
-            layout["xaxis"]["title"] = c1
-            layout["yaxis"]["title"] = c2
-            return {"data": data, "layout": layout, "chart_type": "scatter"}
+    if tool_name == "correlation_analysis":
+        if tool_result.get("analysis_type") == "pairwise":
+            c1 = tool_result.get("column_1")
+            c2 = tool_result.get("column_2")
+            if c1 in df.columns and c2 in df.columns:
+                clean_df = df[[c1, c2]].dropna().head(300)
+                data = [{
+                    "type": "scatter",
+                    "mode": "markers",
+                    "x": clean_df[c1].tolist(),
+                    "y": clean_df[c2].tolist(),
+                    "marker": {
+                        "color": "#818cf8",
+                        "size": 7,
+                        "opacity": 0.7,
+                        "line": {"color": "rgba(255, 255, 255, 0.3)", "width": 1},
+                    },
+                    "hovertemplate": f"{c1}: %{{x}}<br>{c2}: %{{y}}<extra></extra>",
+                }]
+                layout = dict(DARK_LAYOUT)
+                layout["title"] = f"Correlation: {c1} vs {c2} (r = {tool_result.get('correlation_coefficient')})"
+                layout["xaxis"]["title"] = c1
+                layout["yaxis"]["title"] = c2
+                return {"data": data, "layout": layout, "chart_type": "scatter"}
+        elif tool_result.get("analysis_type") == "global_ranking":
+            corr_matrix = tool_result.get("correlation_matrix")
+            num_cols = tool_result.get("numerical_columns")
+            if not corr_matrix or not num_cols:
+                engine = CorrelationAnalysisEngine(df)
+                c_data = engine.analyze()
+                corr_matrix = c_data.get("correlation_matrix", {})
+                num_cols = c_data.get("numerical_columns", [])
+            heatmap_spec = build_correlation_heatmap_spec(corr_matrix=corr_matrix, columns=num_cols)
+            if heatmap_spec:
+                heatmap_spec["chart_type"] = "heatmap"
+                return heatmap_spec
 
     # 4. Outlier Analysis -> Boxplot
     if tool_name == "outlier_analysis" and tool_result.get("analysis_type") == "single_column":
@@ -1574,6 +1613,9 @@ class ConversationSessionManager:
         tool_result: Dict[str, Any],
         visualization: Optional[Dict[str, Any]] = None,
         followups: Optional[List[str]] = None,
+        analysis_plan: Optional[List[str]] = None,
+        requires_visualization: Optional[bool] = None,
+        recommended_chart_type: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Record a completed question-answer interaction."""
         if dataset_id not in self._sessions:
@@ -1590,6 +1632,9 @@ class ConversationSessionManager:
             "tool_result": tool_result,
             "visualization": visualization,
             "followups": followups or [],
+            "analysis_plan": analysis_plan or [],
+            "requires_visualization": requires_visualization,
+            "recommended_chart_type": recommended_chart_type,
         }
         self._sessions[dataset_id].append(turn_entry)
         return turn_entry
@@ -1604,6 +1649,7 @@ class ConversationSessionManager:
     def get_suggested_questions(self, df: pd.DataFrame, dataset_id: str = "dataset") -> List[str]:
         """
         Dynamically generate tailored prompt suggestions based on actual column schema.
+        Includes Phase 11 reference questions.
         """
         schema = inspect_column_types(df)
         num_cols = schema.get("numerical", [])
@@ -1612,42 +1658,36 @@ class ConversationSessionManager:
 
         suggestions = []
 
-        # 1. Groupby suggestion
+        # 1. Time series trend (Phase 11 Example 1)
+        if dt_cols and num_cols:
+            suggestions.append(f"How have {num_cols[0]} changed over time?")
+
+        # 2. Correlation / Relationship (Phase 11 Example 2)
+        if len(num_cols) >= 2:
+            suggestions.append(f"Is {num_cols[0]} related to {num_cols[1]}?")
+        elif len(num_cols) == 1:
+            suggestions.append("What are the strongest correlations?")
+
+        # 3. Category ranking (Phase 11 Example 3)
         if cat_cols and num_cols:
             suggestions.append(f"Which {cat_cols[0]} has the highest {num_cols[0]}?")
         elif cat_cols:
             suggestions.append(f"What is the breakdown of records by {cat_cols[0]}?")
 
-        # 2. Aggregation suggestion
+        # 4. Scalar aggregation
         if num_cols:
             suggestions.append(f"What is the average {num_cols[0]}?")
-
-        # 3. Top region / performer
-        region_col = resolve_column_name(df, "Region")
-        sales_col = resolve_column_name(df, "Sales") or (num_cols[0] if num_cols else None)
-        if region_col and sales_col:
-            suggestions.append("Which region performs best?")
-        elif len(cat_cols) > 1 and num_cols:
-            suggestions.append(f"Which {cat_cols[1]} performs best by {num_cols[0]}?")
-
-        # 4. Correlations
-        if len(num_cols) >= 2:
-            suggestions.append("What are the strongest correlations?")
 
         # 5. Outliers
         if num_cols:
             suggestions.append("Are there unusual values?")
 
-        # 6. Time series
-        if dt_cols and num_cols:
-            suggestions.append(f"How has {num_cols[0]} changed over time?")
-
-        # 7. Products / High revenue
+        # 6. High revenue / products
         prod_col = resolve_column_name(df, "Product")
         if prod_col:
             suggestions.append("Which products have the highest revenue?")
 
-        # 8. Investigation lead
+        # 7. Investigation leads
         suggestions.append("What should I investigate further?")
 
         return suggestions[:8]
@@ -1657,15 +1697,91 @@ class ConversationSessionManager:
 session_manager = ConversationSessionManager()
 
 
+# Register all deterministic analysis tools in the central controlled ToolRegistry
+registry.register_tool_instance(
+    name="dataset_summary",
+    func=dataset_summary,
+    description="Comprehensive dataset dimensions, memory, missingness, duplicate rates, and column taxonomy.",
+    category="overview",
+    requires_visualization=False,
+    default_chart_type="none",
+)
+registry.register_tool_instance(
+    name="column_summary",
+    func=column_summary,
+    description="Deep statistical, frequency, or temporal summary of a single column.",
+    category="univariate",
+    requires_visualization=True,
+    default_chart_type="bar",
+)
+registry.register_tool_instance(
+    name="groupby_analysis",
+    func=groupby_analysis,
+    description="Group a continuous target feature by a categorical dimension with ranking, sorting, and percentage of total.",
+    category="aggregation",
+    requires_visualization=True,
+    default_chart_type="bar",
+)
+registry.register_tool_instance(
+    name="aggregation_analysis",
+    func=aggregation_analysis,
+    description="Compute single or multi-moment scalar statistics across a continuous numerical column.",
+    category="aggregation",
+    requires_visualization=False,
+    default_chart_type="none",
+)
+registry.register_tool_instance(
+    name="correlation_analysis",
+    func=correlation_analysis,
+    description="Pairwise Pearson/Spearman linear correlation or global strongest positive/negative association ranking.",
+    category="bivariate",
+    requires_visualization=True,
+    default_chart_type="scatter",
+)
+registry.register_tool_instance(
+    name="outlier_analysis",
+    func=outlier_analysis,
+    description="Detect statistical anomalies and extreme tail values using IQR (1.5x) or Z-score methods.",
+    category="anomaly",
+    requires_visualization=True,
+    default_chart_type="box",
+)
+registry.register_tool_instance(
+    name="time_series_analysis",
+    func=time_series_analysis,
+    description="Chronological progression, growth percentage, peak and trough periods along datetime features.",
+    category="temporal",
+    requires_visualization=True,
+    default_chart_type="line",
+)
+registry.register_tool_instance(
+    name="distribution_analysis",
+    func=distribution_analysis,
+    description="Histogram bins, skewness, kurtosis, spread, and normality evaluation.",
+    category="distribution",
+    requires_visualization=True,
+    default_chart_type="histogram",
+)
+registry.register_tool_instance(
+    name="investigate_further",
+    func=investigate_further,
+    description="Prioritized exploration leads derived from anomalies, strong correlations, and missingness signals.",
+    category="recommendation",
+    requires_visualization=False,
+    default_chart_type="none",
+)
+
+
 # ==============================================================================
 # 7. MAIN QUESTION ROUTER CLASS
 # ==============================================================================
 
 class QuestionRouter:
     """
-    Main Natural-Language Dataset Q&A Router.
-    Routes user questions to deterministic tools, executes calculations,
-    and synthesizes grounded explanations with optional visualizations.
+    Main Natural-Language Dataset Q&A Router (Phase 11 Engine).
+    Formulates explicit multi-step Analysis Plans, determines visualization necessity,
+    routes user questions strictly to controlled registered tools, executes calculations,
+    and synthesizes grounded explanations with Plotly visualizations.
     """
 
     AVAILABLE_TOOLS = {
@@ -1736,6 +1852,33 @@ class QuestionRouter:
         """Convenience alias for route_and_execute."""
         return self.route_and_execute(df, query, dataset_id=dataset_id, provider=provider, model=model)
 
+    def plan_question(
+        self,
+        df: pd.DataFrame,
+        query: str,
+        dataset_id: str = "dataset",
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Generate and return only the Analysis Plan without executing the tool.
+        """
+        active_prov = (provider or self.provider).lower()
+        active_model = model or self.model
+
+        if self.is_provider_configured(active_prov) and active_prov != "deterministic_fallback":
+            try:
+                routed_intent = self._llm_route_intent(query, df, dataset_id, provider=active_prov, model=active_model)
+            except Exception:
+                routed_intent = route_query_deterministic(query, df)
+        else:
+            routed_intent = route_query_deterministic(query, df)
+
+        tool_name = routed_intent.get("tool", "dataset_summary")
+        tool_params = routed_intent.get("params", {})
+        plan_obj = AnalysisPlanner.plan(query, df, tool_name, tool_params)
+        return plan_obj.to_dict()
+
     def route_and_execute(
         self,
         df: pd.DataFrame,
@@ -1745,12 +1888,13 @@ class QuestionRouter:
         model: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Complete end-to-end pipeline:
-        1. Select tool via LLM or Deterministic NLP Router
-        2. Execute tool safely on DataFrame
-        3. Synthesize factually grounded explanation
-        4. Generate interactive Plotly visualization spec
-        5. Record conversation turn in session memory
+        Complete Phase 11 Intelligent Analysis Planning & Chart Generation Pipeline:
+        1. Formulate multi-step Analysis Plan & select tool (via LLM or Deterministic Planner)
+        2. Evaluate visualization necessity (requires_visualization: True/False)
+        3. Execute authorized tool safely strictly through the controlled ToolRegistry
+        4. Synthesize factually grounded explanation adhering to non-causation mandate
+        5. Generate interactive Plotly visualization specification
+        6. Record turn to conversation session memory
         """
         start_time = datetime.utcnow()
         active_prov = (provider or self.provider).lower()
@@ -1776,7 +1920,21 @@ class QuestionRouter:
         tool_name = routed_intent.get("tool", "dataset_summary")
         tool_params = routed_intent.get("params", {})
 
-        # Handle unsupported tool request directly from router
+        # 2. Formulate Structured Analysis Plan & Visualization Decision
+        plan_obj = AnalysisPlanner.plan(query, df, tool_name, tool_params)
+
+        # Override plan if LLM provided explicit custom steps
+        llm_steps = routed_intent.get("analysis_plan")
+        if llm_steps and isinstance(llm_steps, list) and len(llm_steps) >= 3:
+            plan_obj.steps = [f"{i+1}. {str(s).lstrip('0123456789. ')}" for i, s in enumerate(llm_steps)]
+        if "requires_visualization" in routed_intent:
+            plan_obj.requires_visualization = bool(routed_intent.get("requires_visualization"))
+        if "recommended_chart_type" in routed_intent and routed_intent.get("recommended_chart_type"):
+            plan_obj.recommended_chart_type = str(routed_intent.get("recommended_chart_type"))
+        if "visualization_reasoning" in routed_intent and routed_intent.get("visualization_reasoning"):
+            plan_obj.visualization_reasoning = str(routed_intent.get("visualization_reasoning"))
+
+        # 3. Execute deterministic calculation strictly through registered tools
         if tool_name == "unsupported_analysis":
             tool_result = {
                 "status": "unsupported",
@@ -1785,26 +1943,27 @@ class QuestionRouter:
                 "suggested_columns": tool_params.get("suggested_columns", list(df.columns)),
             }
         else:
-            # 2. Execute deterministic calculation tool
-            tool_func = self.AVAILABLE_TOOLS.get(tool_name, dataset_summary)
             try:
-                tool_result = tool_func(df, **tool_params)
+                tool_result = registry.execute(tool_name, df, **tool_params)
             except Exception as e:
-                logger.error("Error executing tool %s: %s", tool_name, e, exc_info=True)
+                logger.error("Error executing registered tool %s: %s", tool_name, e, exc_info=True)
                 tool_result = {
                     "status": "error",
                     "tool": tool_name,
                     "reason": f"Tool execution failed: {str(e)}",
                 }
 
-        # 3. Grounded Explanation Synthesis
+        # 4. Grounded Explanation Synthesis
         explanation = ""
         followups = []
         explanation_mode = "deterministic"
 
         if self.is_provider_configured(active_prov) and active_prov != "deterministic_fallback" and tool_result.get("status") == "success":
             try:
-                explanation, followups = self._llm_explain_result(query, tool_name, tool_params, tool_result, df, provider=active_prov, model=active_model)
+                explanation, followups = self._llm_explain_result(
+                    query, tool_name, tool_params, tool_result, df,
+                    provider=active_prov, model=active_model, analysis_plan=plan_obj.steps
+                )
                 explanation_mode = f"llm_{active_prov}"
             except Exception as e:
                 logger.warning("LLM explanation synthesis failed (%s). Falling back to deterministic explainer.", e)
@@ -1813,12 +1972,14 @@ class QuestionRouter:
         else:
             explanation, followups = synthesize_tool_explanation(query, tool_name, tool_params, tool_result, df)
 
-        # 4. Optional Visualization Spec
-        viz_spec = build_qa_visualization_spec(tool_name, tool_params, tool_result, df)
+        # 5. Optional Visualization Spec
+        viz_spec = None
+        if plan_obj.requires_visualization:
+            viz_spec = build_qa_visualization_spec(tool_name, tool_params, tool_result, df)
 
         duration_sec = round((datetime.utcnow() - start_time).total_seconds(), 3)
 
-        # 5. Record to session history
+        # 6. Record to session history
         turn_data = session_manager.add_turn(
             dataset_id=dataset_id,
             user_query=query,
@@ -1828,6 +1989,9 @@ class QuestionRouter:
             tool_result=tool_result,
             visualization=viz_spec,
             followups=followups,
+            analysis_plan=plan_obj.steps,
+            requires_visualization=plan_obj.requires_visualization,
+            recommended_chart_type=plan_obj.recommended_chart_type,
         )
 
         return {
@@ -1835,6 +1999,11 @@ class QuestionRouter:
             "turn_id": turn_data.get("id"),
             "query": query,
             "dataset_id": dataset_id,
+            "analysis_plan": plan_obj.steps,
+            "plan_details": plan_obj.to_dict(),
+            "requires_visualization": plan_obj.requires_visualization,
+            "recommended_chart_type": plan_obj.recommended_chart_type,
+            "visualization_reasoning": plan_obj.visualization_reasoning,
             "tool_executed": tool_name,
             "tool_parameters": tool_params,
             "tool_result": tool_result,
@@ -1846,6 +2015,7 @@ class QuestionRouter:
                 "explanation_mode": explanation_mode,
                 "duration_seconds": duration_sec,
                 "grounding": "Strictly Grounded in Python Execution (Zero Hallucinations)",
+                "planning": "Phase 11: Intelligent Multi-Step Planning & Visualization Decision",
                 "timestamp": datetime.utcnow().isoformat(),
             },
         }
@@ -1861,7 +2031,7 @@ class QuestionRouter:
         provider: str,
         model: str,
     ) -> Dict[str, Any]:
-        """Ask LLM to return tool name and parameters in JSON format."""
+        """Ask LLM to return tool name, analysis plan, and parameters in JSON format."""
         schema_info = get_dataset_column_schema(df)
         history = session_manager.get_history(dataset_id)
         prompt = build_qa_router_prompt(query, schema_info, history)
@@ -1888,10 +2058,11 @@ class QuestionRouter:
         df: pd.DataFrame,
         provider: str,
         model: str,
+        analysis_plan: Optional[List[str]] = None,
     ) -> Tuple[str, List[str]]:
         """Ask LLM to explain the deterministic calculation result."""
         schema_info = get_dataset_column_schema(df)
-        prompt = build_qa_explainer_prompt(query, tool_name, tool_params, tool_result, schema_info)
+        prompt = build_qa_explainer_prompt(query, tool_name, tool_params, tool_result, schema_info, analysis_plan=analysis_plan)
 
         response_text = self._dispatch_llm(prompt, system_prompt=QA_EXPLAINER_SYSTEM_PROMPT, provider=provider, model=model)
 

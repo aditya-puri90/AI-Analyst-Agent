@@ -39,7 +39,7 @@
                 <a href="/chat{% if dataset_id %}?dataset_id={{ dataset_id }}{% endif %}" class="nav-link active" id="nav-chat">Ask Your Dataset</a>
                 <div class="system-status-pill">
                     <span class="status-dot"></span>
-                    <span>Phase 10 Q&amp;A Active</span>
+                    <span>Phase 11 Planning &amp; Charts</span>
                 </div>
             </nav>
         </div>
@@ -71,7 +71,7 @@
                         <span class="context-icon">📊</span>
                         <div class="context-text">
                             <span class="context-id" id="chat-dataset-id">{{ dataset_id if dataset_id else 'Select a dataset' }}</span>
-                            <span class="context-sub">Deterministic Python Execution</span>
+                            <span class="context-sub">Controlled Tool Execution</span>
                         </div>
                     </div>
                 </div>
@@ -92,26 +92,23 @@
                         <span class="pill-spark">⚡ Click to Ask</span>
                     </div>
                     <div class="prompt-suggestions" id="suggested-prompts-container">
-                        <button class="prompt-chip" onclick="askPresetPrompt('Which category has the highest sales?')">
-                            <span class="chip-spark">🏆</span> "Which category has the highest sales?"
+                        <button class="prompt-chip" onclick="askPresetPrompt('How have sales changed over time?')">
+                            <span class="chip-spark">📈</span> "How have sales changed over time?"
+                        </button>
+                        <button class="prompt-chip" onclick="askPresetPrompt('Is advertising spend related to revenue?')">
+                            <span class="chip-spark">🔗</span> "Is advertising spend related to revenue?"
+                        </button>
+                        <button class="prompt-chip" onclick="askPresetPrompt('Which category has the highest revenue?')">
+                            <span class="chip-spark">🏆</span> "Which category has the highest revenue?"
                         </button>
                         <button class="prompt-chip" onclick="askPresetPrompt('What is the average profit?')">
                             <span class="chip-spark">💰</span> "What is the average profit?"
                         </button>
-                        <button class="prompt-chip" onclick="askPresetPrompt('Which region performs best?')">
-                            <span class="chip-spark">🌍</span> "Which region performs best?"
-                        </button>
-                        <button class="prompt-chip" onclick="askPresetPrompt('What are the strongest correlations?')">
-                            <span class="chip-spark">🔗</span> "What are the strongest correlations?"
-                        </button>
                         <button class="prompt-chip" onclick="askPresetPrompt('Are there unusual values?')">
                             <span class="chip-spark">⚠️</span> "Are there unusual values?"
                         </button>
-                        <button class="prompt-chip" onclick="askPresetPrompt('How has sales changed over time?')">
-                            <span class="chip-spark">📈</span> "How has sales changed over time?"
-                        </button>
-                        <button class="prompt-chip" onclick="askPresetPrompt('Which products have the highest revenue?')">
-                            <span class="chip-spark">📦</span> "Which products have the highest revenue?"
+                        <button class="prompt-chip" onclick="askPresetPrompt('What are the strongest correlations?')">
+                            <span class="chip-spark">✨</span> "What are the strongest correlations?"
                         </button>
                         <button class="prompt-chip" onclick="askPresetPrompt('What should I investigate further?')">
                             <span class="chip-spark">🔍</span> "What should I investigate further?"
@@ -187,7 +184,7 @@
         <div class="container footer-content">
             <div class="footer-left">
                 <span class="footer-title">AI Data Analyst Agent</span>
-                <span class="footer-desc">Phase 10: Natural-Language Dataset Q&amp;A ("Ask Your Dataset")</span>
+                <span class="footer-desc">Phase 11: Intelligent Analysis Planning &amp; Chart Generation</span>
             </div>
             <div class="footer-right">
                 <span>Deterministic Python Execution</span>

@@ -356,6 +356,7 @@ function renderAssistantMessage(data) {
     const turnId = data.turn_id || `turn_${Date.now()}`;
     const chartId = `chart_${turnId}`;
     const jsonDrawerId = `json_${turnId}`;
+    const planDrawerId = `plan_${turnId}`;
     const toolName = data.tool_executed || 'dataset_summary';
     const toolParamsStr = JSON.stringify(data.tool_parameters || {}, null, 1).replace(/\n\s*/g, ' ');
 
@@ -364,6 +365,40 @@ function renderAssistantMessage(data) {
 
     // Format markdown explanation to HTML
     const formattedHtml = formatMarkdown(data.explanation || 'No response synthesized.');
+
+    // Analysis Plan HTML (Phase 11)
+    const planSteps = data.analysis_plan || [];
+    const requiresViz = data.requires_visualization;
+    const chartType = data.recommended_chart_type || (data.visualization ? data.visualization.chart_type : 'none');
+    const vizReason = data.visualization_reasoning || '';
+
+    const planHtml = planSteps.length > 0 ? `
+        <div class="analysis-plan-card">
+            <div class="analysis-plan-header" onclick="togglePlanDrawer('${planDrawerId}')">
+                <div class="plan-header-title">
+                    <span class="plan-icon">📋</span>
+                    <span class="plan-title-text">Execution Plan (${planSteps.length} Steps)</span>
+                </div>
+                <div class="plan-header-meta">
+                    <span class="plan-viz-badge ${requiresViz ? 'viz-needed' : 'viz-not-needed'}">
+                        ${requiresViz ? `📊 ${escapeHtml(chartType.toUpperCase())} CHART` : 'ℹ️ SCALAR METRIC'}
+                    </span>
+                    <span class="plan-arrow" id="arrow-${planDrawerId}">▼</span>
+                </div>
+            </div>
+            <div class="analysis-plan-body" id="${planDrawerId}">
+                <ol class="plan-steps-list">
+                    ${planSteps.map(step => `
+                        <li class="plan-step-item">
+                            <span class="step-check">✓</span>
+                            <span class="step-text">${escapeHtml(step.replace(/^\d+\.\s*/, ''))}</span>
+                        </li>
+                    `).join('')}
+                </ol>
+                ${vizReason ? `<div class="plan-viz-reasoning"><strong>Visualization Decision:</strong> ${escapeHtml(vizReason)}</div>` : ''}
+            </div>
+        </div>
+    ` : '';
 
     // Follow-ups HTML
     const followups = data.followups || [];
@@ -408,8 +443,11 @@ function renderAssistantMessage(data) {
                 <span class="pill-spark">⚡</span>
                 <span class="tool-name-highlight">Tool: <code>${escapeHtml(toolName)}</code></span>
                 ${data.tool_parameters && Object.keys(data.tool_parameters).length > 0 ? `<span class="tool-params-preview">${escapeHtml(toolParamsStr)}</span>` : ''}
-                <span class="tool-grounded-tag">✓ Deterministically Grounded</span>
+                <span class="tool-grounded-tag">✓ Controlled Python Execution</span>
             </div>
+
+            <!-- Execution Plan Stepper Card -->
+            ${planHtml}
 
             <!-- Grounded Explanation Text -->
             <div class="assistant-markdown-body">
@@ -447,6 +485,19 @@ function renderAssistantMessage(data) {
         }
     }
 }
+
+/**
+ * Toggle execution plan drawer.
+ */
+window.togglePlanDrawer = function(drawerId) {
+    const el = document.getElementById(drawerId);
+    const arrow = document.getElementById(`arrow-${drawerId}`);
+    if (el) {
+        const isHidden = el.style.display === 'none';
+        el.style.display = isHidden ? 'block' : 'none';
+        if (arrow) arrow.textContent = isHidden ? '▼' : '▲';
+    }
+};
 
 /**
  * Toggle raw JSON inspection drawer.

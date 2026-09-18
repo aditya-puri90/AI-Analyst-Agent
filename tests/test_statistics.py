@@ -229,7 +229,7 @@ class TestStatisticalAPIEndpoints:
         res = test_client.get("/api/health")
         assert res.status_code == 200
         data = res.get_json()
-        assert "Phase 5" in data["phase"]
+        assert "Phase" in data["phase"]
 
     def test_statistics_endpoints_with_sample_dataset(self, test_client):
         # Ingest built-in sample dataset

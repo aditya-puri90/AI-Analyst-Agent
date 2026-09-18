@@ -88,6 +88,9 @@ from agent.question_router import (
 
 
 
+from analysis.tool_registry import registry
+from agent.planner import AnalysisPlanner
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -156,7 +159,18 @@ def create_app() -> Flask:
         return jsonify({
             "status": "healthy",
             "service": "AI Data Analyst Agent",
-            "phase": "Phase 5 - Statistical Analysis & Phase 6 - Correlation & Phase 7 - Outliers & Phase 8 - Visualization & Phase 9 - AI Insights & Phase 10 - Natural-Language Dataset Q&A ('Ask Your Dataset')",
+            "phase": "Phase 11: Intelligent Analysis Planning and Chart Generation",
+            "capabilities": [
+                "dataset_profiling",
+                "statistical_analysis",
+                "correlation_heatmaps",
+                "outlier_detection",
+                "plotly_visualizations",
+                "ai_executive_insights",
+                "natural_language_qa",
+                "intelligent_analysis_planning",
+                "controlled_python_tool_registry",
+            ],
             "max_upload_mb": Config.MAX_CONTENT_LENGTH / (1024 * 1024),
             "allowed_extensions": list(Config.ALLOWED_EXTENSIONS),
         })
@@ -1039,88 +1053,54 @@ def create_app() -> Flask:
             "suggestions": suggestions,
         })
 
+    @app.route("/api/chat/plan", methods=["POST"])
+    def chat_plan_route():
+        """
+        Formulate and return the multi-step Analysis Plan and visualization requirement
+        for a user question without executing calculations.
+        """
+        req_json = request.get_json() or {}
+        dataset_id = req_json.get("dataset_id", "").strip()
+        query = req_json.get("query", "").strip()
+        provider = req_json.get("provider", None)
+        model = req_json.get("model", None)
+
+        if not dataset_id:
+            return jsonify({"success": False, "error": "Parameter 'dataset_id' is required."}), 400
+
+        if not query:
+            return jsonify({"success": False, "error": "Parameter 'query' cannot be empty."}), 400
+
+        df, error = load_dataset(dataset_id)
+        if error or df is None:
+            return jsonify({"success": False, "error": f"Failed to load dataset '{dataset_id}': {error}"}), 404
+
+        router = QuestionRouter(provider=provider, model=model)
+        plan_dict = router.plan_question(
+            df=df,
+            query=query,
+            dataset_id=dataset_id,
+            provider=provider,
+            model=model,
+        )
+
+        return jsonify({
+            "success": True,
+            "dataset_id": dataset_id,
+            "plan": plan_dict,
+        })
+
     @app.route("/api/chat/tools", methods=["GET"])
     def get_chat_tools_route():
         """
-        List all available deterministic analysis tools and their descriptions.
+        List all authorized deterministic analysis tools from the controlled ToolRegistry.
         """
-        tools_info = [
-            {
-                "name": "dataset_summary",
-                "description": "Comprehensive dataset dimensions, memory, missingness, duplicate rates, and column types.",
-                "parameters": {},
-            },
-            {
-                "name": "column_summary",
-                "description": "Deep statistical, frequency, or temporal summary of a single column.",
-                "parameters": {"column_name": "string (required)"},
-            },
-            {
-                "name": "groupby_analysis",
-                "description": "Group a continuous target feature by a categorical dimension with ranking, sorting, and percentage of total.",
-                "parameters": {
-                    "group_by_col": "string (required)",
-                    "target_col": "string (optional)",
-                    "agg_func": "string (sum, mean, median, count, min, max, std)",
-                    "sort_desc": "boolean (default: true)",
-                    "limit": "integer (default: 10)",
-                },
-            },
-            {
-                "name": "aggregation_analysis",
-                "description": "Compute single or multi-moment scalar statistics across a continuous numerical column.",
-                "parameters": {
-                    "target_col": "string (required)",
-                    "agg_func": "string (mean, sum, median, min, max, std, count)",
-                },
-            },
-            {
-                "name": "correlation_analysis",
-                "description": "Pairwise Pearson/Spearman linear correlation or global strongest positive/negative association ranking.",
-                "parameters": {
-                    "col1": "string (optional)",
-                    "col2": "string (optional)",
-                    "threshold": "float (default: 0.0)",
-                    "method": "string (pearson, spearman)",
-                },
-            },
-            {
-                "name": "outlier_analysis",
-                "description": "Detect statistical anomalies and extreme tail values using IQR (1.5x) or Z-score methods.",
-                "parameters": {
-                    "column_name": "string (optional)",
-                    "method": "string (iqr, zscore)",
-                    "threshold": "float (default: 1.5)",
-                },
-            },
-            {
-                "name": "time_series_analysis",
-                "description": "Chronological progression, growth percentage, peak and trough periods along datetime features.",
-                "parameters": {
-                    "date_col": "string (optional)",
-                    "value_col": "string (optional)",
-                    "freq": "string (auto, D, M, Y)",
-                    "agg_func": "string (sum, mean)",
-                },
-            },
-            {
-                "name": "distribution_analysis",
-                "description": "Histogram bins, skewness, kurtosis, spread, and normality evaluation.",
-                "parameters": {
-                    "column_name": "string (required)",
-                    "bins": "integer (default: 10)",
-                },
-            },
-            {
-                "name": "investigate_further",
-                "description": "Prioritized exploration leads derived from anomalies, strong correlations, and missingness signals.",
-                "parameters": {},
-            },
-        ]
+        tools_info = registry.list_tools()
         return jsonify({
             "success": True,
             "total_tools": len(tools_info),
             "tools": tools_info,
+            "execution_policy": "Strictly Controlled Registered Functions (No Arbitrary Code Execution)",
         })
 
     return app
