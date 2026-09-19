@@ -251,7 +251,21 @@ AI-Data-Analyst-Agent/
   - [x] Reference Analytical Workflow 2: Linear Correlation (*"Is advertising spend related to revenue?"* -> Identify ad spend -> Identify revenue -> Pearson correlation -> Scatter plot -> Explain relationship without claiming causation).
   - [x] Reference Analytical Workflow 3: Category Leaderboard (*"Which category has the highest revenue?"* -> Identify category -> Identify revenue -> Group by category -> Aggregate revenue -> Sort descending -> Bar chart -> Explain result).
   - [x] UI Execution Plan Stepper with interactive progress cards, step badges, and plan drawer in `/chat`.
-  - [x] Standalone CLI runner `run_planning_demo.py` and 183 automated pytest test cases passing.
+- [x] **Phase 12: Professional Analytics Dashboard UI & Executive Reports**
+  - [x] Modern 11-section unified studio navigation shell with active indicators and URL hash routing: `Dashboard`, `Data Preview`, `Data Quality`, `Cleaning`, `Statistics`, `Correlations`, `Outliers`, `Visualizations`, `AI Insights`, `Ask Dataset`, `Reports`.
+  - [x] 10 Executive Dashboard widgets:
+    - 1. Dataset Overview Cards (Rows, Columns, Cells, Memory, Size, Format, Status).
+    - 2. Data Quality Score Radial Gauge (0-100) & Letter Grade (A+/A/B/C/D).
+    - 3. Missing Value Summary with gradient percentage bars.
+    - 4. Duplicate Redundancy Summary & Uniqueness Rating.
+    - 5. Numerical / Categorical Column Proportional Distribution Bar.
+    - 6. Important Statistical Findings & Mathematical Observations.
+    - 7. Top Correlations (Strongest Positive & Negative associations with visual meters).
+    - 8. Outlier Summary & High-Risk Columns Anomaly Badges.
+    - 9. AI-Generated Executive Summary & Strategic Takeaways.
+    - 10. Top Recommended Interactive Plotly Visualizations.
+  - [x] Executive Report Generator engine (`reports/report_generator.py`) supporting structured JSON, formatted Markdown, and standalone styled printable HTML reports.
+  - [x] Full test suite with 189 passing automated pytest test cases.
 
 ---
 
@@ -302,7 +316,7 @@ The application will be accessible at:
 
 ### Available Pages:
 - **`http://127.0.0.1:5000/`** - Home & CSV Upload Zone
-- **`http://127.0.0.1:5000/dashboard`** - Analytics Dashboard, Profiler & Data Cleaning Studio
+- **`http://127.0.0.1:5000/dashboard`** - Unified Professional Analytics Studio (11 Navigation Sections)
 - **`http://127.0.0.1:5000/chat`** - "Ask Your Dataset" AI Conversational Workspace
 
 ### Standalone CLI Runners:
@@ -329,23 +343,29 @@ python run_planning_demo.py
 
 | Endpoint | Method | Description |
 | :--- | :--- | :--- |
-| `/api/health` | `GET` | System health check and status |
+| `/api/health` | `GET` | System health check, capabilities, and phase reporting |
 | `/api/upload` | `POST` | Upload and validate a new CSV dataset |
 | `/api/datasets` | `GET` | List all available uploaded datasets |
 | `/api/profile/<dataset_id>` | `GET` | Retrieve metadata profile & schema for a dataset |
 | `/api/preview/<dataset_id>` | `GET` | Retrieve paginated rows for tabular inspection |
-| `/api/sample/<name>` | `POST` | Load bundled sample dataset (e.g. Sales, Employees) |
+| `/api/sample/<name>` | `POST` | Load bundled sample dataset (`ecommerce`, `employee`) |
 | `/api/cleaning/audit/<dataset_id>` | `GET` | Run 12-point data quality audit and get defect list |
 | `/api/cleaning/preview/<dataset_id>` | `GET` | Generate before-and-after transformation preview pairs |
 | `/api/cleaning/apply/<dataset_id>` | `POST` | Execute configurable cleaning pipeline & persist to `data/processed/` |
 | `/api/cleaning/download/<dataset_id>` | `GET` | Download cleaned CSV file from `data/processed/` |
-| `/api/insights/<dataset_id>` | `POST` | Generate grounded 8-section AI executive summary report |
+| `/api/statistics/<dataset_id>` | `GET` | Descriptive moments, percentiles, skewness, kurtosis, and 95% CI |
+| `/api/correlation/<dataset_id>` | `GET` | Pearson correlation matrix, ranked pairs, and Plotly heatmap spec |
+| `/api/outliers/<dataset_id>` | `GET` | Multi-method outlier analysis (IQR, Z-score) and boxplot specs |
+| `/api/outliers/remediate/<dataset_id>` | `POST` | Execute non-destructive outlier remediation (remove, cap, winsorize) |
+| `/api/visualization/recommendations/<dataset_id>` | `GET` | Automated ranked Plotly chart recommendations |
+| `/api/visualization/custom/<dataset_id>` | `POST` | Generate custom Plotly chart from user-selected features |
+| `/api/insights/<dataset_id>` | `GET` / `POST` | Generate grounded 8-section AI executive summary report |
 | `/api/chat/ask` | `POST` | Ask natural language question, plan steps, execute safe tool, and generate chart |
 | `/api/chat/plan` | `POST` | Preview structured multi-step execution plan and chart decision for a query |
-| `/api/chat/history/<dataset_id>` | `GET` | Retrieve multi-turn conversation history for active dataset |
-| `/api/chat/clear/<dataset_id>` | `POST` | Clear conversation history for active dataset |
 | `/api/chat/suggested-questions/<dataset_id>` | `GET` | Dynamically generated schema-tailored question chips |
 | `/api/chat/tools` | `GET` | List verified registered analysis tools from Tool Registry |
+| `/api/report/generate/<dataset_id>` | `GET` / `POST` | Compile executive report in structured JSON, Markdown, and styled HTML |
+| `/api/report/download/<dataset_id>` | `GET` | Download executive report as `.html` or `.md` file |
 
 ---
 
@@ -356,4 +376,5 @@ Run the automated test suite with `pytest`:
 python -m pytest -v
 ```
 
-All **183 test cases** across all phases pass with 100% test coverage.
+All **189 test cases** across all phases pass with 100% test coverage.
+
