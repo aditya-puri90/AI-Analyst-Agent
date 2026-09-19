@@ -1,17 +1,22 @@
 /**
- * Dashboard Client-Side Controller for AI Data Analyst Agent.
- * Phase 4: Automatic Dataset Profiling, Data Quality Auditing, Cleaning Engine & Exploration.
+ * AI Data Analyst Agent Studio - Master Dashboard Controller (Phase 12)
+ * Manages all 11 studio navigation views, executive dashboard widgets,
+ * interactive Plotly visualizations, data quality auditing, non-destructive cleaning,
+ * descriptive statistics, correlations, outlier remediation, AI insights,
+ * conversational Q&A assistant, and executive report generation.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
-    // State
+    // -------------------------------------------------------------
+    // Application State
+    // -------------------------------------------------------------
     let activeDatasetId = window.INITIAL_DATASET_ID || '';
     let currentProfile = null;
     let allColumnsProfile = [];
     let activeTypeFilter = 'all';
     let columnSearchQuery = '';
-    
-    // Cleaning Studio State
+
+    // Quality & Cleaning State
     let allDetectedIssues = [];
     let activeSeverityFilter = 'all';
     let currentCleaningSummary = null;
@@ -23,207 +28,59 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentPreviewRows = [];
     let currentPreviewCols = [];
 
-    // DOM Elements - Global
+    // Statistical Engine State
+    let currentStatistics = null;
+    let statsSearchQuery = '';
+
+    // Correlation Engine State
+    let currentCorrelation = null;
+    let currentHeatmapSpec = null;
+    let currentCorrThreshold = 0.0;
+
+    // Outlier Engine State
+    let currentOutliers = null;
+    let activeOutlierMethod = 'iqr';
+
+    // Visualization Engine State
+    let allRecommendations = [];
+    let activeVizFilter = 'all';
+    let vizSchema = null;
+
+    // AI Insights State
+    let currentInsights = null;
+
+    // Report State
+    let currentReport = null;
+
+    // Chat State
+    let isChatStreaming = false;
+
+    // -------------------------------------------------------------
+    // DOM Elements - Navigation & Global
+    // -------------------------------------------------------------
     const datasetSelector = document.getElementById('dataset-selector');
     const loadingState = document.getElementById('dashboard-loading');
     const errorState = document.getElementById('dashboard-error');
     const contentState = document.getElementById('dashboard-content');
-    const activeDatasetName = document.getElementById('active-dataset-name');
-    const activeDatasetIdEl = document.getElementById('active-dataset-id');
-    const activeDatasetSize = document.getElementById('active-dataset-size');
-    const activeDatasetStatus = document.getElementById('active-dataset-status');
-    const openChatBtn = document.getElementById('open-chat-btn');
-
-    // DOM Elements - Studio Tabs
     const studioTabBtns = document.querySelectorAll('.studio-tab-btn');
     const studioTabContents = document.querySelectorAll('.studio-tab-content');
-    const cleaningIssuesBadge = document.getElementById('cleaning-issues-badge');
 
-    // DOM Elements - Overview KPIs
-    const kpiRows = document.getElementById('kpi-rows');
-    const kpiCols = document.getElementById('kpi-cols');
-    const kpiMemory = document.getElementById('kpi-memory');
-    const kpiMemoryBytes = document.getElementById('kpi-memory-bytes');
-    const kpiMissing = document.getElementById('kpi-missing');
-    const kpiMissingHint = document.getElementById('kpi-missing-hint');
-    const kpiDuplicates = document.getElementById('kpi-duplicates');
-    const kpiDuplicatesHint = document.getElementById('kpi-duplicates-hint');
-    const kpiHealthGrade = document.getElementById('kpi-health-grade');
-    const kpiHealthScore = document.getElementById('kpi-health-score');
+    // Header Meta
+    const headerDatasetName = document.getElementById('header-dataset-name');
+    const headerDatasetStatus = document.getElementById('header-dataset-status');
+    const headerQuickStats = document.getElementById('header-quick-stats');
+    const headerStatRows = document.getElementById('header-stat-rows');
+    const headerStatCols = document.getElementById('header-stat-cols');
+    const headerStatGrade = document.getElementById('header-stat-grade');
 
-    // DOM Elements - Quality Summary
-    const qualityStatusBadge = document.getElementById('quality-status-badge');
-    const qualityStatusText = document.getElementById('quality-status-text');
-    const qualityScoreDisplay = document.getElementById('quality-score-display');
-    const qualityChecksCount = document.getElementById('quality-checks-count');
-    const completenessScoreVal = document.getElementById('completeness-score-val');
-    const completenessBarFill = document.getElementById('completeness-bar-fill');
-    const uniquenessScoreVal = document.getElementById('uniqueness-score-val');
-    const uniquenessBarFill = document.getElementById('uniqueness-bar-fill');
-    const qualityInsightsList = document.getElementById('quality-insights-list');
+    // Sample Loaders
+    const btnSampleEcommerce = document.getElementById('btn-sample-ecommerce');
+    const btnSampleEmployee = document.getElementById('btn-sample-employee');
+    const btnLoadSampleErr = document.getElementById('btn-load-sample-err');
 
-    // DOM Elements - Column Profiling Table
-    const countAll = document.getElementById('count-all');
-    const countNumerical = document.getElementById('count-numerical');
-    const countCategorical = document.getElementById('count-categorical');
-    const countDatetime = document.getElementById('count-datetime');
-    const countBoolean = document.getElementById('count-boolean');
-    const countOther = document.getElementById('count-other');
-    const typeFilterBtns = document.querySelectorAll('.type-filter-btn');
-    const columnSearch = document.getElementById('column-search');
-    const columnTableMeta = document.getElementById('column-table-meta');
-    const columnsProfileTbody = document.getElementById('columns-profile-tbody');
-
-    // DOM Elements - Cleaning Studio
-    const btnApplyCleaning = document.getElementById('btn-apply-cleaning');
-    const btnApplyCleaningBottom = document.getElementById('btn-apply-cleaning-bottom');
-    const btnDownloadCleaned = document.getElementById('btn-download-cleaned');
-    const cleaningSummarySection = document.getElementById('cleaning-summary-section');
-    const cleaningTimestamp = document.getElementById('cleaning-timestamp');
-    const cleanKpiRowsBefore = document.getElementById('clean-kpi-rows-before');
-    const cleanKpiRowsAfter = document.getElementById('clean-kpi-rows-after');
-    const cleanKpiDuplicatesRemoved = document.getElementById('clean-kpi-duplicates-removed');
-    const cleanKpiMissingHandled = document.getElementById('clean-kpi-missing-handled');
-    const cleanKpiColsConverted = document.getElementById('clean-kpi-cols-converted');
-    const cleanKpiValsStandardized = document.getElementById('clean-kpi-vals-standardized');
-    const appliedOperationsChips = document.getElementById('applied-operations-chips');
-
-    const sevCountAll = document.getElementById('sev-count-all');
-    const sevCountCritical = document.getElementById('sev-count-critical');
-    const sevCountHigh = document.getElementById('sev-count-high');
-    const sevCountMedium = document.getElementById('sev-count-medium');
-    const sevCountLow = document.getElementById('sev-count-low');
-    const sevFilterBtns = document.querySelectorAll('.sev-filter-btn');
-    const cleaningIssuesTbody = document.getElementById('cleaning-issues-tbody');
-    const previewPairsCount = document.getElementById('preview-pairs-count');
-    const previewCardsGrid = document.getElementById('preview-cards-grid');
-
-    // Config Checkbox Elements
-    const cfgRemoveDuplicates = document.getElementById('cfg-remove-duplicates');
-    const cfgFillNumericMissing = document.getElementById('cfg-fill-numeric-missing');
-    const cfgNumericStrategy = document.getElementById('cfg-numeric-strategy');
-    const cfgFillCategoricalMissing = document.getElementById('cfg-fill-categorical-missing');
-    const cfgCategoricalStrategy = document.getElementById('cfg-categorical-strategy');
-    const cfgStandardizeWhitespace = document.getElementById('cfg-standardize-whitespace');
-    const cfgStandardizeCategorical = document.getElementById('cfg-standardize-categorical');
-    const cfgConvertNumericStrings = document.getElementById('cfg-convert-numeric-strings');
-    const cfgConvertDatetimeStrings = document.getElementById('cfg-convert-datetime-strings');
-    const cfgHandleInvalidNumerical = document.getElementById('cfg-handle-invalid-numerical');
-    const cfgDropHighMissing = document.getElementById('cfg-drop-high-missing');
-    const cfgDropConstantColumns = document.getElementById('cfg-drop-constant-columns');
-    const cfgCapOutliers = document.getElementById('cfg-cap-outliers');
-
-    // DOM Elements - Modal Inspector
-    const modalBackdrop = document.getElementById('column-modal-backdrop');
-    const modalColName = document.getElementById('modal-col-name');
-    const modalColType = document.getElementById('modal-col-type');
-    const modalColDtype = document.getElementById('modal-col-dtype');
-    const modalColBody = document.getElementById('modal-col-body');
-    const modalCloseBtn = document.getElementById('modal-close-btn');
-
-    // DOM Elements - Preview Explorer
-    const viewRawDataBtn = document.getElementById('view-raw-data-btn');
-    const viewCleanDataBtn = document.getElementById('view-clean-data-btn');
-    const tableHead = document.getElementById('data-table-head');
-    const tableBody = document.getElementById('data-table-body');
-    const paginationInfo = document.getElementById('pagination-info');
-    const tableSearch = document.getElementById('table-search');
-    const prevPageBtn = document.getElementById('prev-page-btn');
-    const nextPageBtn = document.getElementById('next-page-btn');
-
-    // DOM Elements - Phase 5 Statistical Analysis
-    let currentStatistics = null;
-    let statsSearchQuery = '';
-    const statsKpiNumCount = document.getElementById('stats-kpi-num-count');
-    const statsKpiCatCount = document.getElementById('stats-kpi-cat-count');
-    const statsKpiDtCount = document.getElementById('stats-kpi-dt-count');
-    const statsKpiOutliersCount = document.getElementById('stats-kpi-outliers-count');
-    const statsKpiNormalCount = document.getElementById('stats-kpi-normal-count');
-    const statsObservationsGrid = document.getElementById('stats-observations-grid');
-    const statsTableSearch = document.getElementById('stats-table-search');
-    const summaryStatisticsTbody = document.getElementById('summary-statistics-tbody');
-    const statsColumnSelector = document.getElementById('stats-column-selector');
-    const distributionDetailsCard = document.getElementById('distribution-details-card');
-
-    // DOM Elements - Phase 6 Correlation Analysis
-    let currentCorrelation = null;
-    let currentHeatmapSpec = null;
-    let currentCorrThreshold = 0.0;
-    let corrSearchQuery = '';
-    const corrThresholdSlider = document.getElementById('corr-threshold-slider');
-    const corrThresholdDisplay = document.getElementById('corr-threshold-display');
-    const corrKpiNumCount = document.getElementById('corr-kpi-num-count');
-    const corrKpiPairsCount = document.getElementById('corr-kpi-pairs-count');
-    const corrKpiStrongCount = document.getElementById('corr-kpi-strong-count');
-    const corrKpiModCount = document.getElementById('corr-kpi-mod-count');
-    const keyCorrelationsGrid = document.getElementById('key-correlations-grid');
-    const correlationHeatmapContainer = document.getElementById('correlation-heatmap-container');
-    const corrTableSearch = document.getElementById('corr-table-search');
-    const rankedCorrelationsTbody = document.getElementById('ranked-correlations-tbody');
-
-    // DOM Elements - Phase 8 Automatic Visualization Engine
-    let allRecommendations = [];
-    let activeVizFilter = 'all';
-    let vizSchema = null;
-    const vizCountBadge = document.getElementById('viz-count-badge');
-    const vizKpiTotalCount = document.getElementById('viz-kpi-total-count');
-    const vizKpiDistCount = document.getElementById('viz-kpi-dist-count');
-    const vizKpiRelCount = document.getElementById('viz-kpi-rel-count');
-    const vizKpiCatCount = document.getElementById('viz-kpi-cat-count');
-    const vizKpiTrendCount = document.getElementById('viz-kpi-trend-count');
-    const recFilterAllCount = document.getElementById('rec-filter-all-count');
-    const recommendedChartsGrid = document.getElementById('recommended-charts-grid');
-    const vizFilterBtns = document.querySelectorAll('.viz-filter-btn');
-
-    // Custom Chart Builder DOM Elements
-    const builderXCol = document.getElementById('builder-x-col');
-    const builderYCol = document.getElementById('builder-y-col');
-    const builderChartType = document.getElementById('builder-chart-type');
-    const builderAggregation = document.getElementById('builder-aggregation');
-    const builderColorCol = document.getElementById('builder-color-col');
-    const builderChartTitle = document.getElementById('builder-chart-title');
-    const btnGenerateCustomChart = document.getElementById('btn-generate-custom-chart');
-    const btnResetCustomChart = document.getElementById('btn-reset-custom-chart');
-    const customPlotlyCanvas = document.getElementById('custom-plotly-canvas');
-
-    // DOM Elements - Phase 9 AI Insight Engine
-    let currentInsights = null;
-    let configuredAiProviders = {};
-    const tabInsightsBtn = document.getElementById('tab-insights-btn');
-    const insightsReadyBadge = document.getElementById('insights-ready-badge');
-    const aiProviderSelect = document.getElementById('ai-provider-select');
-    const aiModelSelect = document.getElementById('ai-model-select');
-    const aiProviderStatusBadge = document.getElementById('ai-provider-status-badge');
-    const aiProviderStatusText = document.getElementById('ai-provider-status-text');
-    const btnGenerateInsights = document.getElementById('btn-generate-insights');
-    const btnGenerateText = document.getElementById('btn-generate-text');
-    const btnCopyInsights = document.getElementById('btn-copy-insights');
-    const btnViewRawContext = document.getElementById('btn-view-raw-context');
-    const insightsLoading = document.getElementById('insights-loading');
-    const insightsLoadingStep = document.getElementById('insights-loading-step');
-    const insightsContainer = document.getElementById('insights-container');
-
-    // Card & Hero Content Bodies
-    const contentExecutiveSummary = document.getElementById('content-executive-summary');
-    const contentKeyFindings = document.getElementById('content-key-findings');
-    const contentImportantTrends = document.getElementById('content-important-trends');
-    const contentImportantRelationships = document.getElementById('content-important-relationships');
-    const contentDataQualityConcerns = document.getElementById('content-data-quality-concerns');
-    const contentPotentialOutliers = document.getElementById('content-potential-outliers');
-    const contentBusinessRecommendations = document.getElementById('content-business-recommendations');
-    const contentSuggestedFollowUp = document.getElementById('content-suggested-follow-up');
-
-    // Hero Meta Pills
-    const pillDatasetDims = document.getElementById('pill-dataset-dims');
-    const pillDatasetHealth = document.getElementById('pill-dataset-health');
-    const pillEngineProvider = document.getElementById('pill-engine-provider');
-
-    // Raw Grounding Python Context Modal
-    const rawContextModal = document.getElementById('raw-context-modal');
-    const modalRawContextCloseBtn = document.getElementById('modal-raw-context-close-btn');
-    const rawContextJsonContent = document.getElementById('raw-context-json-content');
-
-    // Helper: Format bytes
+    // -------------------------------------------------------------
+    // Helper Functions
+    // -------------------------------------------------------------
     function formatBytes(bytes, decimals = 2) {
         if (!bytes || bytes === 0) return '0 B';
         const k = 1024;
@@ -233,7 +90,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
     }
 
-    // Helper: Escape HTML
+    function formatNumber(num) {
+        if (num === null || num === undefined || isNaN(num)) return '--';
+        return Number(num).toLocaleString();
+    }
+
     function escapeHtml(str) {
         if (str === null || str === undefined) return '';
         const div = document.createElement('div');
@@ -241,2749 +102,1656 @@ document.addEventListener('DOMContentLoaded', () => {
         return div.innerHTML;
     }
 
-    // Tab Switcher Handling
-    studioTabBtns.forEach((btn) => {
-        btn.addEventListener('click', () => {
-            const targetTabId = btn.getAttribute('data-tab');
-            studioTabBtns.forEach((b) => b.classList.remove('active'));
-            studioTabContents.forEach((c) => {
-                c.classList.remove('active');
-                c.classList.add('hidden');
+    function showToast(message, icon = 'ℹ️', duration = 3500) {
+        const toast = document.getElementById('toast-notification');
+        const msgEl = document.getElementById('toast-message');
+        const iconEl = document.getElementById('toast-icon');
+        if (!toast || !msgEl) return;
+        msgEl.textContent = message;
+        if (iconEl) iconEl.textContent = icon;
+        toast.classList.remove('hidden');
+        setTimeout(() => {
+            toast.classList.add('hidden');
+        }, duration);
+    }
+
+    // -------------------------------------------------------------
+    // View Navigation & Tab Routing (11 Sections)
+    // -------------------------------------------------------------
+    function switchTab(targetTabId, updateHash = true) {
+        studioTabBtns.forEach(btn => {
+            const isMatch = btn.getAttribute('data-tab') === targetTabId;
+            btn.classList.toggle('active', isMatch);
+            btn.setAttribute('aria-selected', isMatch ? 'true' : 'false');
+        });
+
+        studioTabContents.forEach(content => {
+            const isMatch = content.id === targetTabId;
+            content.classList.toggle('active', isMatch);
+            content.classList.toggle('hidden', !isMatch);
+        });
+
+        if (updateHash) {
+            const hashName = targetTabId.replace('-view', '');
+            window.location.hash = hashName;
+        }
+
+        // Trigger Plotly Resize on all visible chart containers
+        setTimeout(() => {
+            window.dispatchEvent(new Event('resize'));
+            const plotDivs = document.querySelectorAll('.js-plotly-plot');
+            plotDivs.forEach(p => {
+                try { Plotly.Plots.resize(p); } catch (e) {}
             });
+        }, 80);
 
-            btn.classList.add('active');
-            const targetContent = document.getElementById(targetTabId);
-            if (targetContent) {
-                targetContent.classList.remove('hidden');
-                targetContent.classList.add('active');
-            }
+        // Lazy-load specific view engines if not yet loaded
+        if (targetTabId === 'reports-view' && !currentReport) {
+            loadExecutiveReport();
+        } else if (targetTabId === 'chat-view') {
+            loadChatSuggestions();
+        }
+    }
 
-            // Auto-resize Plotly correlation heatmap when tab becomes visible
-            if (targetTabId === 'correlation-view' && window.Plotly && correlationHeatmapContainer) {
-                setTimeout(() => {
-                    Plotly.Plots.resize(correlationHeatmapContainer);
-                }, 50);
-            }
-
-            // Auto-resize Plotly outlier chart when tab becomes visible
-            if (targetTabId === 'outliers-view' && window.Plotly && document.getElementById('outlier-plotly-chart')) {
-                setTimeout(() => {
-                    Plotly.Plots.resize('outlier-plotly-chart');
-                }, 50);
-            }
-
-            // Auto-resize Plotly visualization charts when tab becomes visible
-            if (targetTabId === 'visualization-view' && window.Plotly) {
-                setTimeout(() => {
-                    allRecommendations.forEach((rec) => {
-                        const elId = `plotly-rec-${rec.id}`;
-                        if (document.getElementById(elId)) {
-                            Plotly.Plots.resize(elId);
-                        }
-                    });
-                    if (customPlotlyCanvas) {
-                        Plotly.Plots.resize('custom-plotly-canvas');
-                    }
-                }, 50);
-            }
+    studioTabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const target = btn.getAttribute('data-tab');
+            switchTab(target);
         });
     });
 
-    // Load available datasets for the dropdown
-    async function loadDatasetsList() {
+    // Jump Buttons inside Dashboard
+    document.getElementById('dash-btn-view-quality')?.addEventListener('click', () => switchTab('quality-view'));
+    document.getElementById('dash-btn-clean-missing')?.addEventListener('click', () => switchTab('cleaning-view'));
+    document.getElementById('dash-btn-deduplicate')?.addEventListener('click', () => switchTab('cleaning-view'));
+    document.getElementById('dash-btn-view-stats')?.addEventListener('click', () => switchTab('statistics-view'));
+    document.getElementById('dash-btn-view-corr')?.addEventListener('click', () => switchTab('correlation-view'));
+    document.getElementById('dash-btn-view-outliers')?.addEventListener('click', () => switchTab('outliers-view'));
+    document.getElementById('dash-btn-open-viz-studio')?.addEventListener('click', () => switchTab('visualization-view'));
+    document.getElementById('dash-btn-view-full-ai')?.addEventListener('click', () => switchTab('insights-view'));
+    document.getElementById('dash-btn-jump-reports')?.addEventListener('click', () => switchTab('reports-view'));
+    document.getElementById('dash-btn-jump-chat')?.addEventListener('click', () => switchTab('chat-view'));
+    document.getElementById('btn-goto-cleaning')?.addEventListener('click', () => switchTab('cleaning-view'));
+
+    // Handle Hash on Load
+    function handleInitialHash() {
+        const hash = window.location.hash.replace('#', '').trim();
+        if (hash) {
+            const matchingTab = `${hash}-view`;
+            const tabEl = document.getElementById(matchingTab);
+            if (tabEl) {
+                switchTab(matchingTab, false);
+            }
+        }
+    }
+
+    // -------------------------------------------------------------
+    // Dataset Loading & Pipeline Orchestration
+    // -------------------------------------------------------------
+    async function loadDatasetList() {
         try {
             const res = await fetch('/api/datasets');
             const data = await res.json();
-            if (res.ok && data.success && data.datasets) {
-                if (datasetSelector) {
-                    datasetSelector.innerHTML = '<option value="">-- Switch Dataset --</option>';
-                    data.datasets.forEach((ds) => {
-                        const opt = document.createElement('option');
-                        opt.value = ds.id;
-                        opt.textContent = `${ds.original_name} (${formatBytes(ds.size_bytes)})`;
-                        if (ds.id === activeDatasetId) {
-                            opt.selected = true;
-                        }
-                        datasetSelector.appendChild(opt);
-                    });
-                }
-
-                // If no activeDatasetId, default to latest dataset
-                if (!activeDatasetId && data.datasets.length > 0) {
-                    activeDatasetId = data.datasets[0].id;
-                    if (datasetSelector) datasetSelector.value = activeDatasetId;
-                }
+            if (data.success && data.datasets) {
+                datasetSelector.innerHTML = '<option value="">Select an uploaded dataset...</option>';
+                data.datasets.forEach(d => {
+                    const opt = document.createElement('option');
+                    opt.value = d.dataset_id;
+                    opt.textContent = `${d.original_filename} (${d.rows || 0} rows, ${d.columns || 0} cols)`;
+                    if (d.dataset_id === activeDatasetId) {
+                        opt.selected = true;
+                    }
+                    datasetSelector.appendChild(opt);
+                });
             }
-        } catch (e) {
-            console.error('Failed to load datasets list:', e);
+        } catch (err) {
+            console.error('Failed to load dataset list:', err);
         }
     }
 
-    // Dataset Selector change
-    if (datasetSelector) {
-        datasetSelector.addEventListener('change', (e) => {
-            const selectedId = e.target.value;
-            if (selectedId) {
-                activeDatasetId = selectedId;
-                const newUrl = `${window.location.pathname}?dataset_id=${encodeURIComponent(selectedId)}`;
-                window.history.pushState({ path: newUrl }, '', newUrl);
-                loadDatasetDashboard(selectedId);
-            }
-        });
-    }
-
-    // Main Dashboard Loader
-    async function loadDatasetDashboard(datasetId) {
+    async function loadFullDatasetAnalytics(datasetId) {
         if (!datasetId) {
-            if (loadingState) loadingState.classList.add('hidden');
-            if (errorState) errorState.classList.remove('hidden');
-            if (contentState) contentState.classList.add('hidden');
+            loadingState.classList.add('hidden');
+            contentState.classList.add('hidden');
+            errorState.classList.remove('hidden');
             return;
         }
 
-        if (loadingState) loadingState.classList.remove('hidden');
-        if (errorState) errorState.classList.add('hidden');
-        if (contentState) contentState.classList.add('hidden');
-
-        // Update links & download URL
-        if (openChatBtn) openChatBtn.href = `/chat?dataset_id=${encodeURIComponent(datasetId)}`;
-        if (btnDownloadCleaned) {
-            btnDownloadCleaned.href = `/api/cleaning/download/${encodeURIComponent(datasetId)}`;
-        }
+        activeDatasetId = datasetId;
+        loadingState.classList.remove('hidden');
+        errorState.classList.add('hidden');
+        contentState.classList.add('hidden');
 
         try {
-            // 1. Fetch Profile
-            const res = await fetch(`/api/profile/${encodeURIComponent(datasetId)}`);
-            const data = await res.json();
+            // Update URL without reload
+            const newUrl = new URL(window.location);
+            newUrl.searchParams.set('dataset_id', datasetId);
+            window.history.replaceState({}, '', newUrl);
 
-            if (!res.ok || !data.success) {
-                showDashboardError(data.error || 'Could not profile the selected dataset.');
-                return;
-            }
-
-            currentProfile = data.profile;
+            // 1. Fetch Profile & Overview
+            const profRes = await fetch(`/api/profile/${datasetId}`);
+            const profData = await profRes.json();
+            if (!profData.success) throw new Error(profData.error || 'Failed to profile dataset');
+            currentProfile = profData.profile;
             allColumnsProfile = currentProfile.columns || [];
 
-            renderOverview(datasetId, currentProfile.overview, currentProfile.quality);
-            renderQualitySummary(currentProfile.quality);
-            updateTypeCounts(currentProfile.type_counts, allColumnsProfile.length);
-            renderColumnProfilingTable();
+            // 2. Fetch Data Quality Audit
+            const qualRes = await fetch(`/api/cleaning/audit/${datasetId}`);
+            const qualData = await qualRes.json();
+            allDetectedIssues = qualData.success ? qualData.issues : [];
 
-            // 2. Fetch Data Quality & Cleaning Audit
-            await loadCleaningAudit(datasetId);
+            // 3. Fetch Descriptive Statistics
+            const statsRes = await fetch(`/api/statistics/${datasetId}`);
+            const statsData = await statsRes.json();
+            currentStatistics = statsData.success ? statsData.statistics : null;
 
-            // 3. Fetch Phase 5 Statistical Analysis
-            await loadStatisticsData(datasetId);
+            // 4. Fetch Correlation Analysis & Heatmap
+            const corrRes = await fetch(`/api/correlation/${datasetId}`);
+            const corrData = await corrRes.json();
+            currentCorrelation = corrData.success ? corrData.correlation : null;
+            currentHeatmapSpec = corrData.success ? corrData.heatmap_spec : null;
 
-            // 4. Fetch Phase 6 Correlation Analysis
-            await loadCorrelationData(datasetId);
+            // 5. Fetch Outlier Detection
+            const outRes = await fetch(`/api/outliers/${datasetId}?method=${activeOutlierMethod}`);
+            const outData = await outRes.json();
+            currentOutliers = outData.success ? outData.outliers : null;
 
-            // 5. Fetch Phase 7 Outlier Detection
-            await loadOutlierData(datasetId);
+            // 6. Fetch Chart Recommendations & Schema
+            const vizRes = await fetch(`/api/visualization/recommendations/${datasetId}`);
+            const vizData = await vizRes.json();
+            allRecommendations = vizData.success ? vizData.recommendations : [];
+            vizSchema = vizData.success ? vizData.schema : null;
 
-            // 6. Fetch Phase 8 Automatic Visualization Engine
-            await loadVisualizationData(datasetId);
+            // 7. Fetch AI Insights
+            const aiRes = await fetch(`/api/insights/${datasetId}`);
+            const aiData = await aiRes.json();
+            currentInsights = aiData.success ? aiData.insights : null;
 
-            // 7. Load table preview (Raw)
-            isViewingCleanedData = false;
-            if (viewRawDataBtn) viewRawDataBtn.classList.add('active');
-            if (viewCleanDataBtn) viewCleanDataBtn.classList.remove('active');
-            currentPage = 1;
-            await loadTablePreview(datasetId, currentPage);
+            // 8. Render All Views
+            renderHeaderMeta();
+            renderDashboardExecutiveWidgets();
+            renderDataPreviewExplorer();
+            renderDataQualityAudit();
+            renderCleaningStudio(qualData);
+            renderStatisticsView();
+            renderCorrelationView();
+            renderOutliersView(outData.boxplot_spec);
+            renderVisualizationsView();
+            renderAiInsightsView();
 
-            // 8. Fetch Phase 9 AI Insights
-            await loadAiProviders();
-            await loadDatasetInsights(datasetId);
+            // Reveal UI
+            loadingState.classList.add('hidden');
+            contentState.classList.remove('hidden');
 
-            if (loadingState) loadingState.classList.add('hidden');
-            if (contentState) contentState.classList.remove('hidden');
-
+            handleInitialHash();
         } catch (err) {
-            showDashboardError(`Error profiling dataset: ${err.message}`);
-        }
-    }
-
-    function showDashboardError(msg) {
-        if (loadingState) loadingState.classList.add('hidden');
-        if (contentState) contentState.classList.add('hidden');
-        if (errorState) {
-            const errMsg = document.getElementById('error-message');
-            if (errMsg) errMsg.textContent = msg;
+            console.error('Error loading dataset analytics:', err);
+            loadingState.classList.add('hidden');
+            contentState.classList.add('hidden');
             errorState.classList.remove('hidden');
+            document.getElementById('error-title').textContent = 'Analysis Ingestion Error';
+            document.getElementById('error-message').textContent = err.message || 'Could not load dataset analytics.';
         }
     }
 
-    // 1. Render Dataset Overview Cards
-    function renderOverview(datasetId, overview, quality) {
-        const rawName = datasetId.split('_').slice(2).join('_') || datasetId;
-        if (activeDatasetName) activeDatasetName.textContent = rawName;
-        if (activeDatasetIdEl) activeDatasetIdEl.textContent = datasetId;
-        if (activeDatasetSize) activeDatasetSize.textContent = `${overview.memory_usage_formatted} RAM`;
+    // -------------------------------------------------------------
+    // Header & Meta Bar Rendering
+    // -------------------------------------------------------------
+    function renderHeaderMeta() {
+        if (!currentProfile) return;
+        const ov = currentProfile.overview || {};
+        const qual = currentProfile.quality_summary || {};
+        const filename = currentProfile.original_filename || activeDatasetId;
 
-        if (kpiRows) kpiRows.textContent = overview.total_rows.toLocaleString();
-        if (kpiCols) kpiCols.textContent = overview.total_columns.toLocaleString();
-        if (kpiMemory) kpiMemory.textContent = overview.memory_usage_formatted;
-        if (kpiMemoryBytes) kpiMemoryBytes.textContent = `${overview.memory_usage_bytes.toLocaleString()} bytes in memory`;
-        
-        if (kpiMissing) kpiMissing.textContent = overview.total_missing_cells.toLocaleString();
-        if (kpiMissingHint) kpiMissingHint.textContent = `${overview.missing_cells_percentage}% total missingness (${overview.rows_with_missing} rows affected)`;
+        if (headerDatasetName) headerDatasetName.textContent = filename;
+        if (headerDatasetStatus) {
+            headerDatasetStatus.textContent = currentProfile.is_processed ? 'Cleaned' : 'Raw';
+            headerDatasetStatus.className = currentProfile.is_processed ? 'meta-badge badge-emerald' : 'meta-badge';
+        }
 
-        if (kpiDuplicates) kpiDuplicates.textContent = overview.duplicate_rows.toLocaleString();
-        if (kpiDuplicatesHint) kpiDuplicatesHint.textContent = `${overview.duplicate_rows_percentage}% duplicate row rate`;
+        if (headerQuickStats) headerQuickStats.classList.remove('hidden');
+        if (headerStatRows) headerStatRows.textContent = `${formatNumber(ov.total_rows)} rows`;
+        if (headerStatCols) headerStatCols.textContent = `${formatNumber(ov.total_columns)} cols`;
+        if (headerStatGrade) headerStatGrade.textContent = `Grade: ${qual.health_grade || 'A+'}`;
 
-        if (kpiHealthGrade) kpiHealthGrade.textContent = quality ? quality.health_grade : '--';
-        if (kpiHealthScore) kpiHealthScore.textContent = quality ? `Score: ${quality.health_score}/100` : 'Score: --';
+        // Top banner title
+        const dashTitle = document.getElementById('dash-active-dataset-name');
+        if (dashTitle) dashTitle.textContent = `${filename}`;
+
+        const dashBadge = document.getElementById('dash-processed-badge');
+        if (dashBadge) {
+            dashBadge.classList.toggle('hidden', !currentProfile.is_processed);
+        }
     }
 
-    // 2. Render Data Quality Summary
-    function renderQualitySummary(quality) {
-        if (!quality) return;
+    // -------------------------------------------------------------
+    // VIEW 1: EXECUTIVE DASHBOARD (10 MANDATORY WIDGETS)
+    // -------------------------------------------------------------
+    function renderDashboardExecutiveWidgets() {
+        if (!currentProfile) return;
+        const ov = currentProfile.overview || {};
+        const qual = currentProfile.quality_summary || {};
+        const cols = currentProfile.columns || [];
 
-        if (qualityScoreDisplay) qualityScoreDisplay.textContent = quality.health_score;
-        if (qualityChecksCount) qualityChecksCount.textContent = `Passed ${quality.passed_checks} of ${quality.total_checks} health checks`;
+        // Widget 1: Dataset Overview Cards
+        const kpiRows = document.getElementById('kpi-rows');
+        const kpiCols = document.getElementById('kpi-cols');
+        const kpiCells = document.getElementById('kpi-cells');
+        const kpiMem = document.getElementById('kpi-memory');
+        const kpiFileSize = document.getElementById('kpi-file-size');
+        const kpiProcStatus = document.getElementById('kpi-processing-status');
 
-        if (qualityStatusText) qualityStatusText.textContent = quality.quality_status;
-        if (qualityStatusBadge) {
-            qualityStatusBadge.className = 'quality-status-badge';
-            if (quality.health_score >= 85) {
-                qualityStatusBadge.classList.add('status-success');
-            } else if (quality.health_score >= 60) {
-                qualityStatusBadge.classList.add('status-warning');
+        if (kpiRows) kpiRows.textContent = formatNumber(ov.total_rows);
+        if (kpiCols) kpiCols.textContent = formatNumber(ov.total_columns);
+        if (kpiCells) kpiCells.textContent = formatNumber(ov.total_cells);
+        if (kpiMem) kpiMem.textContent = `${Number(ov.memory_usage_mb || 0).toFixed(2)} MB`;
+        if (kpiFileSize) kpiFileSize.textContent = formatBytes(ov.file_size_bytes || (ov.memory_usage_mb * 1024 * 1024));
+        if (kpiProcStatus) {
+            kpiProcStatus.textContent = currentProfile.is_processed ? 'Cleaned (Processed)' : 'Raw Upload';
+            kpiProcStatus.className = currentProfile.is_processed ? 'kpi-value text-emerald' : 'kpi-value';
+        }
+
+        // Widget 2: Data Quality Score
+        const score = Math.round(qual.overall_score !== undefined ? qual.overall_score : 100);
+        const grade = qual.health_grade || 'A+';
+        const qualityScoreEl = document.getElementById('dash-quality-score');
+        const qualityGradeEl = document.getElementById('dash-quality-grade');
+        const qualityStatusEl = document.getElementById('dash-quality-status');
+        const gaugeFill = document.getElementById('dash-gauge-fill');
+        const rulesPassedEl = document.getElementById('dash-rules-passed');
+        const issuesDetectedEl = document.getElementById('dash-issues-detected');
+
+        if (qualityScoreEl) qualityScoreEl.textContent = score;
+        if (qualityGradeEl) qualityGradeEl.textContent = grade;
+        
+        // Gauge stroke animation (circumference 2 * PI * 50 = 314)
+        if (gaugeFill) {
+            const offset = 314 - (314 * (score / 100));
+            gaugeFill.style.strokeDashoffset = offset;
+            gaugeFill.style.stroke = score >= 85 ? '#10b981' : score >= 70 ? '#f59e0b' : '#ef4444';
+        }
+
+        const totalIssuesCount = allDetectedIssues.length;
+        const totalRulesCount = 12;
+        const passedRules = Math.max(0, totalRulesCount - totalIssuesCount);
+
+        if (rulesPassedEl) rulesPassedEl.textContent = `${passedRules} / ${totalRulesCount}`;
+        if (issuesDetectedEl) {
+            issuesDetectedEl.textContent = `${totalIssuesCount} defect${totalIssuesCount === 1 ? '' : 's'}`;
+            issuesDetectedEl.className = totalIssuesCount === 0 ? 'text-emerald' : 'text-amber';
+        }
+        if (qualityStatusEl) {
+            qualityStatusEl.textContent = score >= 90 ? 'Optimal Data Health' : score >= 75 ? 'Good (Minor Defects)' : 'Action Required';
+            qualityStatusEl.style.color = score >= 90 ? '#34d399' : score >= 75 ? '#fbbf24' : '#fb7185';
+        }
+
+        // Update badge counter on navigation tab
+        const qBadge = document.getElementById('quality-issues-count-badge');
+        if (qBadge) qBadge.textContent = totalIssuesCount;
+
+        // Widget 3: Missing Value Summary
+        const missingCells = ov.missing_cells || 0;
+        const missingPct = Number(ov.missing_cells_percentage || 0);
+        const completeness = Math.max(0, 100 - missingPct);
+
+        const missCountEl = document.getElementById('dash-missing-cells-count');
+        const completenessEl = document.getElementById('dash-completeness-rate');
+        const missBadge = document.getElementById('dash-missing-badge');
+        const missColsAffectedEl = document.getElementById('dash-missing-cols-affected');
+        const topMissingBars = document.getElementById('dash-top-missing-bars');
+
+        if (missCountEl) missCountEl.textContent = formatNumber(missingCells);
+        if (completenessEl) completenessEl.textContent = `${completeness.toFixed(1)}%`;
+        if (missBadge) missBadge.textContent = `${missingPct.toFixed(1)}% Missing`;
+
+        const colsWithMissing = cols.filter(c => (c.missing_count || 0) > 0);
+        if (missColsAffectedEl) missColsAffectedEl.textContent = `${colsWithMissing.length} of ${cols.length}`;
+
+        if (topMissingBars) {
+            if (colsWithMissing.length === 0) {
+                topMissingBars.innerHTML = '<div class="empty-state-text">✓ Zero missing values detected. Perfect 100% data completeness!</div>';
             } else {
-                qualityStatusBadge.classList.add('status-danger');
+                colsWithMissing.sort((a, b) => (b.missing_percentage || 0) - (a.missing_percentage || 0));
+                topMissingBars.innerHTML = colsWithMissing.slice(0, 4).map(c => `
+                    <div class="missing-bar-row">
+                        <div class="missing-bar-labels">
+                            <span class="missing-bar-col-name">${escapeHtml(c.column_name)}</span>
+                            <span class="missing-bar-pct">${c.missing_count} nulls (${Number(c.missing_percentage || 0).toFixed(1)}%)</span>
+                        </div>
+                        <div class="missing-bar-bg">
+                            <div class="missing-bar-fill" style="width: ${Math.min(100, Math.max(4, c.missing_percentage))}%;"></div>
+                        </div>
+                    </div>
+                `).join('');
             }
         }
 
-        if (completenessScoreVal) completenessScoreVal.textContent = `${quality.completeness_score}%`;
-        if (completenessBarFill) {
-            completenessBarFill.style.width = `${quality.completeness_score}%`;
-            completenessBarFill.className = 'progress-bar-fill';
-            if (quality.completeness_score >= 90) completenessBarFill.classList.add('fill-emerald');
-            else if (quality.completeness_score >= 70) completenessBarFill.classList.add('fill-amber');
-            else completenessBarFill.classList.add('fill-rose');
+        // Widget 4: Duplicate Summary
+        const dupRows = ov.duplicate_rows || 0;
+        const dupPct = Number(ov.duplicate_rows_percentage || 0);
+        const uniqueness = Math.max(0, 100 - dupPct);
+
+        const dupCountEl = document.getElementById('dash-dup-rows-count');
+        const dupPctEl = document.getElementById('dash-dup-pct');
+        const uniqEl = document.getElementById('dash-uniqueness-score');
+        const dupBadge = document.getElementById('dash-dup-badge');
+        const dupDesc = document.getElementById('dash-dup-desc');
+
+        if (dupCountEl) dupCountEl.textContent = formatNumber(dupRows);
+        if (dupPctEl) dupPctEl.textContent = `${dupPct.toFixed(1)}%`;
+        if (uniqEl) uniqEl.textContent = `${uniqueness.toFixed(1)}%`;
+        if (dupBadge) {
+            dupBadge.textContent = dupRows === 0 ? '0 Duplicates' : `${formatNumber(dupRows)} Duplicates`;
+            dupBadge.className = dupRows === 0 ? 'stat-tag-emerald' : 'stat-tag-amber';
+        }
+        if (dupDesc) {
+            dupDesc.textContent = dupRows === 0
+                ? 'Zero duplicate records identified. Every observation in the dataset is unique.'
+                : `Detected ${formatNumber(dupRows)} duplicate record${dupRows === 1 ? '' : 's'} (${dupPct.toFixed(2)}% redundancy rate). Recommend deduplication.`;
         }
 
-        if (uniquenessScoreVal) uniquenessScoreVal.textContent = `${quality.uniqueness_score}%`;
-        if (uniquenessBarFill) {
-            uniquenessBarFill.style.width = `${quality.uniqueness_score}%`;
-            uniquenessBarFill.className = 'progress-bar-fill';
-            if (quality.uniqueness_score >= 95) uniquenessBarFill.classList.add('fill-indigo');
-            else if (quality.uniqueness_score >= 80) uniquenessBarFill.classList.add('fill-amber');
-            else uniquenessBarFill.classList.add('fill-rose');
+        // Widget 5: Numerical / Categorical Column Counts
+        let numCount = 0, catCount = 0, dateCount = 0, boolCount = 0, otherCount = 0;
+        cols.forEach(c => {
+            const t = (c.classified_type || '').toLowerCase();
+            if (t === 'numerical') numCount++;
+            else if (t === 'categorical') catCount++;
+            else if (t === 'datetime') dateCount++;
+            else if (t === 'boolean') boolCount++;
+            else otherCount++;
+        });
+
+        const totalCols = cols.length || 1;
+        const numPct = (numCount / totalCols) * 100;
+        const catPct = (catCount / totalCols) * 100;
+        const datePct = (dateCount / totalCols) * 100;
+        const boolPct = (boolCount / totalCols) * 100;
+
+        document.getElementById('dash-count-num').textContent = numCount;
+        document.getElementById('dash-count-cat').textContent = catCount;
+        document.getElementById('dash-count-date').textContent = dateCount;
+        document.getElementById('dash-count-bool').textContent = boolCount;
+        document.getElementById('dash-total-features-pill').textContent = `${totalCols} Features`;
+
+        const distBar = document.getElementById('dash-type-dist-bar');
+        if (distBar) {
+            distBar.innerHTML = `
+                <div class="type-bar-segment seg-num" style="width: ${numPct}%;" title="Numerical: ${numCount}"></div>
+                <div class="type-bar-segment seg-cat" style="width: ${catPct}%;" title="Categorical: ${catCount}"></div>
+                <div class="type-bar-segment seg-date" style="width: ${datePct}%;" title="Datetime: ${dateCount}"></div>
+                <div class="type-bar-segment seg-bool" style="width: ${boolPct}%;" title="Boolean: ${boolCount}"></div>
+            `;
         }
 
-        if (qualityInsightsList) {
-            qualityInsightsList.innerHTML = '';
-            (quality.warnings || []).forEach((w) => {
-                const li = document.createElement('li');
-                li.textContent = w;
-                qualityInsightsList.appendChild(li);
+        // Widget 6: Important Statistical Findings
+        const statFindingsList = document.getElementById('dash-stat-findings-list');
+        if (statFindingsList && currentStatistics) {
+            const obs = currentStatistics.statistical_observations || [];
+            if (obs.length === 0) {
+                statFindingsList.innerHTML = `
+                    <div class="finding-item-box">
+                        <span class="finding-badge badge-cyan">Uniform</span>
+                        <p class="finding-text">Standard bell-curve and nominal distributions observed across features.</p>
+                    </div>
+                `;
+            } else {
+                statFindingsList.innerHTML = obs.slice(0, 4).map(o => `
+                    <div class="finding-item-box">
+                        <span class="finding-badge badge-indigo">${escapeHtml(o.category || 'Stat')}</span>
+                        <p class="finding-text">${escapeHtml(o.message || o)}</p>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // Widget 7: Top Correlations
+        if (currentCorrelation) {
+            const rankedPairs = currentCorrelation.ranked_pairs || [];
+            const posCorr = rankedPairs.find(p => p.pearson_r > 0);
+            const negCorr = rankedPairs.slice().reverse().find(p => p.pearson_r < 0);
+
+            const posR = document.getElementById('dash-pos-corr-r');
+            const posPair = document.getElementById('dash-pos-corr-pair');
+            const posBar = document.getElementById('dash-pos-corr-bar');
+
+            if (posCorr && posR && posPair && posBar) {
+                posR.textContent = `+${posCorr.pearson_r.toFixed(3)}`;
+                posPair.textContent = `${posCorr.feature_a} & ${posCorr.feature_b}`;
+                posBar.style.width = `${Math.abs(posCorr.pearson_r) * 100}%`;
+            } else if (posPair) {
+                posPair.textContent = 'No positive linear pairs found';
+            }
+
+            const negR = document.getElementById('dash-neg-corr-r');
+            const negPair = document.getElementById('dash-neg-corr-pair');
+            const negBar = document.getElementById('dash-neg-corr-bar');
+
+            if (negCorr && negR && negPair && negBar) {
+                negR.textContent = `${negCorr.pearson_r.toFixed(3)}`;
+                negPair.textContent = `${negCorr.feature_a} & ${negCorr.feature_b}`;
+                negBar.style.width = `${Math.abs(negCorr.pearson_r) * 100}%`;
+            } else if (negPair) {
+                negPair.textContent = 'No negative linear pairs found';
+            }
+
+            const corrBadge = document.getElementById('correlation-count-badge');
+            if (corrBadge) corrBadge.textContent = rankedPairs.length;
+        }
+
+        // Widget 8: Outlier Summary
+        if (currentOutliers) {
+            const colMap = currentOutliers.columns || {};
+            let totalOutliers = 0;
+            const affectedCols = [];
+
+            Object.entries(colMap).forEach(([colName, o]) => {
+                const count = o.outlier_count || 0;
+                if (count > 0) {
+                    totalOutliers += count;
+                    affectedCols.push({ colName, count, pct: o.outlier_percentage || 0 });
+                }
             });
+
+            document.getElementById('dash-outliers-total').textContent = formatNumber(totalOutliers);
+            document.getElementById('dash-outliers-cols-count').textContent = `${affectedCols.length}`;
+            document.getElementById('dash-outlier-badge-count').textContent = totalOutliers;
+            
+            const rowPct = ov.total_rows ? ((totalOutliers / ov.total_rows) * 100).toFixed(1) : '0.0';
+            document.getElementById('dash-outliers-row-pct').textContent = `${rowPct}%`;
+
+            const outlierColsList = document.getElementById('dash-outliers-columns-list');
+            if (outlierColsList) {
+                if (affectedCols.length === 0) {
+                    outlierColsList.innerHTML = '<p class="text-muted">No extreme statistical outliers detected.</p>';
+                } else {
+                    outlierColsList.innerHTML = affectedCols.map(a => `
+                        <div class="outlier-chip">
+                            <span>${escapeHtml(a.colName)}</span>
+                            <span class="outlier-chip-badge">${a.count}</span>
+                        </div>
+                    `).join('');
+                }
+            }
+
+            const outNavBadge = document.getElementById('outliers-count-badge');
+            if (outNavBadge) outNavBadge.textContent = totalOutliers;
         }
+
+        // Widget 9: AI-Generated Executive Summary
+        if (currentInsights) {
+            const aiSummaryEl = document.getElementById('dash-ai-summary-text');
+            const aiKeyFinding = document.getElementById('dash-ai-key-finding');
+            const aiKeyRec = document.getElementById('dash-ai-key-recommendation');
+            const aiProviderPill = document.getElementById('dash-ai-provider-pill');
+
+            if (aiSummaryEl) aiSummaryEl.innerHTML = currentInsights.executive_summary || 'Analysis compiled successfully.';
+            
+            const findings = currentInsights.key_findings || [];
+            if (aiKeyFinding) aiKeyFinding.textContent = findings[0] || 'Standard variance and metrics observed.';
+
+            const recs = currentInsights.strategic_recommendations || [];
+            if (aiKeyRec) aiKeyRec.textContent = recs[0] || 'Continue regular data collection and tracking.';
+
+            if (aiProviderPill) aiProviderPill.textContent = currentInsights.provider_used || 'Gemini 2.5 Flash';
+        }
+
+        // Widget 10: Recommended Visualizations (Top 2-3 Plotly Charts)
+        renderDashboardTopVisualizations();
     }
 
-    // Update Filter Tab Counts
-    function updateTypeCounts(typeCounts, totalCols) {
-        if (countAll) countAll.textContent = totalCols;
-        if (countNumerical) countNumerical.textContent = typeCounts['Numerical'] || 0;
-        if (countCategorical) countCategorical.textContent = typeCounts['Categorical'] || 0;
-        if (countDatetime) countDatetime.textContent = typeCounts['Datetime'] || 0;
-        if (countBoolean) countBoolean.textContent = typeCounts['Boolean'] || 0;
-        if (countOther) countOther.textContent = typeCounts['Other'] || 0;
-    }
+    function renderDashboardTopVisualizations() {
+        const grid = document.getElementById('dash-recommended-charts-grid');
+        if (!grid || allRecommendations.length === 0) return;
 
-    // Filter Buttons Handlers
-    typeFilterBtns.forEach((btn) => {
-        btn.addEventListener('click', () => {
-            typeFilterBtns.forEach((b) => b.classList.remove('active'));
-            btn.classList.add('active');
-            activeTypeFilter = btn.getAttribute('data-type');
-            renderColumnProfilingTable();
+        const top2 = allRecommendations.slice(0, 2);
+        grid.innerHTML = top2.map((rec, idx) => `
+            <div class="dash-chart-card">
+                <div class="dash-chart-header">
+                    <span class="chart-tag">${escapeHtml(rec.category || 'Distribution')}</span>
+                    <h4 class="dash-chart-title">${escapeHtml(rec.title || `Chart #${idx + 1}`)}</h4>
+                </div>
+                <div class="dash-chart-container" id="dash-top-chart-${idx}"></div>
+            </div>
+        `).join('');
+
+        top2.forEach((rec, idx) => {
+            const plotDiv = document.getElementById(`dash-top-chart-${idx}`);
+            if (plotDiv && rec.plotly_spec) {
+                const spec = rec.plotly_spec;
+                const layout = Object.assign({}, spec.layout || {}, {
+                    autosize: true,
+                    margin: { l: 40, r: 20, t: 30, b: 40 },
+                    paper_bgcolor: 'transparent',
+                    plot_bgcolor: 'transparent',
+                    font: { color: '#94a3b8', family: 'Plus Jakarta Sans' },
+                });
+                Plotly.newPlot(plotDiv, spec.data || [], layout, { responsive: true, displayModeBar: false });
+            }
         });
-    });
-
-    // Column Search Input
-    if (columnSearch) {
-        columnSearch.addEventListener('input', (e) => {
-            columnSearchQuery = e.target.value.toLowerCase().trim();
-            renderColumnProfilingTable();
-        });
     }
 
-    // 3. Render Column Profiling Table
-    function renderColumnProfilingTable() {
-        if (!columnsProfileTbody) return;
+    // -------------------------------------------------------------
+    // VIEW 2: DATA PREVIEW & EXPLORER
+    // -------------------------------------------------------------
+    function renderDataPreviewExplorer() {
+        renderColumnsProfileTable();
+        loadPreviewPage(1);
+    }
+
+    function renderColumnsProfileTable() {
+        const tbody = document.getElementById('columns-profile-tbody');
+        if (!tbody) return;
 
         let filtered = allColumnsProfile;
-
-        // Type filter
         if (activeTypeFilter !== 'all') {
-            filtered = filtered.filter((c) => (c.classified_type || c.inferred_type) === activeTypeFilter);
+            filtered = filtered.filter(c => (c.classified_type || '').toLowerCase() === activeTypeFilter.toLowerCase());
         }
-
-        // Search query filter
         if (columnSearchQuery) {
-            filtered = filtered.filter((c) => {
-                const nameMatch = c.name.toLowerCase().includes(columnSearchQuery);
-                const dtypeMatch = c.pandas_dtype.toLowerCase().includes(columnSearchQuery);
-                const typeMatch = (c.classified_type || '').toLowerCase().includes(columnSearchQuery);
-                return nameMatch || dtypeMatch || typeMatch;
-            });
+            const q = columnSearchQuery.toLowerCase();
+            filtered = filtered.filter(c => (c.column_name || '').toLowerCase().includes(q) || (c.pandas_dtype || '').toLowerCase().includes(q));
         }
 
-        if (columnTableMeta) {
-            columnTableMeta.textContent = `Showing ${filtered.length} of ${allColumnsProfile.length} columns`;
-        }
+        document.getElementById('column-table-meta').textContent = `Showing ${filtered.length} of ${allColumnsProfile.length} columns`;
 
         if (filtered.length === 0) {
-            columnsProfileTbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 30px;">No columns match the selected filter.</td></tr>`;
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 20px; color: var(--text-muted);">No matching columns found.</td></tr>';
             return;
         }
 
-        columnsProfileTbody.innerHTML = filtered.map((col, idx) => {
-            const colType = col.classified_type || col.inferred_type || 'Other';
-            
-            let missingBarClass = 'fill-emerald';
-            if (col.missing_percentage > 15) missingBarClass = 'fill-rose';
-            else if (col.missing_percentage > 0) missingBarClass = 'fill-amber';
-
-            let statsSummaryHtml = '';
-
-            if (colType === 'Numerical' && col.numerical_stats) {
-                const ns = col.numerical_stats;
-                statsSummaryHtml = `
-                    <div class="stat-row">
-                        <span class="stat-pill" title="Minimum and Maximum range">Range: <strong>[${ns.min}, ${ns.max}]</strong></span>
-                        <span class="stat-pill" title="Mean ± Standard Deviation">Mean: <strong>${ns.mean}</strong> ± <strong>${ns.std}</strong></span>
-                    </div>
-                    <div class="stat-row">
-                        <span class="stat-pill" title="Median (50th percentile)">Median: <strong>${ns.median}</strong></span>
-                        <span class="stat-pill" title="Interquartile Range (Q3 - Q1)">IQR: <strong>${ns.iqr}</strong></span>
-                        <span class="stat-pill" title="Fisher-Pearson Skewness">Skew: <strong>${ns.skewness}</strong></span>
-                    </div>
-                `;
-            } else if (colType === 'Categorical' && col.categorical_stats) {
-                const cs = col.categorical_stats;
-                statsSummaryHtml = `
-                    <div class="stat-row">
-                        <span class="stat-pill" title="Number of distinct categories">Categories: <strong>${cs.num_categories}</strong></span>
-                        <span class="stat-pill" title="Most frequent category (Mode)">Top: <strong>${escapeHtml(cs.most_frequent_category)}</strong></span>
-                    </div>
-                    <div class="stat-row">
-                        <span class="stat-pill" title="Top category frequency">Freq: <strong>${cs.frequency_most_frequent.toLocaleString()}</strong> (${cs.frequency_percentage}%)</span>
-                    </div>
-                `;
-            } else if (colType === 'Datetime' && col.datetime_stats) {
-                const ds = col.datetime_stats;
-                statsSummaryHtml = `
-                    <div class="stat-row">
-                        <span class="stat-pill" title="Earliest Date">Min: <strong>${ds.min_date ? ds.min_date.split('T')[0] : '--'}</strong></span>
-                        <span class="stat-pill" title="Latest Date">Max: <strong>${ds.max_date ? ds.max_date.split('T')[0] : '--'}</strong></span>
-                    </div>
-                    <div class="stat-row">
-                        <span class="stat-pill" title="Date span">Span: <strong>${ds.date_range}</strong></span>
-                    </div>
-                `;
-            } else if (colType === 'Boolean' && col.boolean_stats) {
-                const bs = col.boolean_stats;
-                statsSummaryHtml = `
-                    <div class="stat-row">
-                        <span class="stat-pill" style="color: var(--accent-emerald);">True: <strong>${bs.true_percentage}%</strong> (${bs.true_count})</span>
-                        <span class="stat-pill" style="color: var(--accent-rose);">False: <strong>${bs.false_percentage}%</strong> (${bs.false_count})</span>
-                    </div>
-                `;
-            } else if (col.other_stats) {
-                const os = col.other_stats;
-                statsSummaryHtml = `
-                    <div class="stat-row">
-                        <span class="stat-pill">Avg Length: <strong>${os.avg_length} chars</strong></span>
-                        <span class="stat-pill">Span: <strong>[${os.min_length}, ${os.max_length}]</strong></span>
-                    </div>
-                `;
-            } else {
-                statsSummaryHtml = `<span style="color: var(--text-muted); font-size: 11px;">Standard text/ID distribution</span>`;
-            }
-
-            const samplesHtml = (col.sample_values || [])
-                .map((v) => `<span class="sample-chip" title="${escapeHtml(v)}">${escapeHtml(v !== null ? v : 'NULL')}</span>`)
-                .join('');
+        tbody.innerHTML = filtered.map((c, idx) => {
+            const badgeClass = c.classified_type === 'Numerical' ? 'badge-indigo' : c.classified_type === 'Categorical' ? 'badge-cyan' : c.classified_type === 'Datetime' ? 'badge-purple' : 'badge-emerald';
+            const samples = (c.sample_values || []).slice(0, 3).map(s => `<code class="code-sample">${escapeHtml(String(s))}</code>`).join(' ');
+            const statText = c.classified_type === 'Numerical'
+                ? `Mean: <strong>${Number(c.mean || 0).toFixed(2)}</strong> &bull; Range: [${c.min}, ${c.max}]`
+                : `Unique: <strong>${c.unique_count || 0}</strong> &bull; Top: ${escapeHtml(c.mode || 'N/A')}`;
 
             return `
                 <tr>
-                    <td style="color: var(--text-muted); font-family: var(--font-mono); font-size: 11px;">${idx + 1}</td>
+                    <td>${idx + 1}</td>
                     <td>
-                        <div class="col-info-cell">
-                            <span class="col-name-text">${escapeHtml(col.name)}</span>
-                            <div class="col-meta-pills">
-                                <span class="type-badge-pill type-${colType}">${colType}</span>
-                                <span class="dtype-pill">${escapeHtml(col.pandas_dtype)}</span>
-                            </div>
-                        </div>
+                        <strong>${escapeHtml(c.column_name)}</strong>
+                        <div style="margin-top: 2px;"><span class="badge ${badgeClass}">${c.classified_type}</span> <span style="font-size:11px; color:var(--text-muted);">${c.pandas_dtype}</span></div>
                     </td>
                     <td>
-                        <div class="mini-progress-wrap">
-                            <div class="mini-progress-labels">
-                                <span>${col.missing_percentage}%</span>
-                                <span>${col.missing_count} nulls</span>
-                            </div>
-                            <div class="mini-progress-bg">
-                                <div class="mini-progress-bar ${missingBarClass}" style="width: ${Math.max(col.missing_percentage, 0)}%;"></div>
-                            </div>
-                        </div>
+                        <span>${c.missing_count || 0}</span>
+                        <span style="color:${c.missing_percentage > 0 ? '#fbbf24' : 'var(--text-muted)'}; font-size:11px;">(${Number(c.missing_percentage || 0).toFixed(1)}%)</span>
                     </td>
                     <td>
-                        <div style="font-size: 12px; font-family: var(--font-mono);">
-                            <div><strong>${col.unique_count.toLocaleString()}</strong> unique</div>
-                            <div style="color: var(--text-muted); font-size: 11px;">${col.duplicate_count.toLocaleString()} duplicate values</div>
-                        </div>
+                        <span>${c.unique_count || 0} unique</span>
                     </td>
-                    <td>
-                        <div class="stats-summary-cell">
-                            ${statsSummaryHtml}
-                        </div>
-                    </td>
-                    <td>
-                        <div class="sample-chips-wrap">
-                            ${samplesHtml || '<span class="null-badge">No samples</span>'}
-                        </div>
-                    </td>
+                    <td style="font-size: 12.5px;">${statText}</td>
+                    <td>${samples || '--'}</td>
                     <td style="text-align: center;">
-                        <button class="btn-inspect" data-col-name="${escapeHtml(col.name)}">
-                            Inspect
-                        </button>
+                        <button class="btn btn-outline btn-xs btn-inspect-col" data-col="${escapeHtml(c.column_name)}">Inspect</button>
                     </td>
                 </tr>
             `;
         }).join('');
 
-        // Attach modal inspector listeners
-        document.querySelectorAll('.btn-inspect').forEach((btn) => {
+        // Wire inspect buttons
+        document.querySelectorAll('.btn-inspect-col').forEach(btn => {
             btn.addEventListener('click', () => {
-                const colName = btn.getAttribute('data-col-name');
+                const colName = btn.getAttribute('data-col');
                 openColumnModal(colName);
             });
         });
     }
 
-    // =========================================================================
-    // 4. AUTOMATED DATA QUALITY & CLEANING STUDIO CONTROLLER
-    // =========================================================================
+    async function loadPreviewPage(page = 1) {
+        currentPage = page;
+        const thead = document.getElementById('explorer-thead');
+        const tbody = document.getElementById('explorer-tbody');
+        const pageInd = document.getElementById('page-indicator');
 
-    async function loadCleaningAudit(datasetId) {
         try {
-            const res = await fetch(`/api/cleaning/audit/${encodeURIComponent(datasetId)}`);
+            const res = await fetch(`/api/preview/${activeDatasetId}?page=${page}&page_size=${pageSize}`);
             const data = await res.json();
+            if (!data.success) return;
 
-            if (!res.ok || !data.success) {
-                console.error('Failed to load cleaning audit:', data.error);
-                return;
+            const records = data.records || [];
+            const cols = data.columns || [];
+            const totalPages = data.total_pages || 1;
+
+            if (pageInd) pageInd.textContent = `Page ${page} of ${totalPages} (${formatNumber(data.total_rows)} rows)`;
+
+            if (thead) {
+                thead.innerHTML = `<tr><th>#</th>` + cols.map(c => `<th>${escapeHtml(c)}</th>`).join('') + `</tr>`;
             }
 
-            allDetectedIssues = data.issues || [];
-            const sc = data.severity_counts || { Critical: 0, High: 0, Medium: 0, Low: 0 };
-
-            // Update badge counters
-            if (cleaningIssuesBadge) cleaningIssuesBadge.textContent = allDetectedIssues.length;
-            if (sevCountAll) sevCountAll.textContent = allDetectedIssues.length;
-            if (sevCountCritical) sevCountCritical.textContent = sc.Critical || 0;
-            if (sevCountHigh) sevCountHigh.textContent = sc.High || 0;
-            if (sevCountMedium) sevCountMedium.textContent = sc.Medium || 0;
-            if (sevCountLow) sevCountLow.textContent = sc.Low || 0;
-
-            renderCleaningIssuesTable();
-            renderTransformationPreviews(data.preview);
-
+            if (tbody) {
+                if (records.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="${cols.length + 1}" style="text-align:center; padding: 20px;">No records found.</td></tr>`;
+                } else {
+                    tbody.innerHTML = records.map((r, i) => {
+                        const rowNum = (page - 1) * pageSize + (i + 1);
+                        const cells = cols.map(c => `<td>${escapeHtml(String(r[c] !== null && r[c] !== undefined ? r[c] : ''))}</td>`).join('');
+                        return `<tr><td><span style="color:var(--text-muted); font-size:11px;">${rowNum}</span></td>${cells}</tr>`;
+                    }).join('');
+                }
+            }
         } catch (e) {
-            console.error('Error fetching cleaning audit:', e);
+            console.error('Failed to load preview records:', e);
         }
     }
 
-    // Severity Filter buttons handler
-    sevFilterBtns.forEach((btn) => {
+    document.getElementById('btn-prev-page')?.addEventListener('click', () => {
+        if (currentPage > 1) loadPreviewPage(currentPage - 1);
+    });
+    document.getElementById('btn-next-page')?.addEventListener('click', () => {
+        loadPreviewPage(currentPage + 1);
+    });
+
+    // Column Filters & Search
+    document.querySelectorAll('.type-filter-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            sevFilterBtns.forEach((b) => b.classList.remove('active'));
+            document.querySelectorAll('.type-filter-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            activeSeverityFilter = btn.getAttribute('data-sev');
-            renderCleaningIssuesTable();
+            activeTypeFilter = btn.getAttribute('data-type');
+            renderColumnsProfileTable();
         });
     });
 
-    // Render 12-point Quality Issues Table
-    function renderCleaningIssuesTable() {
-        if (!cleaningIssuesTbody) return;
+    document.getElementById('column-search')?.addEventListener('input', (e) => {
+        columnSearchQuery = e.target.value.trim();
+        renderColumnsProfileTable();
+    });
+
+    // Cleaned Data Toggle in Explorer
+    document.getElementById('preview-cleaned-toggle')?.addEventListener('change', (e) => {
+        isViewingCleanedData = e.target.checked;
+        loadPreviewPage(1);
+    });
+
+    // CSV Export button in Explorer
+    document.getElementById('preview-download-csv-btn')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.location.href = `/api/cleaning/download/${activeDatasetId}`;
+    });
+
+    // -------------------------------------------------------------
+    // VIEW 3: DATA QUALITY AUDIT (12-RULE DEFECT ENGINE)
+    // -------------------------------------------------------------
+    function renderDataQualityAudit() {
+        const tbody = document.getElementById('cleaning-issues-tbody');
+        if (!tbody) return;
 
         let filtered = allDetectedIssues;
         if (activeSeverityFilter !== 'all') {
-            filtered = filtered.filter((i) => i.severity.toLowerCase() === activeSeverityFilter.toLowerCase());
+            filtered = filtered.filter(i => (i.severity || '').toLowerCase() === activeSeverityFilter.toLowerCase());
         }
 
+        // Update counts
+        const criticalCount = allDetectedIssues.filter(i => i.severity === 'Critical').length;
+        const highCount = allDetectedIssues.filter(i => i.severity === 'High').length;
+        const medCount = allDetectedIssues.filter(i => i.severity === 'Medium').length;
+        const lowCount = allDetectedIssues.filter(i => i.severity === 'Low').length;
+
+        document.getElementById('sev-count-all').textContent = allDetectedIssues.length;
+        document.getElementById('sev-count-critical').textContent = criticalCount;
+        document.getElementById('sev-count-high').textContent = highCount;
+        document.getElementById('sev-count-medium').textContent = medCount;
+        document.getElementById('sev-count-low').textContent = lowCount;
+
         if (filtered.length === 0) {
-            cleaningIssuesTbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--accent-emerald); padding: 30px; font-weight: 600;">✨ No data quality issues detected for the selected filter!</td></tr>`;
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 25px; color: #34d399;">✓ Zero data quality defects detected under this filter!</td></tr>';
             return;
         }
 
-        cleaningIssuesTbody.innerHTML = filtered.map((issue, idx) => {
-            const sev = issue.severity || 'Low';
-            const sevClass = `sev-badge sev-badge-${sev.toLowerCase()}`;
-            const colDisplay = issue.column === '(Entire Dataset)' 
-                ? `<span style="font-weight: 700; color: var(--accent-indigo);">(Entire Dataset)</span>`
-                : `<strong style="color: var(--text-primary); font-family: var(--font-mono);">${escapeHtml(issue.column)}</strong>`;
-
+        tbody.innerHTML = filtered.map((iss, idx) => {
+            const sevBadge = iss.severity === 'Critical' ? 'badge-rose' : iss.severity === 'High' ? 'badge-amber' : iss.severity === 'Medium' ? 'badge-indigo' : 'badge-cyan';
             return `
                 <tr>
-                    <td style="color: var(--text-muted); font-family: var(--font-mono); font-size: 11px;">${idx + 1}</td>
-                    <td>${colDisplay}</td>
+                    <td>${idx + 1}</td>
+                    <td><strong>${escapeHtml(iss.column || 'Dataset Wide')}</strong></td>
                     <td>
-                        <div style="font-weight: 600; color: var(--text-primary); font-size: 13px;">${escapeHtml(issue.title)}</div>
-                        <div style="color: var(--text-muted); font-size: 11px; font-family: var(--font-mono);">${escapeHtml(issue.issue_type)}</div>
+                        <div style="font-weight: 600;">${escapeHtml(iss.title || iss.issue_type)}</div>
+                        <div style="font-size: 11.5px; color: var(--text-secondary);">${escapeHtml(iss.description || '')}</div>
                     </td>
-                    <td>
-                        <div style="font-size: 12px; font-family: var(--font-mono);">
-                            <strong>${issue.affected_rows.toLocaleString()}</strong> rows
-                            <span style="color: var(--text-muted);">(${issue.percentage_affected}%)</span>
-                        </div>
-                    </td>
-                    <td>
-                        <span class="${sevClass}">${sev}</span>
-                    </td>
-                    <td>
-                        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4;">
-                            ${escapeHtml(issue.recommended_action)}
-                        </div>
-                    </td>
+                    <td><code>${formatNumber(iss.affected_rows_count || 0)}</code></td>
+                    <td><span class="badge ${sevBadge}">${iss.severity}</span></td>
+                    <td style="font-size: 12px; color: #cbd5e1;">${escapeHtml(iss.recommended_action || 'Inspect and clean')}</td>
                 </tr>
             `;
         }).join('');
     }
 
-    // Render Transformation Preview Cards (Original -> Cleaned)
-    function renderTransformationPreviews(previewData) {
-        if (!previewCardsGrid) return;
+    document.querySelectorAll('.sev-filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.sev-filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            activeSeverityFilter = btn.getAttribute('data-sev');
+            renderDataQualityAudit();
+        });
+    });
 
-        const previews = previewData && previewData.previews ? previewData.previews : [];
-        if (previewPairsCount) previewPairsCount.textContent = `${previews.length} proposed transformation${previews.length === 1 ? '' : 's'}`;
+    // -------------------------------------------------------------
+    // VIEW 4: CLEANING STUDIO (PIPELINE & EXECUTION)
+    // -------------------------------------------------------------
+    function renderCleaningStudio(qualData) {
+        const previewGrid = document.getElementById('preview-cards-grid');
+        const previewPairs = qualData?.preview?.transformation_previews || [];
+        const previewCountEl = document.getElementById('preview-pairs-count');
 
-        if (previews.length === 0) {
-            previewCardsGrid.innerHTML = `
-                <div class="preview-card-placeholder">
-                    ✨ No transformation previews needed for this dataset. All data conforms to standard formatting.
-                </div>
-            `;
-            return;
+        if (previewCountEl) previewCountEl.textContent = `${previewPairs.length} sample pairs`;
+
+        if (previewGrid) {
+            if (previewPairs.length === 0) {
+                previewGrid.innerHTML = '<div class="preview-card-placeholder">No value transformation previews needed for this dataset.</div>';
+            } else {
+                previewGrid.innerHTML = previewPairs.map(p => `
+                    <div class="preview-card">
+                        <div class="preview-card-col">${escapeHtml(p.column)}</div>
+                        <div class="preview-pair-row">
+                            <span class="val-orig">${escapeHtml(String(p.original_value))}</span>
+                            <span class="val-arrow">&rarr;</span>
+                            <span class="val-clean">${escapeHtml(String(p.cleaned_value))}</span>
+                        </div>
+                        <div class="preview-card-rule">${escapeHtml(p.transformation_type)}</div>
+                    </div>
+                `).join('');
+            }
         }
 
-        previewCardsGrid.innerHTML = previews.map((p) => {
-            return `
-                <div class="preview-card">
-                    <div class="preview-card-header">
-                        <span class="preview-card-col">${escapeHtml(p.column)}</span>
-                        <span class="preview-card-category">${escapeHtml(p.category)}</span>
-                    </div>
-                    <div class="preview-transform-flow">
-                        <span class="preview-orig" title="Original raw value">${escapeHtml(p.original_value)}</span>
-                        <span class="preview-arrow">&rarr;</span>
-                        <span class="preview-clean" title="Proposed cleaned value">${escapeHtml(p.cleaned_value)}</span>
-                    </div>
-                    <div class="preview-rule">${escapeHtml(p.rule)}</div>
-                </div>
-            `;
-        }).join('');
+        // Wire Apply Cleaning
+        const applyBtns = [document.getElementById('btn-apply-cleaning'), document.getElementById('btn-apply-cleaning-bottom')];
+        applyBtns.forEach(btn => {
+            if (!btn) return;
+            btn.addEventListener('click', executeCleaningPipeline);
+        });
+
+        // Wire Download Cleaned
+        const dlBtn = document.getElementById('btn-download-cleaned');
+        if (dlBtn) dlBtn.href = `/api/cleaning/download/${activeDatasetId}`;
     }
 
-    // Gather configurable cleaning operations from checkboxes
-    function getSelectedCleaningOperations() {
-        return {
-            remove_duplicates: cfgRemoveDuplicates ? cfgRemoveDuplicates.checked : true,
-            fill_numeric_missing: cfgFillNumericMissing && cfgFillNumericMissing.checked 
-                ? (cfgNumericStrategy ? cfgNumericStrategy.value : 'median') 
-                : 'none',
-            fill_categorical_missing: cfgFillCategoricalMissing && cfgFillCategoricalMissing.checked 
-                ? (cfgCategoricalStrategy ? cfgCategoricalStrategy.value : 'mode') 
-                : 'none',
-            standardize_whitespace: cfgStandardizeWhitespace ? cfgStandardizeWhitespace.checked : true,
-            standardize_categorical: cfgStandardizeCategorical ? cfgStandardizeCategorical.checked : true,
-            convert_numeric_strings: cfgConvertNumericStrings ? cfgConvertNumericStrings.checked : true,
-            convert_datetime_strings: cfgConvertDatetimeStrings ? cfgConvertDatetimeStrings.checked : true,
-            handle_invalid_numerical: cfgHandleInvalidNumerical ? cfgHandleInvalidNumerical.checked : true,
-            drop_high_missing_columns: cfgDropHighMissing ? cfgDropHighMissing.checked : false,
-            drop_constant_columns: cfgDropConstantColumns ? cfgDropConstantColumns.checked : false,
-            cap_outliers: cfgCapOutliers ? cfgCapOutliers.checked : false,
+    async function executeCleaningPipeline() {
+        const btn = document.getElementById('btn-apply-cleaning');
+        if (btn) btn.disabled = true;
+
+        showToast('Applying configurable cleaning pipeline non-destructively...', '🧹');
+
+        const operations = {
+            remove_duplicates: document.getElementById('cfg-remove-duplicates')?.checked ?? true,
+            fill_numeric_missing: document.getElementById('cfg-fill-numeric-missing')?.checked ?? true,
+            numeric_imputation_strategy: document.getElementById('cfg-numeric-strategy')?.value || 'median',
+            fill_categorical_missing: document.getElementById('cfg-fill-categorical-missing')?.checked ?? true,
+            categorical_imputation_strategy: document.getElementById('cfg-categorical-strategy')?.value || 'mode',
+            standardize_whitespace: document.getElementById('cfg-standardize-whitespace')?.checked ?? true,
+            standardize_categorical_casing: document.getElementById('cfg-standardize-categorical')?.checked ?? true,
+            convert_numeric_strings: document.getElementById('cfg-convert-numeric-strings')?.checked ?? true,
+            convert_datetime_strings: document.getElementById('cfg-convert-datetime-strings')?.checked ?? true,
+            handle_invalid_numerical: document.getElementById('cfg-handle-invalid-numerical')?.checked ?? true,
         };
-    }
-
-    // Apply Cleaning Pipeline Action Handler
-    async function handleApplyCleaning() {
-        if (!activeDatasetId) return;
-
-        const originalBtnHtml = btnApplyCleaning ? btnApplyCleaning.innerHTML : '';
-        if (btnApplyCleaning) {
-            btnApplyCleaning.disabled = true;
-            btnApplyCleaning.innerHTML = `<span class="spinner" style="width: 14px; height: 14px; border-width: 2px; margin: 0; display: inline-block;"></span> Applying...`;
-        }
-        if (btnApplyCleaningBottom) {
-            btnApplyCleaningBottom.disabled = true;
-            btnApplyCleaningBottom.innerHTML = `<span class="spinner" style="width: 14px; height: 14px; border-width: 2px; margin: 0; display: inline-block;"></span> Applying...`;
-        }
-
-        const operations = getSelectedCleaningOperations();
 
         try {
-            const res = await fetch(`/api/cleaning/apply/${encodeURIComponent(activeDatasetId)}`, {
+            const res = await fetch(`/api/cleaning/apply/${activeDatasetId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ operations }),
             });
-
             const data = await res.json();
+            if (!data.success) throw new Error(data.error || 'Cleaning pipeline failed');
 
-            if (!res.ok || !data.success) {
-                alert(`Cleaning failed: ${data.error || 'Unknown error'}`);
-                return;
+            const sum = data.summary || {};
+            currentCleaningSummary = sum;
+
+            // Update Summary Card
+            const sumBox = document.getElementById('cleaning-summary-section');
+            if (sumBox) sumBox.classList.remove('hidden');
+
+            document.getElementById('clean-kpi-rows-before').textContent = formatNumber(sum.rows_before);
+            document.getElementById('clean-kpi-rows-after').textContent = formatNumber(sum.rows_after);
+            document.getElementById('clean-kpi-duplicates-removed').textContent = formatNumber(sum.duplicates_removed);
+            document.getElementById('clean-kpi-missing-handled').textContent = formatNumber(sum.missing_values_handled);
+            document.getElementById('clean-kpi-cols-converted').textContent = formatNumber(sum.columns_converted);
+            document.getElementById('clean-kpi-vals-standardized').textContent = formatNumber(sum.values_standardized);
+
+            const chipsWrap = document.getElementById('applied-operations-chips');
+            if (chipsWrap && sum.applied_operations) {
+                chipsWrap.innerHTML = sum.applied_operations.map(op => `<span class="applied-chip">${escapeHtml(op)}</span>`).join('');
             }
 
-            currentCleaningSummary = data.summary;
-            renderCleaningSummary(data.summary);
+            showToast('Dataset cleaned and saved to data/processed/ successfully!', '✓');
 
-            // Update download button
-            if (btnDownloadCleaned) {
-                btnDownloadCleaned.href = data.download_url || `/api/cleaning/download/${encodeURIComponent(activeDatasetId)}`;
-            }
-
-            // Show active status tag
-            if (activeDatasetStatus) activeDatasetStatus.classList.remove('hidden');
-
-            // Refresh audit findings after cleaning
-            await loadCleaningAudit(activeDatasetId);
-
-            // Switch explorer to cleaned preview
-            if (viewCleanDataBtn) viewCleanDataBtn.classList.remove('hidden');
-
-            // Scroll to summary smoothly
-            if (cleaningSummarySection) {
-                cleaningSummarySection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }
-
+            // Reload full analytics on the cleaned dataset
+            setTimeout(() => {
+                loadFullDatasetAnalytics(activeDatasetId);
+            }, 1000);
         } catch (err) {
-            alert(`Error applying cleaning pipeline: ${err.message}`);
+            console.error('Cleaning error:', err);
+            showToast(`Error: ${err.message}`, '⚠️');
         } finally {
-            if (btnApplyCleaning) {
-                btnApplyCleaning.disabled = false;
-                btnApplyCleaning.innerHTML = originalBtnHtml;
-            }
-            if (btnApplyCleaningBottom) {
-                btnApplyCleaningBottom.disabled = false;
-                btnApplyCleaningBottom.innerHTML = `<span class="btn-icon">⚡</span><span>Apply Cleaning Pipeline</span>`;
-            }
+            if (btn) btn.disabled = false;
         }
     }
 
-    // Attach Apply Button Listeners
-    if (btnApplyCleaning) btnApplyCleaning.addEventListener('click', handleApplyCleaning);
-    if (btnApplyCleaningBottom) btnApplyCleaningBottom.addEventListener('click', handleApplyCleaning);
-
-    // Render Cleaning Summary Box
-    function renderCleaningSummary(summary) {
-        if (!summary || !cleaningSummarySection) return;
-
-        cleaningSummarySection.classList.remove('hidden');
-        if (cleaningTimestamp) cleaningTimestamp.textContent = new Date().toLocaleTimeString();
-
-        if (cleanKpiRowsBefore) cleanKpiRowsBefore.textContent = summary.rows_before.toLocaleString();
-        if (cleanKpiRowsAfter) cleanKpiRowsAfter.textContent = summary.rows_after.toLocaleString();
-        if (cleanKpiDuplicatesRemoved) cleanKpiDuplicatesRemoved.textContent = summary.duplicates_removed.toLocaleString();
-        if (cleanKpiMissingHandled) cleanKpiMissingHandled.textContent = summary.missing_values_handled.toLocaleString();
-        if (cleanKpiColsConverted) cleanKpiColsConverted.textContent = summary.columns_converted.toLocaleString();
-        if (cleanKpiValsStandardized) cleanKpiValsStandardized.textContent = summary.values_standardized.toLocaleString();
-
-        if (appliedOperationsChips) {
-            appliedOperationsChips.innerHTML = '';
-            (summary.operations_applied || []).forEach((op) => {
-                const chip = document.createElement('span');
-                chip.className = 'applied-chip';
-                chip.textContent = `✓ ${op}`;
-                appliedOperationsChips.appendChild(chip);
-            });
-            if (!summary.operations_applied || summary.operations_applied.length === 0) {
-                appliedOperationsChips.innerHTML = `<span style="color: var(--text-muted); font-size: 12px;">No transformations needed (dataset already clean).</span>`;
-            }
-        }
-    }
-
-    // Explorer Raw vs Clean Toggle
-    if (viewRawDataBtn) {
-        viewRawDataBtn.addEventListener('click', async () => {
-            isViewingCleanedData = false;
-            viewRawDataBtn.classList.add('active');
-            if (viewCleanDataBtn) viewCleanDataBtn.classList.remove('active');
-            currentPage = 1;
-            await loadTablePreview(activeDatasetId, currentPage);
-        });
-    }
-
-    if (viewCleanDataBtn) {
-        viewCleanDataBtn.addEventListener('click', async () => {
-            isViewingCleanedData = true;
-            viewCleanDataBtn.classList.add('active');
-            if (viewRawDataBtn) viewRawDataBtn.classList.remove('active');
-            currentPage = 1;
-            await loadTablePreview(activeDatasetId, currentPage);
-        });
-    }
-
-    // Modal Inspector Renderer
-    function openColumnModal(colName) {
-        const col = allColumnsProfile.find((c) => c.name === colName);
-        if (!col || !modalBackdrop) return;
-
-        const colType = col.classified_type || col.inferred_type || 'Other';
-
-        if (modalColName) modalColName.textContent = col.name;
-        if (modalColType) {
-            modalColType.textContent = colType;
-            modalColType.className = `modal-type-badge type-badge-pill type-${colType}`;
-        }
-        if (modalColDtype) modalColDtype.textContent = col.pandas_dtype;
-
-        let bodyHtml = `
-            <div>
-                <h4 style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px;">Column Overview</h4>
-                <div class="five-number-grid">
-                    <div class="summary-stat-box">
-                        <div class="stat-box-label">Non-Null Count</div>
-                        <div class="stat-box-val">${col.non_null_count.toLocaleString()}</div>
-                    </div>
-                    <div class="summary-stat-box">
-                        <div class="stat-box-label">Missing Count</div>
-                        <div class="stat-box-val" style="color: ${col.missing_count > 0 ? 'var(--accent-rose)' : 'var(--text-primary)'};">${col.missing_count.toLocaleString()} (${col.missing_percentage}%)</div>
-                    </div>
-                    <div class="summary-stat-box">
-                        <div class="stat-box-label">Unique Values</div>
-                        <div class="stat-box-val">${col.unique_count.toLocaleString()}</div>
-                    </div>
-                    <div class="summary-stat-box">
-                        <div class="stat-box-label">Duplicate Values</div>
-                        <div class="stat-box-val">${col.duplicate_count.toLocaleString()}</div>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        if (colType === 'Numerical' && col.numerical_stats) {
-            const ns = col.numerical_stats;
-            bodyHtml += `
-                <div>
-                    <h4 style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px;">Five-Number Summary & Moments</h4>
-                    <div class="five-number-grid">
-                        <div class="summary-stat-box">
-                            <div class="stat-box-label">Minimum</div>
-                            <div class="stat-box-val">${ns.min}</div>
-                        </div>
-                        <div class="summary-stat-box">
-                            <div class="stat-box-label">Q1 (25%)</div>
-                            <div class="stat-box-val">${ns.q1}</div>
-                        </div>
-                        <div class="summary-stat-box">
-                            <div class="stat-box-label">Median (50%)</div>
-                            <div class="stat-box-val" style="color: var(--accent-indigo);">${ns.median}</div>
-                        </div>
-                        <div class="summary-stat-box">
-                            <div class="stat-box-label">Q3 (75%)</div>
-                            <div class="stat-box-val">${ns.q3}</div>
-                        </div>
-                        <div class="summary-stat-box">
-                            <div class="stat-box-label">Maximum</div>
-                            <div class="stat-box-val">${ns.max}</div>
-                        </div>
-                    </div>
-                    <div class="five-number-grid" style="margin-top: 10px;">
-                        <div class="summary-stat-box">
-                            <div class="stat-box-label">Mean (Average)</div>
-                            <div class="stat-box-val">${ns.mean}</div>
-                        </div>
-                        <div class="summary-stat-box">
-                            <div class="stat-box-label">Std Deviation</div>
-                            <div class="stat-box-val">${ns.std}</div>
-                        </div>
-                        <div class="summary-stat-box">
-                            <div class="stat-box-label">IQR</div>
-                            <div class="stat-box-val">${ns.iqr}</div>
-                        </div>
-                        <div class="summary-stat-box">
-                            <div class="stat-box-label">Skewness</div>
-                            <div class="stat-box-val">${ns.skewness}</div>
-                        </div>
-                        <div class="summary-stat-box">
-                            <div class="stat-box-label">Zeros Count</div>
-                            <div class="stat-box-val">${ns.zeros_count} (${ns.zeros_percentage}%)</div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        if (colType === 'Categorical' && col.categorical_stats && col.categorical_stats.top_categories) {
-            const topCats = col.categorical_stats.top_categories;
-            bodyHtml += `
-                <div>
-                    <h4 style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px;">Top Categories Breakdown (${col.categorical_stats.num_categories} total)</h4>
-                    <table class="modal-category-table">
-                        <thead>
-                            <tr>
-                                <th>Category</th>
-                                <th style="width: 90px; text-align: right;">Count</th>
-                                <th style="width: 90px; text-align: right;">Frequency</th>
-                                <th style="width: 140px;">Distribution</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${topCats.map((cat) => `
-                                <tr>
-                                    <td style="font-weight: 600;">${escapeHtml(cat.category)}</td>
-                                    <td style="text-align: right; font-family: var(--font-mono);">${cat.count.toLocaleString()}</td>
-                                    <td style="text-align: right; font-family: var(--font-mono);">${cat.percentage}%</td>
-                                    <td>
-                                        <div class="progress-bar-bg" style="height: 6px;">
-                                            <div class="progress-bar-fill fill-indigo" style="width: ${cat.percentage}%;"></div>
-                                        </div>
-                                    </td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            `;
-        }
-
-        if (colType === 'Datetime' && col.datetime_stats) {
-            const ds = col.datetime_stats;
-            bodyHtml += `
-                <div>
-                    <h4 style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px;">Temporal Bounds</h4>
-                    <div class="five-number-grid">
-                        <div class="summary-stat-box">
-                            <div class="stat-box-label">Earliest Date</div>
-                            <div class="stat-box-val" style="font-size: 13px;">${ds.min_date}</div>
-                        </div>
-                        <div class="summary-stat-box">
-                            <div class="stat-box-label">Latest Date</div>
-                            <div class="stat-box-val" style="font-size: 13px;">${ds.max_date}</div>
-                        </div>
-                        <div class="summary-stat-box">
-                            <div class="stat-box-label">Span Range</div>
-                            <div class="stat-box-val" style="font-size: 13px; color: var(--accent-cyan);">${ds.date_range}</div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        const sampleChips = (col.sample_values || [])
-            .map((v) => `<span class="sample-chip" style="max-width: none; font-size: 12px; padding: 4px 10px;">${escapeHtml(v !== null ? v : 'NULL')}</span>`)
-            .join('');
-
-        bodyHtml += `
-            <div>
-                <h4 style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px;">Sample Distinct Observations</h4>
-                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                    ${sampleChips || '<span class="null-badge">No samples available</span>'}
-                </div>
-            </div>
-        `;
-
-        if (modalColBody) modalColBody.innerHTML = bodyHtml;
-        modalBackdrop.classList.remove('hidden');
-    }
-
-    // Modal close events
-    if (modalCloseBtn) {
-        modalCloseBtn.addEventListener('click', () => {
-            if (modalBackdrop) modalBackdrop.classList.add('hidden');
-        });
-    }
-
-    if (modalBackdrop) {
-        modalBackdrop.addEventListener('click', (e) => {
-            if (e.target === modalBackdrop) {
-                modalBackdrop.classList.add('hidden');
-            }
-        });
-    }
-
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && modalBackdrop && !modalBackdrop.classList.contains('hidden')) {
-            modalBackdrop.classList.add('hidden');
-        }
-    });
-
-    // 5. Load Paginated Table Preview (Real Data)
-    async function loadTablePreview(datasetId, page = 1) {
-        try {
-            const res = await fetch(`/api/preview/${encodeURIComponent(datasetId)}?page=${page}&page_size=${pageSize}`);
-            const data = await res.json();
-
-            if (!res.ok || !data.success) return;
-
-            currentPreviewCols = data.columns || [];
-            currentPreviewRows = data.rows || [];
-            const pagination = data.pagination;
-
-            renderTable(currentPreviewCols, currentPreviewRows);
-
-            if (paginationInfo) {
-                paginationInfo.textContent = `Page ${pagination.current_page} of ${pagination.total_pages} (${pagination.total_rows.toLocaleString()} rows)`;
-            }
-
-            if (prevPageBtn) prevPageBtn.disabled = !pagination.has_prev;
-            if (nextPageBtn) nextPageBtn.disabled = !pagination.has_next;
-
-        } catch (e) {
-            console.error('Failed to load table preview:', e);
-        }
-    }
-
-    function renderTable(columns, rows) {
-        if (!tableHead || !tableBody) return;
-
-        tableHead.innerHTML = `
-            <tr>
-                <th style="width: 40px;">#</th>
-                ${columns.map((c) => `<th>${escapeHtml(c)}</th>`).join('')}
-            </tr>
-        `;
-
-        if (rows.length === 0) {
-            tableBody.innerHTML = `<tr><td colspan="${columns.length + 1}" style="text-align: center; color: var(--text-muted); padding: 30px;">No matching records in preview.</td></tr>`;
-            return;
-        }
-
-        const startIdx = (currentPage - 1) * pageSize;
-        tableBody.innerHTML = rows.map((row, idx) => {
-            const rowNumber = startIdx + idx + 1;
-            const cells = columns.map((col) => {
-                const val = row[col];
-                if (val === null || val === undefined) {
-                    return `<td><span class="null-badge">NULL</span></td>`;
-                }
-                return `<td>${escapeHtml(val)}</td>`;
-            }).join('');
-
-            return `<tr><td style="color: var(--text-muted); font-family: var(--font-mono);">${rowNumber}</td>${cells}</tr>`;
-        }).join('');
-    }
-
-    // Table Search Filter
-    if (tableSearch) {
-        tableSearch.addEventListener('input', (e) => {
-            const query = e.target.value.toLowerCase().trim();
-            if (!query) {
-                renderTable(currentPreviewCols, currentPreviewRows);
-                return;
-            }
-
-            const filtered = currentPreviewRows.filter((row) => {
-                return Object.values(row).some((val) => {
-                    return val !== null && val !== undefined && String(val).toLowerCase().includes(query);
-                });
-            });
-            renderTable(currentPreviewCols, filtered);
-        });
-    }
-
-    // Pagination Click Handlers
-    if (prevPageBtn) {
-        prevPageBtn.addEventListener('click', async () => {
-            if (currentPage > 1) {
-                currentPage--;
-                await loadTablePreview(activeDatasetId, currentPage);
-            }
-        });
-    }
-
-    if (nextPageBtn) {
-        nextPageBtn.addEventListener('click', async () => {
-            currentPage++;
-            await loadTablePreview(activeDatasetId, currentPage);
-        });
-    }
-
-    // =========================================================================
-    // PHASE 5: STATISTICAL ANALYSIS ENGINE CONTROLLER
-    // =========================================================================
-    async function loadStatisticsData(datasetId) {
-        try {
-            const res = await fetch(`/api/statistics/${encodeURIComponent(datasetId)}`);
-            const data = await res.json();
-            if (res.ok && data.success && data.statistics) {
-                currentStatistics = data.statistics;
-                renderStatisticalAnalysis(currentStatistics);
-            }
-        } catch (e) {
-            console.error('Failed to load statistical analysis:', e);
-        }
-    }
-
-    function renderStatisticalAnalysis(statsData) {
-        if (!statsData) return;
-
-        // 1. Render Quick KPIs
-        const numStats = statsData.numerical_statistics || {};
-        const catStats = statsData.categorical_statistics || {};
-        const dtStats = statsData.datetime_statistics || {};
-        const obs = statsData.statistical_observations || [];
-
-        const numCount = Object.keys(numStats).length;
-        const catCount = Object.keys(catStats).length;
-        const dtCount = Object.keys(dtStats).length;
-
-        // Count outlier features
-        let outlierFeatures = 0;
-        let normalCount = 0;
-        for (const [colName, n] of Object.entries(numStats)) {
-            if (n.outliers && n.outliers.count > 0) outlierFeatures++;
-            if (n.normality && n.normality.is_normal) normalCount++;
-        }
-
-        if (statsKpiNumCount) statsKpiNumCount.textContent = numCount;
-        if (statsKpiCatCount) statsKpiCatCount.textContent = catCount;
-        if (statsKpiDtCount) statsKpiDtCount.textContent = dtCount;
-        if (statsKpiOutliersCount) statsKpiOutliersCount.textContent = `${outlierFeatures} features with outliers`;
-        if (statsKpiNormalCount) statsKpiNormalCount.textContent = `${normalCount} of ${numCount} Gaussian`;
-
-        // 2. Render Statistical Observations
-        renderStatisticalObservations(obs);
-
-        // 3. Render Summary Statistics Table
-        renderSummaryStatisticsTable(numStats);
-
-        // 4. Populate Feature Selector for Distribution Deep Dive
-        if (statsColumnSelector) {
-            statsColumnSelector.innerHTML = '<option value="">-- Choose a Feature to Inspect --</option>';
-
-            // Numerical group
-            if (numCount > 0) {
-                const numGroup = document.createElement('optgroup');
-                numGroup.label = '🔢 Numerical Features';
-                for (const colName of Object.keys(numStats)) {
-                    const opt = document.createElement('option');
-                    opt.value = colName;
-                    opt.textContent = colName;
-                    numGroup.appendChild(opt);
-                }
-                statsColumnSelector.appendChild(numGroup);
-            }
-
-            // Categorical group
-            if (catCount > 0) {
-                const catGroup = document.createElement('optgroup');
-                catGroup.label = '🏷️ Categorical Features';
-                for (const colName of Object.keys(catStats)) {
-                    const opt = document.createElement('option');
-                    opt.value = colName;
-                    opt.textContent = colName;
-                    catGroup.appendChild(opt);
-                }
-                statsColumnSelector.appendChild(catGroup);
-            }
-
-            // Datetime group
-            if (dtCount > 0) {
-                const dtGroup = document.createElement('optgroup');
-                dtGroup.label = '📅 Datetime Features';
-                for (const colName of Object.keys(dtStats)) {
-                    const opt = document.createElement('option');
-                    opt.value = colName;
-                    opt.textContent = colName;
-                    dtGroup.appendChild(opt);
-                }
-                statsColumnSelector.appendChild(dtGroup);
-            }
-
-            // Default select first numerical column
-            const firstNumCol = Object.keys(numStats)[0] || Object.keys(catStats)[0] || Object.keys(dtStats)[0];
-            if (firstNumCol) {
-                statsColumnSelector.value = firstNumCol;
-                renderDistributionDeepDive(statsData, firstNumCol);
-            }
-        }
-    }
-
-    function renderStatisticalObservations(observations) {
-        if (!statsObservationsGrid) return;
-        if (!observations || observations.length === 0) {
-            statsObservationsGrid.innerHTML = `
-                <div class="stats-obs-card info">
-                    <div class="obs-card-header">
-                        <span class="obs-icon">✨</span>
-                        <h4 class="obs-title">Clean Statistical Balance</h4>
-                    </div>
-                    <p class="obs-message">No critical distributional defects, heavy outliers, or extreme skewness were detected.</p>
-                </div>
-            `;
-            return;
-        }
-
-        const icons = {
-            'Quality Warning': '⚠️',
-            'Zero Variance': '⚪',
-            'Distribution Shape': '📊',
-            'Heavy Tails': '📐',
-            'Outlier Alert': '🚨',
-            'High Dispersion': '📈',
-            'Class Imbalance': '⚖️',
-            'High Cardinality': '🏷️',
-            'Temporal Span': '📅',
-            'General Quality': '✨',
-        };
-
-        statsObservationsGrid.innerHTML = observations.map((obs) => {
-            const icon = icons[obs.type] || '🔍';
-            const cardClass = obs.severity === 'high' ? 'high' : (obs.severity === 'warning' ? 'warning' : 'info');
-            return `
-                <div class="stats-obs-card ${cardClass}">
-                    <div class="obs-card-header">
-                        <span class="obs-icon">${icon}</span>
-                        <h4 class="obs-title">${escapeHtml(obs.title)}</h4>
-                    </div>
-                    <p class="obs-message">${escapeHtml(obs.message)}</p>
-                </div>
-            `;
-        }).join('');
-    }
-
-    function renderSummaryStatisticsTable(numStats) {
-        if (!summaryStatisticsTbody) return;
-
-        let entries = Object.entries(numStats || {});
-
-        if (statsSearchQuery) {
-            entries = entries.filter(([colName]) => colName.toLowerCase().includes(statsSearchQuery));
-        }
-
-        if (entries.length === 0) {
-            summaryStatisticsTbody.innerHTML = `<tr><td colspan="15" style="text-align: center; color: var(--text-muted); padding: 30px;">No numerical features matching '${escapeHtml(statsSearchQuery)}'</td></tr>`;
-            return;
-        }
-
-        summaryStatisticsTbody.innerHTML = entries.map(([colName, n], idx) => {
-            const ci = n.confidence_interval || {};
-            const outliers = n.outliers || {};
-            const ciStr = ci.lower !== null && ci.upper !== null ? `[${ci.lower}, ${ci.upper}]` : '--';
-            const rangeStr = n.min !== null && n.max !== null ? `[${n.min}, ${n.max}]` : '--';
-            const iqrBounds = n.q1 !== null && n.q3 !== null ? `${n.iqr} [${n.q1}, ${n.q3}]` : '--';
-
-            // Skewness pill styling
-            let skewPill = `<span class="skew-pill skew-normal">${n.skewness !== null ? n.skewness : '--'}</span>`;
-            if (n.skewness !== null && n.skewness > 1.0) {
-                skewPill = `<span class="skew-pill skew-positive" title="Right Skewed">${n.skewness} ↗</span>`;
-            } else if (n.skewness !== null && n.skewness < -1.0) {
-                skewPill = `<span class="skew-pill skew-negative" title="Left Skewed">${n.skewness} ↖</span>`;
-            }
-
-            // Outlier styling
-            const outlierText = outliers.count > 0 
-                ? `<span style="color: var(--accent-rose); font-weight: 700;">${outliers.count} (${outliers.percentage}%)</span>`
-                : `<span style="color: var(--accent-emerald);">0</span>`;
-
-            return `
-                <tr>
-                    <td style="color: var(--text-muted);">${idx + 1}</td>
-                    <td class="stats-col-name">${escapeHtml(colName)}</td>
-                    <td>${n.valid_count !== undefined ? n.valid_count.toLocaleString() : '--'}</td>
-                    <td style="font-weight: 700; color: var(--accent-indigo);">${n.mean !== null ? n.mean : '--'}</td>
-                    <td>${n.median !== null ? n.median : '--'}</td>
-                    <td style="color: var(--text-secondary);">${n.mode !== null ? n.mode : '--'}</td>
-                    <td>${n.std !== null ? n.std : '--'}</td>
-                    <td>${n.variance !== null ? n.variance : '--'}</td>
-                    <td>${rangeStr}</td>
-                    <td>${n.range !== null ? n.range : '--'}</td>
-                    <td>${iqrBounds}</td>
-                    <td>${skewPill}</td>
-                    <td>${n.kurtosis !== null ? n.kurtosis : '--'}</td>
-                    <td><span class="ci-pill">${ciStr}</span></td>
-                    <td>${outlierText}</td>
-                </tr>
-            `;
-        }).join('');
-    }
-
-    function renderDistributionDeepDive(statsData, colName) {
-        if (!distributionDetailsCard || !colName) return;
-
-        const numStats = statsData.numerical_statistics || {};
-        const catStats = statsData.categorical_statistics || {};
-        const dtStats = statsData.datetime_statistics || {};
-
-        if (numStats[colName]) {
-            const n = numStats[colName];
-            const p = n.percentiles || {};
-            const ci = n.confidence_interval || {};
-            const norm = n.normality || {};
-            const disp = n.dispersion_metrics || {};
-            const outliers = n.outliers || {};
-
-            let normBadgeClass = 'normality-normal';
-            if (norm.distribution_shape && norm.distribution_shape.includes('Skewed')) normBadgeClass = 'normality-skewed';
-            if (norm.distribution_shape && norm.distribution_shape.includes('Heavy')) normBadgeClass = 'normality-heavy';
-
-            distributionDetailsCard.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
-                    <div>
-                        <h4 style="font-size: 18px; font-weight: 800; color: var(--text-primary);">${escapeHtml(colName)}</h4>
-                        <span style="font-size: 12px; color: var(--text-muted);">Numerical Feature • ${n.valid_count.toLocaleString()} valid observations (${n.missing_percentage}% missing)</span>
-                    </div>
-                    <div>
-                        <span class="normality-badge ${normBadgeClass}">
-                            <span>●</span>
-                            <span>${norm.distribution_shape || 'Distribution Analysis'}</span>
-                        </span>
-                    </div>
-                </div>
-
-                <div class="dist-grid-layout">
-                    <!-- Percentiles Matrix -->
-                    <div class="dist-box">
-                        <div class="dist-box-title">Percentiles Spectrum (P1 – P99)</div>
-                        <div class="percentiles-grid">
-                            <div class="percentile-chip">
-                                <div class="percentile-label">P1 (Min Tail)</div>
-                                <div class="percentile-val">${p.p1 !== undefined ? p.p1 : '--'}</div>
-                            </div>
-                            <div class="percentile-chip">
-                                <div class="percentile-label">P5</div>
-                                <div class="percentile-val">${p.p5 !== undefined ? p.p5 : '--'}</div>
-                            </div>
-                            <div class="percentile-chip">
-                                <div class="percentile-label">P10</div>
-                                <div class="percentile-val">${p.p10 !== undefined ? p.p10 : '--'}</div>
-                            </div>
-                            <div class="percentile-chip" style="background: rgba(99, 102, 241, 0.12); border-color: rgba(99, 102, 241, 0.3);">
-                                <div class="percentile-label" style="color: var(--accent-indigo);">P25 (Q1)</div>
-                                <div class="percentile-val" style="color: var(--accent-indigo);">${p.p25 !== undefined ? p.p25 : '--'}</div>
-                            </div>
-                            <div class="percentile-chip" style="background: rgba(99, 102, 241, 0.2); border-color: rgba(99, 102, 241, 0.4);">
-                                <div class="percentile-label" style="color: #fff;">P50 (Median)</div>
-                                <div class="percentile-val" style="color: #fff;">${p.p50 !== undefined ? p.p50 : '--'}</div>
-                            </div>
-                            <div class="percentile-chip" style="background: rgba(99, 102, 241, 0.12); border-color: rgba(99, 102, 241, 0.3);">
-                                <div class="percentile-label" style="color: var(--accent-indigo);">P75 (Q3)</div>
-                                <div class="percentile-val" style="color: var(--accent-indigo);">${p.p75 !== undefined ? p.p75 : '--'}</div>
-                            </div>
-                            <div class="percentile-chip">
-                                <div class="percentile-label">P90</div>
-                                <div class="percentile-val">${p.p90 !== undefined ? p.p90 : '--'}</div>
-                            </div>
-                            <div class="percentile-chip">
-                                <div class="percentile-label">P95</div>
-                                <div class="percentile-val">${p.p95 !== undefined ? p.p95 : '--'}</div>
-                            </div>
-                            <div class="percentile-chip">
-                                <div class="percentile-label">P99 (Max Tail)</div>
-                                <div class="percentile-val">${p.p99 !== undefined ? p.p99 : '--'}</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Dispersion & Confidence Interval -->
-                    <div class="dist-box">
-                        <div class="dist-box-title">Dispersion & Confidence Bounds</div>
-                        <div style="display: flex; flex-direction: column; gap: 12px; font-size: 13px;">
-                            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px;">
-                                <span style="color: var(--text-secondary);">95% Confidence Interval for Mean:</span>
-                                <strong style="font-family: var(--font-mono); color: var(--accent-indigo);">[${ci.lower}, ${ci.upper}]</strong>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px;">
-                                <span style="color: var(--text-secondary);">Standard Error (SEM):</span>
-                                <strong style="font-family: var(--font-mono);">${disp.sem !== null ? disp.sem : '--'}</strong>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px;">
-                                <span style="color: var(--text-secondary);">Coefficient of Variation (CV):</span>
-                                <strong style="font-family: var(--font-mono);">${disp.cv_percentage !== null ? disp.cv_percentage + '%' : '--'}</strong>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px;">
-                                <span style="color: var(--text-secondary);">Fisher Excess Kurtosis:</span>
-                                <strong style="font-family: var(--font-mono);">${n.kurtosis !== null ? n.kurtosis : '--'}</strong>
-                            </div>
-                            <div style="display: flex; justify-content: space-between;">
-                                <span style="color: var(--text-secondary);">Fisher-Pearson Skewness:</span>
-                                <strong style="font-family: var(--font-mono);">${n.skewness !== null ? n.skewness : '--'}</strong>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Outlier Analysis Box -->
-                    <div class="dist-box">
-                        <div class="dist-box-title">1.5x IQR Outlier Detection</div>
-                        <div style="display: flex; flex-direction: column; gap: 12px; font-size: 13px;">
-                            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px;">
-                                <span style="color: var(--text-secondary);">Lower Bound (Q1 - 1.5*IQR):</span>
-                                <strong style="font-family: var(--font-mono);">${outliers.lower_bound !== null ? outliers.lower_bound : '--'}</strong>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px;">
-                                <span style="color: var(--text-secondary);">Upper Bound (Q3 + 1.5*IQR):</span>
-                                <strong style="font-family: var(--font-mono);">${outliers.upper_bound !== null ? outliers.upper_bound : '--'}</strong>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px;">
-                                <span style="color: var(--text-secondary);">Detected Outliers:</span>
-                                <strong style="font-family: var(--font-mono); color: ${outliers.count > 0 ? 'var(--accent-rose)' : 'var(--accent-emerald)'};">${outliers.count} (${outliers.percentage}%)</strong>
-                            </div>
-                            <div style="display: flex; justify-content: space-between;">
-                                <span style="color: var(--text-secondary);">Zeros Count:</span>
-                                <strong style="font-family: var(--font-mono);">${disp.zeros_count} (${disp.zeros_percentage}%)</strong>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        } else if (catStats[colName]) {
-            const c = catStats[colName];
-            const topCats = c.top_categories || [];
-
-            distributionDetailsCard.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
-                    <div>
-                        <h4 style="font-size: 18px; font-weight: 800; color: var(--text-primary);">${escapeHtml(colName)}</h4>
-                        <span style="font-size: 12px; color: var(--text-muted);">Categorical Feature • ${c.valid_count.toLocaleString()} valid values • ${c.num_categories} distinct categories</span>
-                    </div>
-                    <div style="display: flex; gap: 10px;">
-                        <span class="meta-tag">Shannon Entropy: ${c.entropy !== null ? c.entropy : '--'}</span>
-                        <span class="meta-tag">Rare (<1%): ${c.rare_categories_count}</span>
-                    </div>
-                </div>
-
-                <div class="dist-box">
-                    <div class="dist-box-title">Category Percentage Distribution & Cumulative Share</div>
-                    <table class="modal-category-table">
-                        <thead>
-                            <tr>
-                                <th>Category</th>
-                                <th style="width: 90px; text-align: right;">Count</th>
-                                <th style="width: 90px; text-align: right;">Frequency</th>
-                                <th style="width: 100px; text-align: right;">Cumulative</th>
-                                <th style="width: 160px;">Share</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${topCats.map((cat) => `
-                                <tr>
-                                    <td style="font-weight: 700; color: var(--text-primary);">${escapeHtml(cat.category)}</td>
-                                    <td style="text-align: right; font-family: var(--font-mono);">${cat.count.toLocaleString()}</td>
-                                    <td style="text-align: right; font-family: var(--font-mono);">${cat.percentage}%</td>
-                                    <td style="text-align: right; font-family: var(--font-mono); color: var(--accent-cyan);">${cat.cumulative_percentage}%</td>
-                                    <td>
-                                        <div class="progress-bar-bg" style="height: 6px;">
-                                            <div class="progress-bar-fill fill-indigo" style="width: ${cat.percentage}%;"></div>
-                                        </div>
-                                    </td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            `;
-        } else if (dtStats[colName]) {
-            const d = dtStats[colName];
-            const months = d.records_by_month || {};
-            const dows = d.records_by_day_of_week || {};
-
-            distributionDetailsCard.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
-                    <div>
-                        <h4 style="font-size: 18px; font-weight: 800; color: var(--text-primary);">${escapeHtml(colName)}</h4>
-                        <span style="font-size: 12px; color: var(--text-muted);">Datetime Feature • ${d.valid_count.toLocaleString()} valid dates • Inferred Cadence: ${d.inferred_frequency}</span>
-                    </div>
-                    <div>
-                        <span class="meta-tag meta-tag-accent">Span: ${d.date_range_formatted}</span>
-                    </div>
-                </div>
-
-                <div class="dist-grid-layout">
-                    <div class="dist-box">
-                        <div class="dist-box-title">Date Span & Boundaries</div>
-                        <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
-                            <div style="display: flex; justify-content: space-between;">
-                                <span style="color: var(--text-secondary);">Earliest Date:</span>
-                                <strong style="font-family: var(--font-mono);">${d.min_date ? d.min_date.split('T')[0] : '--'}</strong>
-                            </div>
-                            <div style="display: flex; justify-content: space-between;">
-                                <span style="color: var(--text-secondary);">Latest Date:</span>
-                                <strong style="font-family: var(--font-mono);">${d.max_date ? d.max_date.split('T')[0] : '--'}</strong>
-                            </div>
-                            <div style="display: flex; justify-content: space-between;">
-                                <span style="color: var(--text-secondary);">Total Elapsed Days:</span>
-                                <strong style="font-family: var(--font-mono); color: var(--accent-cyan);">${d.date_range_days.toLocaleString()} days</strong>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="dist-box">
-                        <div class="dist-box-title">Records by Month</div>
-                        <div style="display: flex; flex-direction: column; gap: 6px; max-height: 180px; overflow-y: auto;">
-                            ${Object.entries(months).map(([m, cnt]) => `
-                                <div style="display: flex; justify-content: space-between; font-size: 12px;">
-                                    <span>${m}</span>
-                                    <strong style="font-family: var(--font-mono);">${cnt.toLocaleString()}</strong>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-
-                    <div class="dist-box">
-                        <div class="dist-box-title">Records by Day of Week</div>
-                        <div style="display: flex; flex-direction: column; gap: 6px; max-height: 180px; overflow-y: auto;">
-                            ${Object.entries(dows).map(([dow, cnt]) => `
-                                <div style="display: flex; justify-content: space-between; font-size: 12px;">
-                                    <span>${dow}</span>
-                                    <strong style="font-family: var(--font-mono);">${cnt.toLocaleString()}</strong>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-    }
-
-    // Stats Table Search Handler
-    if (statsTableSearch) {
-        statsTableSearch.addEventListener('input', (e) => {
-            statsSearchQuery = e.target.value.toLowerCase().trim();
-            if (currentStatistics && currentStatistics.numerical_statistics) {
-                renderSummaryStatisticsTable(currentStatistics.numerical_statistics);
-            }
-        });
-    }
-
-    // Feature Selector Change Handler
-    if (statsColumnSelector) {
-        statsColumnSelector.addEventListener('change', (e) => {
-            const selectedCol = e.target.value;
-            if (selectedCol && currentStatistics) {
-                renderDistributionDeepDive(currentStatistics, selectedCol);
-            }
-        });
-    }
-
-    // =========================================================================
-    // PHASE 6: CORRELATION ANALYSIS ENGINE CONTROLLER
-    // =========================================================================
-    async function loadCorrelationData(datasetId, threshold = 0.0) {
-        try {
-            const res = await fetch(`/api/correlation/${encodeURIComponent(datasetId)}?threshold=${threshold}`);
-            const data = await res.json();
-            if (res.ok && data.success && data.correlation) {
-                currentCorrelation = data.correlation;
-                currentHeatmapSpec = data.heatmap_spec;
-                renderCorrelationAnalysis(currentCorrelation, currentHeatmapSpec);
-            }
-        } catch (e) {
-            console.error('Failed to load correlation analysis:', e);
-        }
-    }
-
-    function renderCorrelationAnalysis(corrData, heatmapSpec) {
-        if (!corrData) return;
-
-        // 1. Render KPIs
-        const numCount = corrData.total_numerical_columns || 0;
-        const totalPairs = corrData.total_pairs_count || 0;
-        const strCounts = corrData.strength_counts || {};
-        const strongCount = (strCounts.very_strong || 0) + (strCounts.strong || 0);
-        const modCount = strCounts.moderate || 0;
-
-        if (corrKpiNumCount) corrKpiNumCount.textContent = numCount;
-        if (corrKpiPairsCount) corrKpiPairsCount.textContent = totalPairs;
-        if (corrKpiStrongCount) corrKpiStrongCount.textContent = `${strongCount} pairs`;
-        if (corrKpiModCount) corrKpiModCount.textContent = `${modCount} pairs`;
-
-        // 2. Render Key Correlations
-        renderKeyCorrelations(corrData.key_correlations);
-
-        // 3. Render Plotly Heatmap
-        if (heatmapSpec) {
-            renderCorrelationHeatmap(heatmapSpec);
-        }
-
-        // 4. Render Ranked Associations Table
-        renderRankedCorrelationsTable(corrData.all_ranked_pairs || corrData.ranked_pairs || []);
-    }
-
-    function renderKeyCorrelations(keyCorrs) {
-        if (!keyCorrelationsGrid) return;
-        const highlights = keyCorrs && keyCorrs.key_highlights ? keyCorrs.key_highlights : [];
-
-        if (highlights.length === 0) {
-            keyCorrelationsGrid.innerHTML = `
-                <div class="key-corr-empty">
-                    <p>No significant linear correlations (|r| &ge; 0.20) detected between numerical features in this dataset.</p>
-                </div>
-            `;
-            return;
-        }
-
-        keyCorrelationsGrid.innerHTML = highlights.map((h) => {
-            const isPos = h.direction === 'Positive';
-            const cardClass = isPos ? 'positive' : 'negative';
-            const dirIcon = isPos ? '↗' : '↘';
-            const rVal = h.correlation !== null ? Number(h.correlation).toFixed(4) : '--';
-
-            // Strength Badge Class
-            let strClass = 'strength-very-weak';
-            if (h.strength === 'Very strong') strClass = 'strength-very-strong';
-            else if (h.strength === 'Strong') strClass = 'strength-strong';
-            else if (h.strength === 'Moderate') strClass = 'strength-moderate';
-            else if (h.strength === 'Weak') strClass = 'strength-weak';
-
-            return `
-                <div class="key-corr-card ${cardClass}">
-                    <div class="key-corr-header">
-                        <div class="key-corr-pair-title">
-                            <span>${escapeHtml(h.variable_a)}</span>
-                            <span style="color: var(--text-muted); font-size: 13px;">↔</span>
-                            <span>${escapeHtml(h.variable_b)}</span>
-                        </div>
-                        <span class="key-corr-r-pill">r = ${rVal}</span>
-                    </div>
-                    <div class="key-corr-badges-row">
-                        <span class="direction-pill ${isPos ? 'direction-positive' : 'direction-negative'}">
-                            <span>${dirIcon}</span>
-                            <span>${escapeHtml(h.direction)}</span>
-                        </span>
-                        <span class="strength-pill ${strClass}">
-                            <span>${escapeHtml(h.strength)}</span>
-                        </span>
-                    </div>
-                    <div class="key-corr-explanation">
-                        ${escapeHtml(h.explanation)}
-                    </div>
-                </div>
-            `;
-        }).join('');
-    }
-
-    function renderCorrelationHeatmap(spec) {
-        if (!correlationHeatmapContainer || !spec) return;
-
-        if (!window.Plotly) {
-            correlationHeatmapContainer.innerHTML = `
-                <div class="heatmap-loading-placeholder">
-                    <p style="color: var(--accent-rose);">Plotly.js library could not be loaded. Please check network connection.</p>
-                </div>
-            `;
-            return;
-        }
-
-        const data = spec.data || [];
-        const layout = spec.layout || {};
-        const config = spec.config || { responsive: true };
-
-        Plotly.react('correlation-heatmap-container', data, layout, config);
-    }
-
-    function renderRankedCorrelationsTable(pairs) {
-        if (!rankedCorrelationsTbody) return;
-
-        let filtered = pairs || [];
-
-        // Apply threshold filter
-        if (currentCorrThreshold > 0) {
-            filtered = filtered.filter((p) => {
-                const absR = p.absolute_correlation !== undefined ? p.absolute_correlation : Math.abs(p.correlation || 0);
-                return absR >= currentCorrThreshold;
-            });
-        }
-
-        // Apply search query filter
-        if (corrSearchQuery) {
-            filtered = filtered.filter((p) => {
-                const a = (p.variable_a || '').toLowerCase();
-                const b = (p.variable_b || '').toLowerCase();
-                const str = (p.strength || '').toLowerCase();
-                const dir = (p.direction || '').toLowerCase();
-                return a.includes(corrSearchQuery) || b.includes(corrSearchQuery) || str.includes(corrSearchQuery) || dir.includes(corrSearchQuery);
-            });
-        }
-
-        if (filtered.length === 0) {
-            rankedCorrelationsTbody.innerHTML = `
-                <tr>
-                    <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 30px;">
-                        No correlation pairs matching threshold |r| &ge; ${currentCorrThreshold.toFixed(2)} ${corrSearchQuery ? `and query '${escapeHtml(corrSearchQuery)}'` : ''}
-                    </td>
-                </tr>
-            `;
-            return;
-        }
-
-        rankedCorrelationsTbody.innerHTML = filtered.map((p, idx) => {
-            const rVal = p.correlation !== null ? Number(p.correlation).toFixed(4) : '--';
-            const isPos = p.direction === 'Positive';
-            const isNeg = p.direction === 'Negative';
-            const dirIcon = isPos ? '↗' : (isNeg ? '↘' : '—');
-            const dirClass = isPos ? 'direction-positive' : (isNeg ? 'direction-negative' : 'direction-neutral');
-
-            let strClass = 'strength-very-weak';
-            if (p.strength === 'Very strong') strClass = 'strength-very-strong';
-            else if (p.strength === 'Strong') strClass = 'strength-strong';
-            else if (p.strength === 'Moderate') strClass = 'strength-moderate';
-            else if (p.strength === 'Weak') strClass = 'strength-weak';
-
-            // Color highlight for r value
-            let rColor = 'var(--text-primary)';
-            if (isPos && Math.abs(p.correlation) >= 0.6) rColor = 'var(--accent-emerald)';
-            else if (isNeg && Math.abs(p.correlation) >= 0.6) rColor = 'var(--accent-rose)';
-
-            return `
-                <tr>
-                    <td style="color: var(--text-muted); font-family: var(--font-mono); font-size: 11px;">${idx + 1}</td>
-                    <td style="font-weight: 700; color: var(--text-primary);">${escapeHtml(p.variable_a)}</td>
-                    <td style="font-weight: 700; color: var(--text-primary);">${escapeHtml(p.variable_b)}</td>
-                    <td><strong style="font-family: var(--font-mono); color: ${rColor};">${rVal}</strong></td>
-                    <td><span class="strength-pill ${strClass}">${escapeHtml(p.strength)}</span></td>
-                    <td>
-                        <span class="direction-pill ${dirClass}">
-                            <span>${dirIcon}</span>
-                            <span>${escapeHtml(p.direction)}</span>
-                        </span>
-                    </td>
-                    <td style="font-family: var(--font-mono); color: var(--text-secondary);">${p.sample_size !== undefined ? p.sample_size.toLocaleString() : '--'}</td>
-                </tr>
-            `;
-        }).join('');
-    }
-
-    // Threshold Slider Listener
-    if (corrThresholdSlider) {
-        corrThresholdSlider.addEventListener('input', (e) => {
-            currentCorrThreshold = parseFloat(e.target.value) || 0.0;
-            if (corrThresholdDisplay) {
-                corrThresholdDisplay.textContent = currentCorrThreshold.toFixed(2);
-            }
-            if (currentCorrelation) {
-                renderRankedCorrelationsTable(currentCorrelation.all_ranked_pairs || currentCorrelation.ranked_pairs || []);
-            }
-        });
-    }
-
-    // Correlation Table Search Listener
-    if (corrTableSearch) {
-        corrTableSearch.addEventListener('input', (e) => {
-            corrSearchQuery = e.target.value.toLowerCase().trim();
-            if (currentCorrelation) {
-                renderRankedCorrelationsTable(currentCorrelation.all_ranked_pairs || currentCorrelation.ranked_pairs || []);
-            }
-        });
-    }
-
-    // =========================================================
-    // PHASE 7: OUTLIER & ANOMALY DETECTION CONTROLLER
-    // =========================================================
-    let currentOutliers = null;
-    let currentOutlierMethod = 'iqr';
-    let currentOutlierParam = 1.5;
-    let currentOutlierVizMode = 'boxplot'; // 'boxplot' | 'distribution'
-    let currentOutlierSelectedCol = '';
-    let outlierTableSearchQuery = '';
-    let currentBoxplotSpec = null;
-
-    const outliersCountBadge = document.getElementById('outliers-count-badge');
-    const outlierMethodSelect = document.getElementById('outlier-method-select');
-    const outlierParamInput = document.getElementById('outlier-param-input');
-    const outlierParamLabel = document.getElementById('outlier-param-label');
-    const btnRecalcOutliers = document.getElementById('btn-recalc-outliers');
-
-    const outliersKpiNumCount = document.getElementById('outliers-kpi-num-count');
-    const outliersKpiAffectedCols = document.getElementById('outliers-kpi-affected-cols');
-    const outliersKpiTotalCount = document.getElementById('outliers-kpi-total-count');
-    const outliersKpiErrorCount = document.getElementById('outliers-kpi-error-count');
-    const outliersKpiPotentialCount = document.getElementById('outliers-kpi-potential-count');
-    const outliersKpiCleanCount = document.getElementById('outliers-kpi-clean-count');
-    const outliersWarningsContainer = document.getElementById('outliers-warnings-container');
-
-    const viewOutlierBoxplotBtn = document.getElementById('view-outlier-boxplot-btn');
-    const viewOutlierDistBtn = document.getElementById('view-outlier-dist-btn');
-    const outlierDistSelectWrap = document.getElementById('outlier-dist-select-wrap');
-    const outlierDistColSelect = document.getElementById('outlier-dist-col-select');
-    const outlierPlotlyChart = document.getElementById('outlier-plotly-chart');
-
-    const outlierTableSearch = document.getElementById('outlier-table-search');
-    const outliersSummaryTbody = document.getElementById('outliers-summary-tbody');
-
-    const btnOutliersKeep = document.getElementById('btn-outliers-keep');
-    const btnOutliersRemove = document.getElementById('btn-outliers-remove');
-    const btnOutliersCap = document.getElementById('btn-outliers-cap');
-    const btnOutliersRemoveErrors = document.getElementById('btn-outliers-remove-errors');
-
-    const outlierInspectorModal = document.getElementById('outlier-inspector-modal');
-    const modalOutlierTitle = document.getElementById('modal-outlier-title');
-    const modalOutlierMeta = document.getElementById('modal-outlier-meta');
-    const modalOutlierTbody = document.getElementById('modal-outlier-tbody');
-    const modalOutlierCloseBtn = document.getElementById('modal-outlier-close-btn');
-
-    async function loadOutlierData(datasetId, method = currentOutlierMethod, param = currentOutlierParam) {
-        if (!datasetId) return;
-
-        try {
-            const url = `/api/outliers/${encodeURIComponent(datasetId)}?method=${encodeURIComponent(method)}&param=${encodeURIComponent(param)}`;
-            const res = await fetch(url);
-            const data = await res.json();
-
-            if (!res.ok || !data.success) {
-                console.warn('Outlier detection API returned non-success:', data);
-                return;
-            }
-
-            currentOutliers = data.outliers;
-            currentBoxplotSpec = data.boxplot_spec;
-
-            // 1. Update KPI Summary
-            renderOutlierKPIs(currentOutliers);
-
-            // 2. Update Tab Badge Counter
-            if (outliersCountBadge) {
-                outliersCountBadge.textContent = (currentOutliers.total_outlier_instances || 0).toLocaleString();
-            }
-
-            // 3. Render Statistical Warnings Banner
-            renderOutlierWarnings(currentOutliers.warnings || []);
-
-            // 4. Populate Feature Distribution Selector Dropdown
-            populateOutlierColumnSelector();
-
-            // 5. Render Outlier Summary Table
-            renderOutliersSummaryTable();
-
-            // 6. Render Active Visualization Chart
-            renderOutlierVisualization();
-
-        } catch (err) {
-            console.error('Failed to load outlier detection data:', err);
-        }
-    }
-
-    function renderOutlierKPIs(outliers) {
-        if (!outliers) return;
-
-        if (outliersKpiNumCount) outliersKpiNumCount.textContent = (outliers.numerical_columns_count || 0).toLocaleString();
-        if (outliersKpiAffectedCols) outliersKpiAffectedCols.textContent = (outliers.columns_with_outliers_count || 0).toLocaleString();
-        if (outliersKpiTotalCount) outliersKpiTotalCount.textContent = (outliers.total_outlier_instances || 0).toLocaleString();
-        if (outliersKpiErrorCount) outliersKpiErrorCount.textContent = (outliers.total_confirmed_errors || 0).toLocaleString();
-        if (outliersKpiPotentialCount) outliersKpiPotentialCount.textContent = (outliers.total_potential_outliers || 0).toLocaleString();
-        if (outliersKpiCleanCount) outliersKpiCleanCount.textContent = (outliers.clean_columns_count || 0).toLocaleString();
-    }
-
-    function renderOutlierWarnings(warnings) {
-        if (!outliersWarningsContainer) return;
-
-        if (!warnings || warnings.length === 0) {
-            outliersWarningsContainer.innerHTML = '';
-            outliersWarningsContainer.classList.add('hidden');
-            return;
-        }
-
-        outliersWarningsContainer.classList.remove('hidden');
-        outliersWarningsContainer.innerHTML = warnings.map((w) => {
-            let cardClass = 'outlier-warning-card';
-            let icon = '⚠️';
-
-            if (w.toLowerCase().includes('zero standard deviation') || w.toLowerCase().includes('zero variance')) {
-                cardClass += ' warning-zero-std';
-                icon = '🛑';
-            } else if (w.toLowerCase().includes('zero iqr')) {
-                cardClass += ' warning-zero-iqr';
-                icon = '📉';
-            } else if (w.toLowerCase().includes('small sample size') || w.toLowerCase().includes('small dataset')) {
-                icon = '🔬';
-            }
-
-            return `
-                <div class="${cardClass}">
-                    <span class="outlier-warning-icon">${icon}</span>
-                    <div class="outlier-warning-text">
-                        <strong>Statistical Edge Case:</strong> ${escapeHtml(w)}
-                    </div>
-                </div>
-            `;
-        }).join('');
-    }
-
-    function populateOutlierColumnSelector() {
-        if (!outlierDistColSelect || !currentOutliers) return;
-
-        const summaryTable = currentOutliers.summary_table || [];
-        outlierDistColSelect.innerHTML = '<option value="">Select feature to inspect distribution...</option>';
-
-        summaryTable.forEach((item) => {
-            const opt = document.createElement('option');
-            opt.value = item.column_name;
-            const errStr = item.confirmed_error_count > 0 ? ` (${item.confirmed_error_count} errors)` : '';
-            opt.textContent = `${item.column_name} [${item.outlier_count} outliers${errStr}]`;
-            outlierDistColSelect.appendChild(opt);
-        });
-
-        if (!currentOutlierSelectedCol && summaryTable.length > 0) {
-            // Default to first column with outliers, or first column overall
-            const withOutliers = summaryTable.find((c) => c.outlier_count > 0);
-            currentOutlierSelectedCol = withOutliers ? withOutliers.column_name : summaryTable[0].column_name;
-            outlierDistColSelect.value = currentOutlierSelectedCol;
-        } else if (currentOutlierSelectedCol) {
-            outlierDistColSelect.value = currentOutlierSelectedCol;
-        }
-    }
-
-    function renderOutliersSummaryTable() {
-        if (!outliersSummaryTbody || !currentOutliers) return;
-
-        let rows = currentOutliers.summary_table || [];
-
-        if (outlierTableSearchQuery) {
-            rows = rows.filter((r) => {
-                const name = (r.column_name || '').toLowerCase();
-                const status = (r.status || '').toLowerCase();
-                return name.includes(outlierTableSearchQuery) || status.includes(outlierTableSearchQuery);
-            });
-        }
-
-        if (rows.length === 0) {
-            outliersSummaryTbody.innerHTML = `
-                <tr>
-                    <td colspan="11" style="text-align: center; color: var(--text-muted); padding: 30px;">
-                        No numerical columns found matching search query '${escapeHtml(outlierTableSearchQuery)}'.
-                    </td>
-                </tr>
-            `;
-            return;
-        }
-
-        outliersSummaryTbody.innerHTML = rows.map((r, idx) => {
-            const isClean = (r.outlier_count || 0) === 0;
-            const hasErrors = (r.confirmed_error_count || 0) > 0;
-            const outlierPct = r.outlier_percentage !== undefined ? Number(r.outlier_percentage).toFixed(2) : '0.00';
-            const lowerVal = r.lower_threshold !== null && r.lower_threshold !== undefined ? Number(r.lower_threshold).toFixed(2) : '--';
-            const upperVal = r.upper_threshold !== null && r.upper_threshold !== undefined ? Number(r.upper_threshold).toFixed(2) : '--';
-
-            // Diagnosis badge
-            let diagBadge = '';
-            if (isClean) {
-                diagBadge = '<span class="diag-badge diag-badge-clean">✓ Clean</span>';
-            } else if (hasErrors) {
-                diagBadge = `<span class="diag-badge diag-badge-error">⚠️ ${r.confirmed_error_count} Data Error${r.confirmed_error_count > 1 ? 's' : ''}</span>`;
-            } else if (r.outlier_percentage > 5.0) {
-                diagBadge = `<span class="diag-badge diag-badge-error">⚡ ${r.outlier_count} High Outliers</span>`;
+    // -------------------------------------------------------------
+    // VIEW 5: STATISTICAL ANALYSIS ENGINE
+    // -------------------------------------------------------------
+    function renderStatisticsView() {
+        if (!currentStatistics) return;
+        const numStats = currentStatistics.numerical_statistics || {};
+        const catStats = currentStatistics.categorical_statistics || {};
+        const dtStats = currentStatistics.datetime_statistics || {};
+
+        document.getElementById('stats-kpi-num-count').textContent = Object.keys(numStats).length;
+        document.getElementById('stats-kpi-cat-count').textContent = Object.keys(catStats).length;
+        document.getElementById('stats-kpi-date-count').textContent = Object.keys(dtStats).length;
+
+        // Render Observations
+        const obsGrid = document.getElementById('stats-observations-grid');
+        const obs = currentStatistics.statistical_observations || [];
+        if (obsGrid) {
+            if (obs.length === 0) {
+                obsGrid.innerHTML = '<div class="obs-card"><div class="obs-card-icon icon-cyan">ℹ️</div><div class="obs-card-text">Uniform distributions observed across all numerical features.</div></div>';
             } else {
-                diagBadge = `<span class="diag-badge diag-badge-potential">⚡ ${r.outlier_count} Outliers</span>`;
-            }
-
-            // Warnings badge
-            let warnBadge = '<span style="color: var(--text-muted); font-size: 11px;">None</span>';
-            if (r.warnings_count > 0) {
-                const firstWarn = r.warnings && r.warnings[0] ? r.warnings[0] : 'Warning detected';
-                warnBadge = `<span class="diag-badge diag-badge-warning" title="${escapeHtml(firstWarn)}">⚠️ ${r.warnings_count} Alert${r.warnings_count > 1 ? 's' : ''}</span>`;
-            }
-
-            // Action buttons
-            const inspectDisabled = isClean ? 'disabled' : '';
-            const actionButtons = `
-                <div style="display: flex; gap: 6px;">
-                    <button class="btn btn-outline btn-xs btn-inspect-outliers" data-col="${escapeHtml(r.column_name)}" ${inspectDisabled}>
-                        🔍 Review (${r.outlier_count})
-                    </button>
-                    <button class="btn btn-outline btn-xs btn-view-outlier-chart" data-col="${escapeHtml(r.column_name)}">
-                        📊 Chart
-                    </button>
-                </div>
-            `;
-
-            return `
-                <tr>
-                    <td style="color: var(--text-muted); font-family: var(--font-mono); font-size: 11px;">${idx + 1}</td>
-                    <td style="font-weight: 700; color: var(--text-primary);">${escapeHtml(r.column_name)}</td>
-                    <td><code style="font-size: 11px; background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px;">${escapeHtml(r.method || 'IQR')}</code></td>
-                    <td style="font-family: var(--font-mono);">${(r.valid_observations || 0).toLocaleString()}</td>
-                    <td><strong style="font-family: var(--font-mono); color: ${isClean ? 'var(--accent-emerald)' : 'var(--accent-rose)'};">${(r.outlier_count || 0).toLocaleString()}</strong></td>
-                    <td style="font-family: var(--font-mono); color: ${isClean ? 'var(--text-muted)' : 'var(--accent-rose)'};">${outlierPct}%</td>
-                    <td style="font-family: var(--font-mono); color: var(--text-secondary);">${lowerVal}</td>
-                    <td style="font-family: var(--font-mono); color: var(--text-secondary);">${upperVal}</td>
-                    <td>${diagBadge}</td>
-                    <td>${warnBadge}</td>
-                    <td>${actionButtons}</td>
-                </tr>
-            `;
-        }).join('');
-    }
-
-    async function renderOutlierVisualization() {
-        if (!outlierPlotlyChart) return;
-
-        if (!window.Plotly) {
-            outlierPlotlyChart.innerHTML = `
-                <div class="chart-loading-placeholder">
-                    <p style="color: var(--accent-rose);">Plotly.js library unavailable.</p>
-                </div>
-            `;
-            return;
-        }
-
-        if (currentOutlierVizMode === 'boxplot') {
-            if (currentBoxplotSpec) {
-                Plotly.react('outlier-plotly-chart', currentBoxplotSpec.data || [], currentBoxplotSpec.layout || {}, currentBoxplotSpec.config || { responsive: true });
-            }
-        } else {
-            // Distribution mode for selected column
-            if (!currentOutlierSelectedCol && currentOutliers && currentOutliers.summary_table && currentOutliers.summary_table.length > 0) {
-                currentOutlierSelectedCol = currentOutliers.summary_table[0].column_name;
-            }
-
-            if (currentOutlierSelectedCol) {
-                try {
-                    const url = `/api/outliers/${encodeURIComponent(activeDatasetId)}/column/${encodeURIComponent(currentOutlierSelectedCol)}?method=${encodeURIComponent(currentOutlierMethod)}&param=${encodeURIComponent(currentOutlierParam)}`;
-                    const res = await fetch(url);
-                    const data = await res.json();
-                    if (res.ok && data.success && data.distribution_spec) {
-                        Plotly.react('outlier-plotly-chart', data.distribution_spec.data || [], data.distribution_spec.layout || {}, data.distribution_spec.config || { responsive: true });
-                    }
-                } catch (err) {
-                    console.error('Failed to render distribution chart for column:', currentOutlierSelectedCol, err);
-                }
+                obsGrid.innerHTML = obs.map(o => `
+                    <div class="obs-card">
+                        <div class="obs-card-icon icon-indigo">📈</div>
+                        <div class="obs-card-text">
+                            <strong>${escapeHtml(o.category || 'Observation')}:</strong> ${escapeHtml(o.message || o)}
+                        </div>
+                    </div>
+                `).join('');
             }
         }
-    }
 
-    function openOutlierInspectorModal(colName) {
-        if (!outlierInspectorModal || !currentOutliers) return;
-
-        const colDetails = (currentOutliers.column_details && currentOutliers.column_details[colName]) || null;
-        if (!colDetails) {
-            alert(`No outlier details available for column '${colName}'.`);
-            return;
-        }
-
-        const outliers = colDetails.outliers || [];
-
-        if (modalOutlierTitle) {
-            modalOutlierTitle.textContent = `Outlier Records Drill-Down: ${colName}`;
-        }
-        if (modalOutlierMeta) {
-            modalOutlierMeta.textContent = `${outliers.length} Flagged Observations | Lower: ${colDetails.lower_threshold} | Upper: ${colDetails.upper_threshold}`;
-        }
-
-        if (modalOutlierTbody) {
-            if (outliers.length === 0) {
-                modalOutlierTbody.innerHTML = `
-                    <tr>
-                        <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">
-                            No outlier records found in column '${escapeHtml(colName)}'.
-                        </td>
-                    </tr>
-                `;
+        // Render Numerical Table
+        const numTbody = document.getElementById('numerical-stats-tbody');
+        if (numTbody) {
+            const keys = Object.keys(numStats);
+            if (keys.length === 0) {
+                numTbody.innerHTML = '<tr><td colspan="14" style="text-align:center; padding:20px;">No numerical features present.</td></tr>';
             } else {
-                modalOutlierTbody.innerHTML = outliers.map((o) => {
-                    const isError = o.is_data_error;
-                    const tagClass = isError ? 'class-tag-error' : 'class-tag-potential';
-                    const boundVi = o.direction === 'below_lower' ? 'Below Lower Bound' : 'Above Upper Bound';
-                    const threshVal = o.direction === 'below_lower' ? o.lower_threshold : o.upper_threshold;
-
+                numTbody.innerHTML = keys.map(k => {
+                    const s = numStats[k];
+                    const ci = s.confidence_interval_95 || [];
+                    const ciText = ci.length === 2 ? `[${ci[0].toFixed(1)}, ${ci[1].toFixed(1)}]` : '--';
                     return `
                         <tr>
-                            <td style="font-family: var(--font-mono); font-weight: 700; color: var(--text-primary);">${o.row_index}</td>
-                            <td><strong style="font-family: var(--font-mono); color: ${isError ? 'var(--accent-rose)' : 'var(--accent-amber)'}; font-size: 13px;">${o.value}</strong></td>
-                            <td style="font-size: 12px; color: var(--text-secondary);">${boundVi}</td>
-                            <td style="font-family: var(--font-mono); font-size: 12px;">${threshVal !== null ? Number(threshVal).toFixed(2) : '--'}</td>
-                            <td style="font-family: var(--font-mono); font-size: 12px; color: var(--accent-rose);">+${o.deviation_from_threshold !== null ? Number(o.deviation_from_threshold).toFixed(2) : '--'}</td>
-                            <td><span class="class-tag ${tagClass}">${escapeHtml(o.classification || (isError ? 'Confirmed Data Error' : 'Potential Outlier'))}</span></td>
-                            <td style="font-size: 12px; color: var(--text-secondary); line-height: 1.4;">${escapeHtml(o.rationale || '')}</td>
+                            <td><strong>${escapeHtml(k)}</strong></td>
+                            <td>${formatNumber(s.count)}</td>
+                            <td>${Number(s.mean || 0).toFixed(2)}</td>
+                            <td>${Number(s.std || 0).toFixed(2)}</td>
+                            <td>${s.min}</td>
+                            <td>${Number(s.q1_25 || s.percentile_25 || 0).toFixed(2)}</td>
+                            <td><strong>${Number(s.median || s.percentile_50 || 0).toFixed(2)}</strong></td>
+                            <td>${Number(s.q3_75 || s.percentile_75 || 0).toFixed(2)}</td>
+                            <td>${s.max}</td>
+                            <td>${Number(s.iqr || 0).toFixed(2)}</td>
+                            <td style="color:${Math.abs(s.skewness || 0) > 1 ? '#fbbf24' : 'inherit'};">${Number(s.skewness || 0).toFixed(2)}</td>
+                            <td>${Number(s.kurtosis || 0).toFixed(2)}</td>
+                            <td style="font-size:11px; font-family:var(--font-mono);">${ciText}</td>
+                            <td style="text-align:center;">
+                                <button class="btn btn-outline btn-xs btn-inspect-col" data-col="${escapeHtml(k)}">Inspect</button>
+                            </td>
                         </tr>
                     `;
                 }).join('');
             }
         }
 
-        outlierInspectorModal.classList.remove('hidden');
+        // Render Categorical Table
+        const catTbody = document.getElementById('categorical-stats-tbody');
+        if (catTbody) {
+            const keys = Object.keys(catStats);
+            if (keys.length === 0) {
+                catTbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">No categorical features present.</td></tr>';
+            } else {
+                catTbody.innerHTML = keys.map(k => {
+                    const s = catStats[k];
+                    const topFreqs = (s.top_categories || []).slice(0, 3).map(t => `<span class="freq-tag">${escapeHtml(t.category)}: ${t.frequency}</span>`).join(' ');
+                    return `
+                        <tr>
+                            <td><strong>${escapeHtml(k)}</strong></td>
+                            <td>${formatNumber(s.unique_count)}</td>
+                            <td><span class="badge badge-cyan">${escapeHtml(s.mode || 'N/A')}</span></td>
+                            <td>${formatNumber(s.mode_frequency)}</td>
+                            <td>${Number(s.mode_percentage || 0).toFixed(1)}%</td>
+                            <td>${Number(s.entropy_bits || 0).toFixed(2)}</td>
+                            <td>${topFreqs || '--'}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        }
     }
 
-    async function executeOutlierRemediation(action) {
-        if (!activeDatasetId) {
-            alert('Please select an active dataset first.');
+    // -------------------------------------------------------------
+    // VIEW 6: CORRELATIONS (HEATMAP & PAIRS)
+    // -------------------------------------------------------------
+    function renderCorrelationView() {
+        if (!currentCorrelation) return;
+
+        // Render Plotly Heatmap
+        const heatmapDiv = document.getElementById('plotly-correlation-heatmap');
+        if (heatmapDiv && currentHeatmapSpec) {
+            const spec = currentHeatmapSpec;
+            const layout = Object.assign({}, spec.layout || {}, {
+                autosize: true,
+                paper_bgcolor: 'transparent',
+                plot_bgcolor: 'transparent',
+                font: { color: '#cbd5e1', family: 'Plus Jakarta Sans' },
+                margin: { l: 80, r: 40, t: 40, b: 80 },
+            });
+            Plotly.newPlot(heatmapDiv, spec.data || [], layout, { responsive: true });
+        }
+
+        // Render Ranked Pairs Table
+        renderCorrelationsTable();
+
+        // Threshold Slider Listener
+        const slider = document.getElementById('corr-threshold-slider');
+        const display = document.getElementById('corr-threshold-display');
+        if (slider) {
+            slider.addEventListener('input', (e) => {
+                currentCorrThreshold = parseFloat(e.target.value);
+                if (display) display.textContent = currentCorrThreshold.toFixed(2);
+                renderCorrelationsTable();
+            });
+        }
+    }
+
+    function renderCorrelationsTable() {
+        const tbody = document.getElementById('corr-pairs-tbody');
+        if (!tbody || !currentCorrelation) return;
+
+        let pairs = currentCorrelation.ranked_pairs || [];
+        if (currentCorrThreshold > 0) {
+            pairs = pairs.filter(p => Math.abs(p.pearson_r) >= currentCorrThreshold);
+        }
+
+        if (pairs.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">No correlation pairs match threshold.</td></tr>';
             return;
         }
 
-        let confirmMsg = '';
-        if (action === 'remove') {
-            confirmMsg = 'Are you sure you want to remove all rows containing outliers?\n\nThis creates a separate new dataset in data/processed/. Your original raw CSV will not be modified.';
-        } else if (action === 'remove_errors_only') {
-            confirmMsg = 'Are you sure you want to remove rows with confirmed data errors?\n\nLegitimate statistical outliers will be kept. Creates a new dataset in data/processed/.';
-        } else if (action === 'cap') {
-            confirmMsg = 'Are you sure you want to cap/winsorize extreme outliers to the boundary thresholds?\n\nNo rows will be dropped. Creates a new dataset in data/processed/.';
-        }
+        tbody.innerHTML = pairs.map((p, idx) => {
+            const badgeClass = p.strength === 'Strong' ? 'badge-indigo' : p.strength === 'Moderate' ? 'badge-cyan' : 'badge-emerald';
+            const dirClass = p.direction === 'Positive' ? 'text-indigo' : 'text-rose';
+            return `
+                <tr>
+                    <td>${idx + 1}</td>
+                    <td><strong>${escapeHtml(p.feature_a)}</strong></td>
+                    <td><strong>${escapeHtml(p.feature_b)}</strong></td>
+                    <td style="font-family:var(--font-mono); font-weight:700;">${p.pearson_r.toFixed(4)}</td>
+                    <td><span class="badge ${badgeClass}">${p.strength}</span></td>
+                    <td class="${dirClass}"><strong>${p.direction}</strong></td>
+                    <td style="font-family:var(--font-mono);">${Math.abs(p.pearson_r).toFixed(4)}</td>
+                </tr>
+            `;
+        }).join('');
+    }
 
-        if (!confirm(confirmMsg)) return;
+    // -------------------------------------------------------------
+    // VIEW 7: OUTLIERS (DETECTION & REMEDIATION)
+    // -------------------------------------------------------------
+    function renderOutliersView(boxplotSpec) {
+        if (!currentOutliers) return;
 
-        try {
-            const res = await fetch(`/api/outliers/remediate/${encodeURIComponent(activeDatasetId)}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: action,
-                    method: currentOutlierMethod,
-                    param: currentOutlierParam,
-                }),
+        // Render Multi-Feature Box Plot
+        const boxplotDiv = document.getElementById('plotly-outlier-boxplot');
+        if (boxplotDiv && boxplotSpec) {
+            const layout = Object.assign({}, boxplotSpec.layout || {}, {
+                autosize: true,
+                paper_bgcolor: 'transparent',
+                plot_bgcolor: 'transparent',
+                font: { color: '#cbd5e1', family: 'Plus Jakarta Sans' },
+                margin: { l: 50, r: 30, t: 40, b: 60 },
             });
+            Plotly.newPlot(boxplotDiv, boxplotSpec.data || [], layout, { responsive: true });
+        }
 
-            const data = await res.json();
-            if (res.ok && data.success) {
-                alert(`✓ Outlier remediation complete!\n\n${data.message}\nSaved as processed dataset: ${data.processed_id}`);
-                // Refresh datasets list & reload dashboard
-                await loadDatasetsList();
-                if (activeDatasetStatus) {
-                    activeDatasetStatus.classList.remove('hidden');
-                    activeDatasetStatus.textContent = 'Cleaned & Processed Dataset Available';
-                }
+        // Render Outlier Table
+        const tbody = document.getElementById('outlier-summary-tbody');
+        if (tbody) {
+            const colMap = currentOutliers.columns || {};
+            const keys = Object.keys(colMap);
+            if (keys.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:20px;">No numerical features available for outlier detection.</td></tr>';
             } else {
-                alert(`Error applying remediation: ${data.error || 'Operation failed.'}`);
-            }
-        } catch (err) {
-            alert(`Remediation request failed: ${err.message}`);
-        }
-    }
+                tbody.innerHTML = keys.map(k => {
+                    const o = colMap[k];
+                    const hasOutliers = (o.outlier_count || 0) > 0;
+                    return `
+                        <tr>
+                            <td><strong>${escapeHtml(k)}</strong></td>
+                            <td>${formatNumber(o.valid_count)}</td>
+                            <td class="${hasOutliers ? 'text-rose' : ''}"><strong>${o.outlier_count || 0}</strong></td>
+                            <td>${Number(o.outlier_percentage || 0).toFixed(2)}%</td>
+                            <td>${Number(o.lower_threshold || 0).toFixed(2)}</td>
+                            <td>${Number(o.upper_threshold || 0).toFixed(2)}</td>
+                            <td>${o.confirmed_errors_count || 0}</td>
+                            <td>${o.statistical_outliers_count || (o.outlier_count || 0)}</td>
+                            <td style="text-align:center;">
+                                <button class="btn btn-outline btn-xs btn-drill-outlier" data-col="${escapeHtml(k)}">Drilldown</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
 
-    // Event: Outlier Method Selection
-    if (outlierMethodSelect) {
-        outlierMethodSelect.addEventListener('change', (e) => {
-            const val = e.target.value;
-            if (val === 'iqr') {
-                currentOutlierMethod = 'iqr';
-                currentOutlierParam = 1.5;
-                if (outlierParamLabel) outlierParamLabel.textContent = 'IQR Multiplier:';
-            } else if (val === 'iqr_extreme') {
-                currentOutlierMethod = 'iqr';
-                currentOutlierParam = 3.0;
-                if (outlierParamLabel) outlierParamLabel.textContent = 'IQR Multiplier:';
-            } else if (val === 'zscore') {
-                currentOutlierMethod = 'zscore';
-                currentOutlierParam = 3.0;
-                if (outlierParamLabel) outlierParamLabel.textContent = 'Z-Score (σ):';
-            } else if (val === 'zscore_sensitive') {
-                currentOutlierMethod = 'zscore';
-                currentOutlierParam = 2.5;
-                if (outlierParamLabel) outlierParamLabel.textContent = 'Z-Score (σ):';
-            } else if (val === 'modified_zscore') {
-                currentOutlierMethod = 'modified_zscore';
-                currentOutlierParam = 3.5;
-                if (outlierParamLabel) outlierParamLabel.textContent = 'MAD Threshold:';
-            }
-
-            if (outlierParamInput) outlierParamInput.value = currentOutlierParam;
-            loadOutlierData(activeDatasetId, currentOutlierMethod, currentOutlierParam);
-        });
-    }
-
-    // Event: Recalculate Outlier Bounds
-    if (btnRecalcOutliers) {
-        btnRecalcOutliers.addEventListener('click', () => {
-            if (outlierParamInput) {
-                currentOutlierParam = parseFloat(outlierParamInput.value) || 1.5;
-            }
-            loadOutlierData(activeDatasetId, currentOutlierMethod, currentOutlierParam);
-        });
-    }
-
-    // Event: Toggle Visualizations
-    if (viewOutlierBoxplotBtn) {
-        viewOutlierBoxplotBtn.addEventListener('click', () => {
-            currentOutlierVizMode = 'boxplot';
-            viewOutlierBoxplotBtn.classList.add('active');
-            if (viewOutlierDistBtn) viewOutlierDistBtn.classList.remove('active');
-            if (outlierDistSelectWrap) outlierDistSelectWrap.classList.add('hidden');
-            renderOutlierVisualization();
-        });
-    }
-
-    if (viewOutlierDistBtn) {
-        viewOutlierDistBtn.addEventListener('click', () => {
-            currentOutlierVizMode = 'distribution';
-            viewOutlierDistBtn.classList.add('active');
-            if (viewOutlierBoxplotBtn) viewOutlierBoxplotBtn.classList.remove('active');
-            if (outlierDistSelectWrap) outlierDistSelectWrap.classList.remove('hidden');
-            renderOutlierVisualization();
-        });
-    }
-
-    if (outlierDistColSelect) {
-        outlierDistColSelect.addEventListener('change', (e) => {
-            currentOutlierSelectedCol = e.target.value;
-            renderOutlierVisualization();
-        });
-    }
-
-    // Event: Outlier Table Search Filter
-    if (outlierTableSearch) {
-        outlierTableSearch.addEventListener('input', (e) => {
-            outlierTableSearchQuery = e.target.value.toLowerCase().trim();
-            renderOutliersSummaryTable();
-        });
-    }
-
-    // Event Delegation: Outlier Table Actions (Inspect & Chart buttons)
-    if (outliersSummaryTbody) {
-        outliersSummaryTbody.addEventListener('click', (e) => {
-            const inspectBtn = e.target.closest('.btn-inspect-outliers');
-            if (inspectBtn) {
-                const colName = inspectBtn.getAttribute('data-col');
-                if (colName) openOutlierInspectorModal(colName);
-                return;
-            }
-
-            const chartBtn = e.target.closest('.btn-view-outlier-chart');
-            if (chartBtn) {
-                const colName = chartBtn.getAttribute('data-col');
-                if (colName) {
-                    currentOutlierSelectedCol = colName;
-                    currentOutlierVizMode = 'distribution';
-                    if (viewOutlierDistBtn) viewOutlierDistBtn.classList.add('active');
-                    if (viewOutlierBoxplotBtn) viewOutlierBoxplotBtn.classList.remove('active');
-                    if (outlierDistSelectWrap) outlierDistSelectWrap.classList.remove('hidden');
-                    if (outlierDistColSelect) outlierDistColSelect.value = colName;
-                    renderOutlierVisualization();
-
-                    // Smooth scroll to chart
-                    const chartCard = document.querySelector('.outliers-viz-section');
-                    if (chartCard) chartCard.scrollIntoView({ behavior: 'smooth' });
-                }
-            }
-        });
-    }
-
-    // Modal Close Events
-    if (modalOutlierCloseBtn && outlierInspectorModal) {
-        modalOutlierCloseBtn.addEventListener('click', () => {
-            outlierInspectorModal.classList.add('hidden');
-        });
-        outlierInspectorModal.addEventListener('click', (e) => {
-            if (e.target === outlierInspectorModal) {
-                outlierInspectorModal.classList.add('hidden');
-            }
-        });
-    }
-
-    // Remediation Buttons
-    if (btnOutliersKeep) {
-        btnOutliersKeep.addEventListener('click', () => {
-            alert('✓ Outliers retained. All extreme observations marked as valid domain data.');
-        });
-    }
-
-    if (btnOutliersRemoveErrors) {
-        btnOutliersRemoveErrors.addEventListener('click', () => executeOutlierRemediation('remove_errors_only'));
-    }
-
-    if (btnOutliersCap) {
-        btnOutliersCap.addEventListener('click', () => executeOutlierRemediation('cap'));
-    }
-
-    if (btnOutliersRemove) {
-        btnOutliersRemove.addEventListener('click', () => executeOutlierRemediation('remove'));
-    }
-
-    // =========================================================================
-    // PHASE 8: AUTOMATIC VISUALIZATION ENGINE & CUSTOM CHART BUILDER
-    // =========================================================================
-
-    async function loadVisualizationData(datasetId) {
-        if (!datasetId) return;
-        try {
-            const res = await fetch(`/api/visualization/recommendations/${encodeURIComponent(datasetId)}?limit=12`);
-            const data = await res.json();
-            if (res.ok && data.success) {
-                allRecommendations = data.recommendations || [];
-                vizSchema = data.schema || {};
-
-                // Update badge counter
-                if (vizCountBadge) vizCountBadge.textContent = allRecommendations.length;
-                if (recFilterAllCount) recFilterAllCount.textContent = allRecommendations.length;
-
-                // Compute breakdown KPIs
-                let distCount = 0, relCount = 0, catCount = 0, trendCount = 0;
-                allRecommendations.forEach((r) => {
-                    const cat = (r.category || '').toLowerCase();
-                    if (cat.includes('dist')) distCount++;
-                    else if (cat.includes('rel')) relCount++;
-                    else if (cat.includes('cat')) catCount++;
-                    else if (cat.includes('trend')) trendCount++;
+                document.querySelectorAll('.btn-drill-outlier').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const colName = btn.getAttribute('data-col');
+                        openOutlierModal(colName);
+                    });
                 });
-
-                if (vizKpiTotalCount) vizKpiTotalCount.textContent = allRecommendations.length;
-                if (vizKpiDistCount) vizKpiDistCount.textContent = distCount;
-                if (vizKpiRelCount) vizKpiRelCount.textContent = relCount;
-                if (vizKpiCatCount) vizKpiCatCount.textContent = catCount;
-                if (vizKpiTrendCount) vizKpiTrendCount.textContent = trendCount;
-
-                renderRecommendedCharts();
-                populateCustomChartControls(allColumnsProfile, vizSchema);
             }
-        } catch (err) {
-            console.error('Failed to load visualization data:', err);
         }
+
+        // Outlier Method Switcher
+        const methodSelect = document.getElementById('outlier-method-select');
+        if (methodSelect) {
+            methodSelect.addEventListener('change', async (e) => {
+                activeOutlierMethod = e.target.value;
+                showToast(`Switching outlier detection method to ${activeOutlierMethod}...`, '🎯');
+                const outRes = await fetch(`/api/outliers/${activeDatasetId}?method=${activeOutlierMethod}`);
+                const outData = await outRes.json();
+                if (outData.success) {
+                    currentOutliers = outData.outliers;
+                    renderOutliersView(outData.boxplot_spec);
+                }
+            });
+        }
+
+        // Outlier Remediation Execution
+        document.getElementById('btn-execute-outlier-remediation')?.addEventListener('click', async () => {
+            const action = document.getElementById('remed-action-select')?.value || 'remove';
+            showToast(`Applying non-destructive outlier remediation (${action})...`, '🛠️');
+
+            try {
+                const res = await fetch(`/api/outliers/remediate/${activeDatasetId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action, method: activeOutlierMethod }),
+                });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error || 'Remediation failed');
+
+                showToast('Outliers remediated successfully! Saved as new processed dataset.', '✓');
+                setTimeout(() => {
+                    loadFullDatasetAnalytics(activeDatasetId);
+                }, 1000);
+            } catch (err) {
+                console.error('Remediation error:', err);
+                showToast(`Error: ${err.message}`, '⚠️');
+            }
+        });
     }
 
-    function renderRecommendedCharts() {
-        if (!recommendedChartsGrid) return;
+    // -------------------------------------------------------------
+    // VIEW 8: VISUALIZATIONS (RECOMMENDATIONS & BUILDER)
+    // -------------------------------------------------------------
+    function renderVisualizationsView() {
+        renderChartRecommendations();
+        populateCustomChartBuilderOptions();
+    }
 
-        const filtered = activeVizFilter === 'all'
-            ? allRecommendations
-            : allRecommendations.filter((r) => (r.category || '').toLowerCase() === activeVizFilter.toLowerCase());
+    function renderChartRecommendations() {
+        const grid = document.getElementById('viz-recommendations-grid');
+        if (!grid) return;
+
+        let filtered = allRecommendations;
+        if (activeVizFilter !== 'all') {
+            filtered = filtered.filter(r => (r.category || '').toLowerCase() === activeVizFilter.toLowerCase());
+        }
+
+        document.getElementById('viz-count-all').textContent = allRecommendations.length;
+        document.getElementById('viz-count-dist').textContent = allRecommendations.filter(r => (r.category || '').toLowerCase() === 'distribution').length;
+        document.getElementById('viz-count-rel').textContent = allRecommendations.filter(r => (r.category || '').toLowerCase() === 'relationship').length;
+        document.getElementById('viz-count-cat').textContent = allRecommendations.filter(r => (r.category || '').toLowerCase() === 'categorical').length;
+        document.getElementById('viz-count-temp').textContent = allRecommendations.filter(r => (r.category || '').toLowerCase() === 'temporal').length;
 
         if (filtered.length === 0) {
-            recommendedChartsGrid.innerHTML = `
-                <div class="viz-empty-card">
-                    <span class="empty-icon">📊</span>
-                    <h4>No Recommended Visualizations in this Category</h4>
-                    <p>Try switching filter tabs or use "Build Your Own Chart" below to create custom visualizations.</p>
-                </div>
-            `;
+            grid.innerHTML = '<div class="preview-card-placeholder">No chart recommendations match the selected category filter.</div>';
             return;
         }
 
-        recommendedChartsGrid.innerHTML = '';
+        grid.innerHTML = filtered.map((rec, idx) => `
+            <div class="dash-chart-card">
+                <div class="dash-chart-header">
+                    <div>
+                        <span class="chart-tag">${escapeHtml(rec.category || 'Chart')}</span>
+                        <h4 class="dash-chart-title" style="margin-top: 4px;">${escapeHtml(rec.title || `Chart #${idx + 1}`)}</h4>
+                    </div>
+                </div>
+                <div class="dash-chart-container" id="viz-rec-plot-${idx}"></div>
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">${escapeHtml(rec.rationale || '')}</p>
+            </div>
+        `).join('');
 
         filtered.forEach((rec, idx) => {
-            const card = document.createElement('div');
-            card.className = 'rec-chart-card';
-
-            const priorityBadgeClass = rec.priority === 'High' ? 'badge-rose' : 'badge-cyan';
-            const chartId = `plotly-rec-${rec.id}`;
-
-            card.innerHTML = `
-                <div class="rec-chart-header">
-                    <div class="rec-title-wrap">
-                        <div class="rec-badges-row">
-                            <span class="rec-rank-badge">#${idx + 1}</span>
-                            <span class="modal-type-badge ${priorityBadgeClass}">${escapeHtml(rec.priority)} Priority</span>
-                            <span class="rec-type-badge">${escapeHtml((rec.chart_type || '').toUpperCase())}</span>
-                            <span class="rec-category-badge">${escapeHtml(rec.category || '')}</span>
-                        </div>
-                        <h4 class="rec-chart-title">${escapeHtml(rec.title)}</h4>
-                    </div>
-                </div>
-                
-                <div class="rec-rationale-box">
-                    <span class="rationale-icon">💡</span>
-                    <p class="rationale-text">${escapeHtml(rec.rationale)}</p>
-                </div>
-
-                <div class="rec-plotly-container" id="${chartId}">
-                    <div class="chart-loading-placeholder">
-                        <div class="spinner"></div>
-                    </div>
-                </div>
-
-                <div class="rec-chart-footer">
-                    <div class="rec-cols-used">
-                        <span class="cols-label">Features:</span>
-                        ${(rec.columns_used || []).map(c => `<code class="col-pill">${escapeHtml(c)}</code>`).join(' ')}
-                    </div>
-                </div>
-            `;
-
-            recommendedChartsGrid.appendChild(card);
-
-            if (window.Plotly && rec.plotly_spec) {
-                setTimeout(() => {
-                    const el = document.getElementById(chartId);
-                    if (el) {
-                        Plotly.newPlot(chartId, rec.plotly_spec.data || [], rec.plotly_spec.layout || {}, rec.plotly_spec.config || PLOTLY_CONFIG);
-                    }
-                }, 40);
+            const plotDiv = document.getElementById(`viz-rec-plot-${idx}`);
+            if (plotDiv && rec.plotly_spec) {
+                const spec = rec.plotly_spec;
+                const layout = Object.assign({}, spec.layout || {}, {
+                    autosize: true,
+                    paper_bgcolor: 'transparent',
+                    plot_bgcolor: 'transparent',
+                    font: { color: '#cbd5e1', family: 'Plus Jakarta Sans' },
+                    margin: { l: 45, r: 25, t: 35, b: 45 },
+                });
+                Plotly.newPlot(plotDiv, spec.data || [], layout, { responsive: true });
             }
         });
     }
 
-    function populateCustomChartControls(columns, schema) {
-        if (!builderXCol || !builderYCol || !builderColorCol) return;
-
-        const colNames = (columns || []).map(c => (typeof c === 'object' && c !== null ? c.name : c)).filter(Boolean);
-
-        const prevX = builderXCol.value;
-        const prevY = builderYCol.value;
-        const prevColor = builderColorCol.value;
-
-        builderXCol.innerHTML = '<option value="">Select X Column...</option>';
-        builderYCol.innerHTML = '<option value="">None / Frequency Count</option>';
-        builderColorCol.innerHTML = '<option value="">No Grouping</option>';
-
-        colNames.forEach((col) => {
-            const optX = document.createElement('option');
-            optX.value = col;
-            optX.textContent = col;
-            if (col === prevX) optX.selected = true;
-            builderXCol.appendChild(optX);
-
-            const optY = document.createElement('option');
-            optY.value = col;
-            optY.textContent = col;
-            if (col === prevY) optY.selected = true;
-            builderYCol.appendChild(optY);
-
-            const optColor = document.createElement('option');
-            optColor.value = col;
-            optColor.textContent = col;
-            if (col === prevColor) optColor.selected = true;
-            builderColorCol.appendChild(optColor);
+    document.querySelectorAll('.viz-filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.viz-filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            activeVizFilter = btn.getAttribute('data-category');
+            renderChartRecommendations();
         });
+    });
 
-        if (!builderXCol.value && colNames.length > 0) {
-            builderXCol.value = colNames[0];
-            if (colNames.length > 1) {
-                builderYCol.value = colNames[1];
-            }
-        }
+    function populateCustomChartBuilderOptions() {
+        const xSelect = document.getElementById('custom-x-col');
+        const ySelect = document.getElementById('custom-y-col');
+        const colorSelect = document.getElementById('custom-color-col');
+
+        if (!xSelect || allColumnsProfile.length === 0) return;
+
+        const optionsHtml = allColumnsProfile.map(c => `<option value="${escapeHtml(c.column_name)}">${escapeHtml(c.column_name)} (${c.classified_type})</option>`).join('');
+
+        xSelect.innerHTML = `<option value="">Select feature...</option>` + optionsHtml;
+        if (ySelect) ySelect.innerHTML = `<option value="">None (Count / Frequency)</option>` + optionsHtml;
+        if (colorSelect) colorSelect.innerHTML = `<option value="">None</option>` + optionsHtml;
+
+        document.getElementById('btn-generate-custom-chart')?.addEventListener('click', generateCustomChart);
     }
 
-    async function executeGenerateCustomChart() {
-        if (!activeDatasetId) return;
+    async function generateCustomChart() {
+        const chartType = document.getElementById('custom-chart-type')?.value || 'bar';
+        const xCol = document.getElementById('custom-x-col')?.value;
+        const yCol = document.getElementById('custom-y-col')?.value || null;
+        const colorCol = document.getElementById('custom-color-col')?.value || null;
+        const aggregation = document.getElementById('custom-aggregation')?.value || 'none';
 
-        const xCol = builderXCol ? builderXCol.value : '';
         if (!xCol) {
-            alert('Please select an X-Axis column.');
+            showToast('Please select an X-Axis feature.', '⚠️');
             return;
         }
 
-        const yCol = builderYCol ? builderYCol.value : '';
-        const chartType = builderChartType ? builderChartType.value : 'bar';
-        const aggregation = builderAggregation ? builderAggregation.value : 'none';
-        const colorCol = builderColorCol ? builderColorCol.value : '';
-        const title = builderChartTitle ? builderChartTitle.value.trim() : '';
-
-        if (customPlotlyCanvas) {
-            customPlotlyCanvas.innerHTML = `
-                <div class="chart-loading-placeholder">
-                    <div class="spinner"></div>
-                    <p>Generating custom ${escapeHtml(chartType)} chart specification...</p>
-                </div>
-            `;
-        }
+        showToast('Generating custom visualization...', '🎨');
 
         try {
-            const res = await fetch(`/api/visualization/custom/${encodeURIComponent(activeDatasetId)}`, {
+            const res = await fetch(`/api/visualization/custom/${activeDatasetId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     chart_type: chartType,
                     x_col: xCol,
-                    y_col: yCol || null,
-                    color_col: colorCol || null,
+                    y_col: yCol,
+                    color_col: colorCol,
                     aggregation: aggregation,
-                    title: title || null,
                 }),
             });
-
             const data = await res.json();
-            if (res.ok && data.success && data.spec && customPlotlyCanvas) {
-                customPlotlyCanvas.innerHTML = '';
-                Plotly.newPlot(
-                    'custom-plotly-canvas',
-                    data.spec.data || [],
-                    data.spec.layout || {},
-                    data.spec.config || PLOTLY_CONFIG
-                );
-            } else {
-                if (customPlotlyCanvas) {
-                    customPlotlyCanvas.innerHTML = `
-                        <div class="builder-empty-placeholder text-rose">
-                            <span class="empty-icon">⚠️</span>
-                            <h4>Chart Generation Error</h4>
-                            <p>${escapeHtml(data.error || 'Could not generate custom chart.')}</p>
+            if (!data.success) throw new Error(data.error || 'Failed to generate chart');
+
+            const resultContainer = document.getElementById('custom-chart-result-container');
+            const plotDiv = document.getElementById('plotly-custom-chart');
+            const titleDisplay = document.getElementById('custom-chart-title-display');
+
+            if (resultContainer) resultContainer.classList.remove('hidden');
+            if (titleDisplay) titleDisplay.textContent = `${chartType.toUpperCase()} of ${xCol}${yCol ? ' vs ' + yCol : ''}`;
+
+            if (plotDiv && data.spec) {
+                const spec = data.spec;
+                const layout = Object.assign({}, spec.layout || {}, {
+                    autosize: true,
+                    paper_bgcolor: 'transparent',
+                    plot_bgcolor: 'transparent',
+                    font: { color: '#cbd5e1', family: 'Plus Jakarta Sans' },
+                });
+                Plotly.newPlot(plotDiv, spec.data || [], layout, { responsive: true });
+            }
+
+            showToast('Custom chart generated successfully!', '✓');
+        } catch (err) {
+            console.error('Custom chart error:', err);
+            showToast(`Error: ${err.message}`, '⚠️');
+        }
+    }
+
+    // -------------------------------------------------------------
+    // VIEW 9: AI INSIGHTS ENGINE
+    // -------------------------------------------------------------
+    function renderAiInsightsView() {
+        if (!currentInsights) return;
+
+        const setContent = (id, text) => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = text || 'Analysis metric verified.';
+        };
+
+        setContent('content-executive-summary', currentInsights.executive_summary);
+        setContent('content-key-findings', (currentInsights.key_findings || []).map(f => `&bull; ${escapeHtml(f)}`).join('<br><br>'));
+        setContent('content-correlations-patterns', (currentInsights.important_relationships || []).map(f => `&bull; ${escapeHtml(f)}`).join('<br><br>'));
+        setContent('content-data-quality-concerns', (currentInsights.data_quality_concerns || []).map(f => `&bull; ${escapeHtml(f)}`).join('<br><br>'));
+        setContent('content-potential-outliers', (currentInsights.anomalies_and_risks || currentInsights.potential_outliers || []).map(f => `&bull; ${escapeHtml(f)}`).join('<br><br>'));
+        setContent('content-business-recommendations', (currentInsights.strategic_recommendations || currentInsights.business_recommendations || []).map(f => `&bull; ${escapeHtml(f)}`).join('<br><br>'));
+
+        // Regenerate Button
+        document.getElementById('btn-regenerate-insights')?.addEventListener('click', async () => {
+            const provider = document.getElementById('ai-provider-select')?.value;
+            showToast(`Regenerating AI insights using ${provider}...`, '✨');
+            try {
+                const res = await fetch(`/api/insights/generate/${activeDatasetId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ provider }),
+                });
+                const data = await res.json();
+                if (data.success) {
+                    currentInsights = data.insights;
+                    renderAiInsightsView();
+                    renderDashboardExecutiveWidgets();
+                    showToast('AI insights successfully refreshed!', '✓');
+                }
+            } catch (err) {
+                showToast(`AI generation error: ${err.message}`, '⚠️');
+            }
+        });
+
+        // Inspect Raw Context Modal
+        const btnInspect = document.getElementById('btn-inspect-raw-context');
+        const dashBtnInspect = document.getElementById('dash-btn-inspect-context');
+        [btnInspect, dashBtnInspect].forEach(b => {
+            if (!b) return;
+            b.addEventListener('click', openRawContextModal);
+        });
+    }
+
+    async function openRawContextModal() {
+        const modal = document.getElementById('raw-context-modal');
+        const codeEl = document.getElementById('raw-context-json-content');
+        if (!modal) return;
+
+        modal.classList.remove('hidden');
+        if (codeEl) codeEl.textContent = 'Fetching exact structured Python context...';
+
+        try {
+            const res = await fetch(`/api/insights/context/${activeDatasetId}`);
+            const data = await res.json();
+            if (data.success && codeEl) {
+                codeEl.textContent = JSON.stringify(data.analysis_context, null, 2);
+            }
+        } catch (e) {
+            if (codeEl) codeEl.textContent = 'Failed to fetch analysis context.';
+        }
+    }
+
+    document.getElementById('modal-raw-context-close-btn')?.addEventListener('click', () => {
+        document.getElementById('raw-context-modal')?.classList.add('hidden');
+    });
+
+    // -------------------------------------------------------------
+    // VIEW 10: ASK DATASET (CONVERSATIONAL Q&A ASSISTANT)
+    // -------------------------------------------------------------
+    async function loadChatSuggestions() {
+        const chipsContainer = document.getElementById('chat-suggested-chips');
+        if (!chipsContainer) return;
+
+        try {
+            const res = await fetch(`/api/chat/suggested-questions/${activeDatasetId}`);
+            const data = await res.json();
+            if (data.success && data.suggestions) {
+                chipsContainer.innerHTML = data.suggestions.map(s => `
+                    <button class="chip-btn" data-query="${escapeHtml(s)}">${escapeHtml(s)}</button>
+                `).join('');
+
+                chipsContainer.querySelectorAll('.chip-btn').forEach(b => {
+                    b.addEventListener('click', () => {
+                        const q = b.getAttribute('data-query');
+                        const input = document.getElementById('chat-query-input');
+                        if (input) {
+                            input.value = q;
+                            sendChatQuery();
+                        }
+                    });
+                });
+            }
+        } catch (e) {
+            console.error('Failed to load chat suggestions:', e);
+        }
+    }
+
+    async function sendChatQuery() {
+        const input = document.getElementById('chat-query-input');
+        const sendBtn = document.getElementById('chat-send-btn');
+        const loader = document.getElementById('chat-loader');
+        const container = document.getElementById('chat-messages-container');
+
+        if (!input || !container) return;
+        const query = input.value.trim();
+        if (!query || isChatStreaming) return;
+
+        // Append User Message
+        const userMsgHtml = `
+            <div class="chat-message message-user">
+                <div class="message-avatar">👤</div>
+                <div class="message-content-wrap">
+                    <div class="message-sender-name">You</div>
+                    <div class="message-text">${escapeHtml(query)}</div>
+                </div>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', userMsgHtml);
+        input.value = '';
+        container.scrollTop = container.scrollHeight;
+
+        // Append Loading Agent Message
+        const tempMsgId = `agent-msg-${Date.now()}`;
+        const agentLoadingHtml = `
+            <div class="chat-message message-agent" id="${tempMsgId}">
+                <div class="message-avatar">⚡</div>
+                <div class="message-content-wrap">
+                    <div class="message-sender-name">AI Data Analyst</div>
+                    <div class="message-text">
+                        <span class="spinner-sm"></span> Formulating analysis plan & executing deterministic tool...
+                    </div>
+                </div>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', agentLoadingHtml);
+        container.scrollTop = container.scrollHeight;
+
+        isChatStreaming = true;
+        if (sendBtn) sendBtn.disabled = true;
+
+        try {
+            const res = await fetch('/api/chat/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    dataset_id: activeDatasetId,
+                    query: query,
+                }),
+            });
+            const data = await res.json();
+            const msgEl = document.getElementById(tempMsgId);
+
+            if (msgEl) {
+                const answerText = data.success ? (data.answer || 'Analysis complete.') : (`⚠️ ${data.error || 'Failed to process question'}`);
+                const plan = data.plan || {};
+                const plotId = `plot-${Date.now()}`;
+
+                let planHtml = '';
+                if (plan.steps && plan.steps.length > 0) {
+                    planHtml = `
+                        <div class="analysis-plan-box">
+                            <div class="analysis-plan-header">
+                                <span class="badge-plan-tool">Tool: ${escapeHtml(plan.tool || 'Python Engine')}</span>
+                                <span class="plan-steps-count">${plan.steps.length} Step Plan</span>
+                            </div>
+                            <ul class="plan-steps-list">
+                                ${plan.steps.map(s => `<li class="plan-step-item"><span class="step-check">✓</span> <span class="step-text">${escapeHtml(s)}</span></li>`).join('')}
+                            </ul>
                         </div>
                     `;
                 }
+
+                let plotHtml = '';
+                if (data.plotly_spec) {
+                    plotHtml = `<div class="chat-plot-box" id="${plotId}"></div>`;
+                }
+
+                msgEl.querySelector('.message-text').innerHTML = `
+                    ${planHtml}
+                    <div class="answer-body-markdown">${answerText.replace(/\n/g, '<br>')}</div>
+                    ${plotHtml}
+                `;
+
+                if (data.plotly_spec) {
+                    setTimeout(() => {
+                        const pDiv = document.getElementById(plotId);
+                        if (pDiv) {
+                            const spec = data.plotly_spec;
+                            const layout = Object.assign({}, spec.layout || {}, {
+                                autosize: true,
+                                paper_bgcolor: 'transparent',
+                                plot_bgcolor: 'transparent',
+                                font: { color: '#cbd5e1', family: 'Plus Jakarta Sans' },
+                            });
+                            Plotly.newPlot(pDiv, spec.data || [], layout, { responsive: true });
+                        }
+                    }, 50);
+                }
             }
         } catch (err) {
-            console.error('Failed to generate custom chart:', err);
-            if (customPlotlyCanvas) {
-                customPlotlyCanvas.innerHTML = `
-                    <div class="builder-empty-placeholder text-rose">
-                        <span class="empty-icon">⚠️</span>
-                        <h4>Chart Generation Request Failed</h4>
-                        <p>${escapeHtml(err.message)}</p>
-                    </div>
-                `;
+            console.error('Chat error:', err);
+            const msgEl = document.getElementById(tempMsgId);
+            if (msgEl) {
+                msgEl.querySelector('.message-text').textContent = `⚠️ Error: ${err.message}`;
             }
+        } finally {
+            isChatStreaming = false;
+            if (sendBtn) sendBtn.disabled = false;
+            container.scrollTop = container.scrollHeight;
         }
     }
 
-    // Event: Visualization Filter Buttons
-    vizFilterBtns.forEach((btn) => {
-        btn.addEventListener('click', () => {
-            const filterVal = btn.getAttribute('data-filter') || 'all';
-            activeVizFilter = filterVal;
-            vizFilterBtns.forEach((b) => b.classList.remove('active'));
-            btn.classList.add('active');
-            renderRecommendedCharts();
-        });
+    document.getElementById('chat-send-btn')?.addEventListener('click', sendChatQuery);
+    document.getElementById('chat-query-input')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') sendChatQuery();
     });
 
-    // Event: Generate Custom Chart Button
-    if (btnGenerateCustomChart) {
-        btnGenerateCustomChart.addEventListener('click', () => {
-            executeGenerateCustomChart();
-        });
-    }
-
-    // Event: Reset Custom Chart Button
-    if (btnResetCustomChart) {
-        btnResetCustomChart.addEventListener('click', () => {
-            if (builderChartType) builderChartType.value = 'bar';
-            if (builderAggregation) builderAggregation.value = 'none';
-            if (builderColorCol) builderColorCol.value = '';
-            if (builderChartTitle) builderChartTitle.value = '';
-            if (allColumnsProfile && allColumnsProfile.length > 0) {
-                if (builderXCol) builderXCol.value = allColumnsProfile[0].name || '';
-                if (builderYCol && allColumnsProfile.length > 1) {
-                    builderYCol.value = allColumnsProfile[1].name || '';
-                }
-            }
-            if (customPlotlyCanvas) {
-                customPlotlyCanvas.innerHTML = `
-                    <div class="builder-empty-placeholder">
-                        <span class="empty-icon">📊</span>
-                        <h4>Custom Chart Workbench Ready</h4>
-                        <p>Select your X and Y columns above and click "Generate / Update Chart" to render an interactive visualization.</p>
+    document.getElementById('btn-clear-chat-history')?.addEventListener('click', async () => {
+        try {
+            await fetch(`/api/chat/clear/${activeDatasetId}`, { method: 'POST' });
+            const container = document.getElementById('chat-messages-container');
+            if (container) {
+                container.innerHTML = `
+                    <div class="chat-message message-agent">
+                        <div class="message-avatar">⚡</div>
+                        <div class="message-content-wrap">
+                            <div class="message-sender-name">AI Data Analyst</div>
+                            <div class="message-text">Chat history cleared. Ready for your next question!</div>
+                        </div>
                     </div>
                 `;
             }
-        });
-    }
+            showToast('Chat history cleared.', '✓');
+        } catch (e) {}
+    });
 
-    // =========================================================================
-    // PHASE 9: AI INSIGHT ENGINE CONTROLLER
-    // =========================================================================
+    // -------------------------------------------------------------
+    // VIEW 11: REPORTS STUDIO (EXECUTIVE REPORT COMPILER)
+    // -------------------------------------------------------------
+    async function loadExecutiveReport() {
+        const htmlPreview = document.getElementById('report-html-preview');
+        const mdContent = document.getElementById('report-md-content');
+        if (!htmlPreview) return;
 
-    function renderMarkdownToHtml(md) {
-        if (!md) return '<p class="placeholder-text">No insights generated for this section.</p>';
-        let html = escapeHtml(md);
+        htmlPreview.innerHTML = `
+            <div class="report-loading-state">
+                <div class="spinner"></div>
+                <p>Compiling executive data analysis report...</p>
+            </div>
+        `;
 
-        // Code blocks
-        html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
-        // Inline code
-        html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-        // Bold
-        html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-        // Italics
-        html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-
-        const lines = html.split('\n');
-        let inList = false;
-        let processed = [];
-
-        lines.forEach((line) => {
-            const trimmed = line.trim();
-            if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-                if (!inList) {
-                    processed.push('<ul>');
-                    inList = true;
-                }
-                processed.push(`<li>${trimmed.substring(2)}</li>`);
-            } else {
-                if (inList) {
-                    processed.push('</ul>');
-                    inList = false;
-                }
-                if (trimmed.startsWith('### ')) {
-                    processed.push(`<h4>${trimmed.substring(4)}</h4>`);
-                } else if (trimmed.startsWith('## ')) {
-                    processed.push(`<h3>${trimmed.substring(3)}</h3>`);
-                } else if (trimmed.startsWith('# ')) {
-                    processed.push(`<h2>${trimmed.substring(2)}</h2>`);
-                } else if (trimmed.length > 0) {
-                    processed.push(`<p>${trimmed}</p>`);
-                }
-            }
-        });
-
-        if (inList) {
-            processed.push('</ul>');
-        }
-
-        return processed.join('\n');
-    }
-
-    async function loadAiProviders() {
         try {
-            const res = await fetch('/api/insights/providers');
+            const res = await fetch(`/api/report/generate/${activeDatasetId}`);
             const data = await res.json();
-            if (res.ok && data.success && data.providers) {
-                configuredAiProviders = data.providers;
-                const activeProv = data.active_provider || 'gemini';
+            if (!data.success) throw new Error(data.error || 'Failed to generate report');
 
-                if (aiProviderSelect) {
-                    aiProviderSelect.innerHTML = '';
-                    Object.entries(data.providers).forEach(([key, prov]) => {
-                        const opt = document.createElement('option');
-                        opt.value = key;
-                        const statusLabel = prov.configured ? '✓ Ready' : 'Key missing (Fallback)';
-                        opt.textContent = `${prov.name} (${statusLabel})`;
-                        if (key === activeProv) opt.selected = true;
-                        aiProviderSelect.appendChild(opt);
-                    });
-                }
+            currentReport = data;
 
-                updateAiModelOptions(activeProv);
+            // Render HTML preview
+            if (data.html) {
+                htmlPreview.innerHTML = data.html;
+            }
+
+            // Render Markdown preview
+            if (mdContent && data.markdown) {
+                mdContent.textContent = data.markdown;
+            }
+
+            // Wire Download Links
+            const dlMd = document.getElementById('btn-download-report-md');
+            const dlHtml = document.getElementById('btn-download-report-html');
+            if (dlMd) dlMd.href = `/api/report/download/${activeDatasetId}?format=md`;
+            if (dlHtml) dlHtml.href = `/api/report/download/${activeDatasetId}?format=html`;
+        } catch (err) {
+            console.error('Report error:', err);
+            htmlPreview.innerHTML = `<div class="error-card"><p>Failed to generate report: ${err.message}</p></div>`;
+        }
+    }
+
+    // Report Mode Switcher (HTML Presentation vs Markdown Source)
+    document.getElementById('btn-report-view-html')?.addEventListener('click', () => {
+        document.getElementById('btn-report-view-html').classList.add('active');
+        document.getElementById('btn-report-view-md').classList.remove('active');
+        document.getElementById('report-html-preview').classList.remove('hidden');
+        document.getElementById('report-md-preview').classList.add('hidden');
+    });
+
+    document.getElementById('btn-report-view-md')?.addEventListener('click', () => {
+        document.getElementById('btn-report-view-md').classList.add('active');
+        document.getElementById('btn-report-view-html').classList.remove('active');
+        document.getElementById('report-md-preview').classList.remove('hidden');
+        document.getElementById('report-html-preview').classList.add('hidden');
+    });
+
+    // Copy Markdown to Clipboard
+    document.getElementById('btn-copy-report-md')?.addEventListener('click', () => {
+        if (currentReport && currentReport.markdown) {
+            navigator.clipboard.writeText(currentReport.markdown);
+            showToast('Executive Report Markdown copied to clipboard!', '📋');
+        }
+    });
+
+    // Print to PDF
+    document.getElementById('btn-print-report')?.addEventListener('click', () => {
+        window.print();
+    });
+
+    // -------------------------------------------------------------
+    // Modal Handlers (Column Drilldown & Outlier Inspector)
+    // -------------------------------------------------------------
+    function openColumnModal(colName) {
+        const modal = document.getElementById('column-modal-backdrop');
+        const titleEl = document.getElementById('modal-col-name');
+        const typeEl = document.getElementById('modal-col-type');
+        const dtypeEl = document.getElementById('modal-col-dtype');
+        const bodyEl = document.getElementById('modal-col-body');
+        if (!modal) return;
+
+        const col = allColumnsProfile.find(c => c.column_name === colName);
+        if (!col) return;
+
+        titleEl.textContent = col.column_name;
+        typeEl.textContent = col.classified_type;
+        dtypeEl.textContent = col.pandas_dtype;
+
+        const samplesHtml = (col.sample_values || []).map(s => `<span class="val-pill">${escapeHtml(String(s))}</span>`).join(' ');
+
+        bodyEl.innerHTML = `
+            <div class="modal-metric-grid">
+                <div class="kpi-card"><div class="kpi-label">Valid Values</div><div class="kpi-value">${formatNumber(col.non_null_count)}</div></div>
+                <div class="kpi-card"><div class="kpi-label">Missing Count</div><div class="kpi-value text-amber">${formatNumber(col.missing_count)} (${Number(col.missing_percentage || 0).toFixed(1)}%)</div></div>
+                <div class="kpi-card"><div class="kpi-label">Unique Values</div><div class="kpi-value">${formatNumber(col.unique_count)}</div></div>
+            </div>
+            <div style="margin-top: 16px;">
+                <h4 style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">Sample Records:</h4>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">${samplesHtml || 'None'}</div>
+            </div>
+        `;
+
+        modal.classList.remove('hidden');
+    }
+
+    document.getElementById('modal-close-btn')?.addEventListener('click', () => {
+        document.getElementById('column-modal-backdrop')?.classList.add('hidden');
+    });
+
+    async function openOutlierModal(colName) {
+        const modal = document.getElementById('outlier-inspector-modal');
+        const titleEl = document.getElementById('modal-outlier-title');
+        const tbody = document.getElementById('modal-outlier-tbody');
+        if (!modal || !tbody) return;
+
+        titleEl.textContent = `Outlier Instances: ${colName}`;
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">Fetching row-level outlier audit records...</td></tr>';
+        modal.classList.remove('hidden');
+
+        try {
+            const res = await fetch(`/api/outliers/${activeDatasetId}/column/${encodeURIComponent(colName)}?method=${activeOutlierMethod}`);
+            const data = await res.json();
+            const resData = data.result || {};
+            const outliers = resData.outlier_instances || [];
+
+            if (outliers.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:#34d399;">✓ No outlier rows detected in this feature under selected threshold.</td></tr>';
+            } else {
+                tbody.innerHTML = outliers.slice(0, 50).map(o => `
+                    <tr>
+                        <td><code>#${o.row_index}</code></td>
+                        <td><strong>${o.value}</strong></td>
+                        <td><span class="badge ${o.bound_violated === 'Upper Bound' ? 'badge-rose' : 'badge-amber'}">${o.bound_violated}</span></td>
+                        <td>${Number(o.threshold || 0).toFixed(2)}</td>
+                        <td>${Number(o.deviation || 0).toFixed(2)}</td>
+                        <td><span class="badge ${o.classification === 'Confirmed Data Error' ? 'badge-rose' : 'badge-indigo'}">${o.classification || 'Outlier'}</span></td>
+                        <td style="font-size: 11.5px; color: var(--text-secondary);">${escapeHtml(o.rationale || '')}</td>
+                    </tr>
+                `).join('');
             }
         } catch (e) {
-            console.error('Failed to load AI providers:', e);
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:#fb7185;">Failed to load outlier instances.</td></tr>';
         }
     }
 
-    function updateAiModelOptions(providerKey) {
-        if (!aiModelSelect) return;
-        aiModelSelect.innerHTML = '';
-        const prov = configuredAiProviders[providerKey] || {};
-        const models = prov.models || ['default'];
-        models.forEach((m) => {
-            const opt = document.createElement('option');
-            opt.value = m;
-            opt.textContent = m;
-            if (m === prov.default_model) opt.selected = true;
-            aiModelSelect.appendChild(opt);
-        });
+    document.getElementById('modal-outlier-close-btn')?.addEventListener('click', () => {
+        document.getElementById('outlier-inspector-modal')?.classList.add('hidden');
+    });
 
-        if (aiProviderStatusText && aiProviderStatusBadge) {
-            if (prov.configured) {
-                aiProviderStatusText.textContent = `${prov.name} Ready`;
-                aiProviderStatusBadge.style.borderColor = 'rgba(16, 185, 129, 0.4)';
-                aiProviderStatusBadge.style.color = '#6ee7b7';
-            } else {
-                aiProviderStatusText.textContent = `${prov.name} (Deterministic Fallback)`;
-                aiProviderStatusBadge.style.borderColor = 'rgba(245, 158, 11, 0.4)';
-                aiProviderStatusBadge.style.color = '#fde68a';
-            }
-        }
-    }
-
-    async function loadDatasetInsights(datasetId, forceRefresh = false) {
-        if (!datasetId) return;
-
-        if (insightsLoading) insightsLoading.classList.remove('hidden');
-        if (insightsContainer) insightsContainer.classList.add('hidden');
-        if (btnGenerateText) btnGenerateText.textContent = 'Synthesizing...';
-
+    // -------------------------------------------------------------
+    // Sample Datasets Loader
+    // -------------------------------------------------------------
+    async function loadSampleDataset(sampleType) {
+        showToast(`Loading bundled sample ${sampleType} dataset...`, '⚡');
         try {
-            const url = `/api/insights/${encodeURIComponent(datasetId)}${forceRefresh ? '?refresh=true' : ''}`;
-            const res = await fetch(url);
+            const res = await fetch(`/api/sample/${sampleType}`, { method: 'POST' });
             const data = await res.json();
-
-            if (res.ok && data.success && data.insights) {
-                currentInsights = data.insights;
-                renderInsightsPayload(data.insights);
-            } else {
-                renderInsightsError(data.error || 'Failed to generate insights.');
+            if (data.success && data.dataset_id) {
+                showToast(`Sample dataset '${data.original_filename}' loaded!`, '✓');
+                await loadDatasetList();
+                loadFullDatasetAnalytics(data.dataset_id);
             }
         } catch (err) {
-            console.error('Failed to load insights:', err);
-            renderInsightsError(err.message);
-        } finally {
-            if (insightsLoading) insightsLoading.classList.add('hidden');
-            if (insightsContainer) insightsContainer.classList.remove('hidden');
-            if (btnGenerateText) btnGenerateText.textContent = 'Generate / Refresh Insights';
+            showToast(`Failed to load sample: ${err.message}`, '⚠️');
         }
     }
 
-    async function executeGenerateInsights() {
-        if (!activeDatasetId) return;
+    btnSampleEcommerce?.addEventListener('click', () => loadSampleDataset('ecommerce'));
+    btnSampleEmployee?.addEventListener('click', () => loadSampleDataset('employee'));
+    btnLoadSampleErr?.addEventListener('click', () => loadSampleDataset('ecommerce'));
 
-        const provider = aiProviderSelect ? aiProviderSelect.value : null;
-        const model = aiModelSelect ? aiModelSelect.value : null;
+    // Dataset Selector Switcher
+    datasetSelector?.addEventListener('change', (e) => {
+        const val = e.target.value;
+        if (val) loadFullDatasetAnalytics(val);
+    });
 
-        if (insightsLoading) insightsLoading.classList.remove('hidden');
-        if (insightsContainer) insightsContainer.classList.add('hidden');
-        if (btnGenerateText) btnGenerateText.textContent = 'Synthesizing LLM Insights...';
-
-        // Step animation progression
-        if (insightsLoadingStep) {
-            insightsLoadingStep.textContent = 'Assembling structured metrics from Python profiler, statistics, correlation, and outlier engines...';
-            setTimeout(() => {
-                if (insightsLoadingStep) {
-                    insightsLoadingStep.textContent = 'Synthesizing natural-language strategic report via AI engine...';
-                }
-            }, 600);
-        }
-
-        try {
-            const res = await fetch(`/api/insights/generate/${encodeURIComponent(activeDatasetId)}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ provider, model }),
-            });
-            const data = await res.json();
-
-            if (res.ok && data.success && data.insights) {
-                currentInsights = data.insights;
-                renderInsightsPayload(data.insights);
+    // -------------------------------------------------------------
+    // App Initialization
+    // -------------------------------------------------------------
+    async function init() {
+        await loadDatasetList();
+        if (activeDatasetId) {
+            loadFullDatasetAnalytics(activeDatasetId);
+        } else {
+            // Auto-load first dataset or sample if none selected
+            const firstOpt = datasetSelector?.options[1]?.value;
+            if (firstOpt) {
+                loadFullDatasetAnalytics(firstOpt);
             } else {
-                renderInsightsError(data.error || 'Failed to generate AI insights.');
-            }
-        } catch (err) {
-            console.error('Failed to trigger AI insight generation:', err);
-            renderInsightsError(err.message);
-        } finally {
-            if (insightsLoading) insightsLoading.classList.add('hidden');
-            if (insightsContainer) insightsContainer.classList.remove('hidden');
-            if (btnGenerateText) btnGenerateText.textContent = 'Generate / Refresh Insights';
-        }
-    }
-
-    function renderInsightsPayload(insightsData) {
-        const sections = insightsData.sections || {};
-        const meta = insightsData.metadata || {};
-        const ctx = insightsData.context_summary || {};
-
-        // 1. Executive Summary
-        if (contentExecutiveSummary) {
-            contentExecutiveSummary.innerHTML = renderMarkdownToHtml(sections.executive_summary);
-        }
-
-        // Meta Pills
-        if (pillDatasetDims) {
-            pillDatasetDims.textContent = `${ctx.total_rows || '--'} Rows × ${ctx.total_columns || '--'} Columns`;
-        }
-        if (pillDatasetHealth) {
-            pillDatasetHealth.textContent = `Grade ${ctx.health_grade || 'A'} (${ctx.health_score || '--'}/100)`;
-        }
-        if (pillEngineProvider) {
-            const modeText = meta.generation_mode === 'llm' ? 'Live LLM' : 'Verified Deterministic';
-            pillEngineProvider.textContent = `${meta.provider || 'AI'} • ${modeText}`;
-        }
-
-        // Remaining 7 sections
-        if (contentKeyFindings) {
-            contentKeyFindings.innerHTML = renderMarkdownToHtml(sections.key_findings);
-        }
-        if (contentImportantTrends) {
-            contentImportantTrends.innerHTML = renderMarkdownToHtml(sections.important_trends);
-        }
-        if (contentImportantRelationships) {
-            contentImportantRelationships.innerHTML = renderMarkdownToHtml(sections.important_relationships);
-        }
-        if (contentDataQualityConcerns) {
-            contentDataQualityConcerns.innerHTML = renderMarkdownToHtml(sections.data_quality_concerns);
-        }
-        if (contentPotentialOutliers) {
-            contentPotentialOutliers.innerHTML = renderMarkdownToHtml(sections.potential_outlier_findings);
-        }
-        if (contentBusinessRecommendations) {
-            contentBusinessRecommendations.innerHTML = renderMarkdownToHtml(sections.business_recommendations);
-        }
-        if (contentSuggestedFollowUp) {
-            contentSuggestedFollowUp.innerHTML = renderMarkdownToHtml(sections.suggested_follow_up);
-        }
-
-        // Update ready badge
-        if (insightsReadyBadge) {
-            insightsReadyBadge.textContent = '8 Sections Ready';
-        }
-    }
-
-    function renderInsightsError(errorMsg) {
-        if (contentExecutiveSummary) {
-            contentExecutiveSummary.innerHTML = `
-                <div class="builder-empty-placeholder text-rose">
-                    <span class="empty-icon">⚠️</span>
-                    <h4>AI Insight Engine Notice</h4>
-                    <p>${escapeHtml(errorMsg)}</p>
-                </div>
-            `;
-        }
-    }
-
-    function copyInsightsReport() {
-        if (!currentInsights || !currentInsights.raw_markdown) {
-            alert('No insights available to copy. Please generate insights first.');
-            return;
-        }
-
-        navigator.clipboard.writeText(currentInsights.raw_markdown).then(() => {
-            if (btnCopyInsights) {
-                const originalHtml = btnCopyInsights.innerHTML;
-                btnCopyInsights.innerHTML = '<span class="btn-icon">✓</span><span>Copied!</span>';
-                btnCopyInsights.classList.add('btn-success');
-                setTimeout(() => {
-                    btnCopyInsights.innerHTML = originalHtml;
-                    btnCopyInsights.classList.remove('btn-success');
-                }, 2000);
-            }
-        }).catch((err) => {
-            console.error('Failed to copy to clipboard:', err);
-            alert('Failed to copy report to clipboard.');
-        });
-    }
-
-    async function showRawContextModal(datasetId) {
-        if (!datasetId) return;
-
-        if (rawContextModal) rawContextModal.classList.remove('hidden');
-        if (rawContextJsonContent) rawContextJsonContent.textContent = 'Loading Python engine context...';
-
-        try {
-            const res = await fetch(`/api/insights/context/${encodeURIComponent(datasetId)}`);
-            const data = await res.json();
-            if (res.ok && data.success && data.analysis_context) {
-                if (rawContextJsonContent) {
-                    rawContextJsonContent.textContent = JSON.stringify(data.analysis_context, null, 2);
-                }
-            } else {
-                if (rawContextJsonContent) {
-                    rawContextJsonContent.textContent = 'Error loading analysis context.';
-                }
-            }
-        } catch (e) {
-            if (rawContextJsonContent) {
-                rawContextJsonContent.textContent = `Error: ${e.message}`;
+                loadSampleDataset('ecommerce');
             }
         }
     }
 
-    // Event Listeners - Phase 9
-    if (aiProviderSelect) {
-        aiProviderSelect.addEventListener('change', () => {
-            updateAiModelOptions(aiProviderSelect.value);
-        });
-    }
-
-    if (btnGenerateInsights) {
-        btnGenerateInsights.addEventListener('click', () => {
-            executeGenerateInsights();
-        });
-    }
-
-    if (btnCopyInsights) {
-        btnCopyInsights.addEventListener('click', () => {
-            copyInsightsReport();
-        });
-    }
-
-    if (btnViewRawContext) {
-        btnViewRawContext.addEventListener('click', () => {
-            showRawContextModal(activeDatasetId);
-        });
-    }
-
-    if (modalRawContextCloseBtn && rawContextModal) {
-        modalRawContextCloseBtn.addEventListener('click', () => {
-            rawContextModal.classList.add('hidden');
-        });
-    }
-
-    // Modal backdrop click close
-    if (rawContextModal) {
-        rawContextModal.addEventListener('click', (e) => {
-            if (e.target === rawContextModal) {
-                rawContextModal.classList.add('hidden');
-            }
-        });
-    }
-
-    // Initial Execution
-    (async () => {
-        await loadDatasetsList();
-        await loadDatasetDashboard(activeDatasetId);
-    })();
+    init();
 });
-
