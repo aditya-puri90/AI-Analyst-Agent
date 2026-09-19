@@ -90,6 +90,7 @@ from agent.question_router import (
 
 from analysis.tool_registry import registry
 from agent.planner import AnalysisPlanner
+from reports.report_generator import ReportGenerator
 
 # Configure logging
 logging.basicConfig(
@@ -159,17 +160,22 @@ def create_app() -> Flask:
         return jsonify({
             "status": "healthy",
             "service": "AI Data Analyst Agent",
-            "phase": "Phase 11: Intelligent Analysis Planning and Chart Generation",
+            "phase": "Phase 12: Professional Analytics Dashboard UI",
             "capabilities": [
                 "dataset_profiling",
+                "data_quality_auditing",
+                "cleaning_pipeline_studio",
                 "statistical_analysis",
                 "correlation_heatmaps",
-                "outlier_detection",
+                "outlier_detection_and_remediation",
                 "plotly_visualizations",
+                "custom_chart_builder",
                 "ai_executive_insights",
                 "natural_language_qa",
                 "intelligent_analysis_planning",
                 "controlled_python_tool_registry",
+                "executive_reports",
+                "professional_dashboard_ui",
             ],
             "max_upload_mb": Config.MAX_CONTENT_LENGTH / (1024 * 1024),
             "allowed_extensions": list(Config.ALLOWED_EXTENSIONS),
@@ -1102,6 +1108,63 @@ def create_app() -> Flask:
             "tools": tools_info,
             "execution_policy": "Strictly Controlled Registered Functions (No Arbitrary Code Execution)",
         })
+
+    # -------------------------------------------------------------
+    # Phase 12: Executive Report Generation & Export API Routes
+    # -------------------------------------------------------------
+    @app.route("/api/report/generate/<dataset_id>", methods=["GET", "POST"])
+    def generate_report_route(dataset_id: str):
+        """
+        Compile comprehensive executive report for the dataset in structured JSON,
+        formatted Markdown, and standalone styled HTML.
+        """
+        df, error = load_dataset(dataset_id)
+        if error or df is None:
+            return jsonify({"success": False, "error": error or "Dataset not found."}), 404
+
+        generator = ReportGenerator(df, dataset_id=dataset_id)
+        structured_data = generator.generate_structured_report()
+        markdown_text = generator.generate_markdown_report()
+        html_text = generator.generate_html_report()
+
+        return jsonify({
+            "success": True,
+            "dataset_id": dataset_id,
+            "report": structured_data,
+            "markdown": markdown_text,
+            "html": html_text,
+        })
+
+    @app.route("/api/report/download/<dataset_id>", methods=["GET"])
+    def download_report_route(dataset_id: str):
+        """
+        Download executive report as .html or .md attachment.
+        Query param 'format': 'html' (default) or 'md'.
+        """
+        report_format = request.args.get("format", "html").lower().strip()
+        df, error = load_dataset(dataset_id)
+        if error or df is None:
+            return jsonify({"success": False, "error": error or "Dataset not found."}), 404
+
+        generator = ReportGenerator(df, dataset_id=dataset_id)
+        
+        if report_format == "md" or report_format == "markdown":
+            content = generator.generate_markdown_report()
+            mimetype = "text/markdown"
+            filename = f"report_{dataset_id}.md"
+        else:
+            content = generator.generate_html_report()
+            mimetype = "text/html"
+            filename = f"report_{dataset_id}.html"
+
+        mem = io.BytesIO(content.encode("utf-8"))
+        mem.seek(0)
+        return send_file(
+            mem,
+            as_attachment=True,
+            download_name=filename,
+            mimetype=mimetype,
+        )
 
     return app
 
