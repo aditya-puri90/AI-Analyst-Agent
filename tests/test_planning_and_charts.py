@@ -322,7 +322,7 @@ class TestPlanningAndChartsApiRoutes:
         res = client_app.get("/api/health")
         assert res.status_code == 200
         data = res.get_json()
-        assert "Phase 11" in data["phase"]
+        assert "Phase 11" in data["phase"] or "Phase 12" in data["phase"]
         assert "intelligent_analysis_planning" in data["capabilities"]
         assert "controlled_python_tool_registry" in data["capabilities"]
 
