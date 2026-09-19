@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="AI Data Analyst Agent Dashboard - Automated Dataset Profiling, Data Quality Auditing, Cleaning Engine, and Exploration.">
-    <title>Dataset Profiler & Cleaning Dashboard | AI Data Analyst Agent</title>
+    <meta name="description" content="AI Data Analyst Agent Studio - Modern Professional Analytics Dashboard, Automated Profiling, Quality Auditing, Cleaning Engine, Statistical Modeling, Interactive Plotly Visualizations, AI Insights, and Conversational Q&A.">
+    <title>AI Data Analyst Studio | Professional Analytics Dashboard</title>
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- Core Styles -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
@@ -24,93 +24,139 @@
     
     <!-- Header Navigation -->
     <header class="main-header">
-        <div class="container nav-container">
+        <div class="container-fluid nav-container">
             <a href="/" class="brand-logo" id="brand-logo">
                 <div class="logo-icon">⚡</div>
                 <div class="logo-text">
                     <span class="logo-title">AI Data Analyst</span>
-                    <span class="logo-badge">PROFILER & CLEANER</span>
+                    <span class="logo-badge">STUDIO PRO</span>
                 </div>
             </a>
-            
-            <nav class="nav-links">
-                <a href="/" class="nav-link">Home</a>
-                <a href="/dashboard" class="nav-link active" id="nav-dashboard">Dashboard</a>
-                <a href="/chat{% if dataset_id %}?dataset_id={{ dataset_id }}{% endif %}" class="nav-link" id="nav-chat">Ask Your Dataset</a>
-                <div class="system-status-pill">
-                    <span class="status-dot"></span>
-                    <span>Phase 4 Cleaning Engine Active</span>
+
+            <!-- Active Dataset Pill in Header -->
+            <div class="header-dataset-meta" id="header-dataset-meta">
+                <div class="meta-pill" id="header-dataset-pill">
+                    <span class="meta-icon">📊</span>
+                    <span class="meta-name" id="header-dataset-name">No dataset loaded</span>
+                    <span class="meta-badge" id="header-dataset-status">Raw</span>
                 </div>
+                <div class="meta-quick-stats hidden" id="header-quick-stats">
+                    <span class="stat-tag" id="header-stat-rows">-- rows</span>
+                    <span class="stat-tag" id="header-stat-cols">-- cols</span>
+                    <span class="stat-tag" id="header-stat-grade">Health: --</span>
+                </div>
+            </div>
+            
+            <nav class="nav-actions-header">
+                <!-- Dataset Switcher -->
+                <div class="select-wrapper select-wrapper-sm">
+                    <select id="dataset-selector" class="custom-select custom-select-sm" title="Switch Dataset">
+                        <option value="">Select an uploaded dataset...</option>
+                    </select>
+                </div>
+
+                <!-- Sample Datasets Quick-Load Dropdown / Buttons -->
+                <button class="btn btn-outline btn-sm" id="btn-sample-ecommerce" title="Load Sample E-Commerce Dataset">
+                    <span>🛒 E-Commerce</span>
+                </button>
+                <button class="btn btn-outline btn-sm" id="btn-sample-employee" title="Load Sample Workforce Dataset">
+                    <span>💼 Workforce</span>
+                </button>
+
+                <a href="/" class="btn btn-primary btn-sm" id="upload-new-btn">
+                    <span>+ Upload CSV</span>
+                </a>
             </nav>
         </div>
     </header>
 
+    <!-- App Navigation Bar (11 Studio Sections) -->
+    <div class="app-nav-bar-wrap">
+        <div class="container-fluid">
+            <nav class="studio-tabs-bar" role="tablist" aria-label="Studio Navigation Tabs">
+                <!-- 1. Dashboard (Default) -->
+                <button class="studio-tab-btn active" id="tab-dashboard-btn" data-tab="dashboard-view" role="tab" aria-selected="true">
+                    <span class="tab-icon">📊</span>
+                    <span>Dashboard</span>
+                </button>
+
+                <!-- 2. Data Preview -->
+                <button class="studio-tab-btn" id="tab-preview-btn" data-tab="preview-view" role="tab" aria-selected="false">
+                    <span class="tab-icon">📑</span>
+                    <span>Data Preview</span>
+                </button>
+
+                <!-- 3. Data Quality -->
+                <button class="studio-tab-btn" id="tab-quality-btn" data-tab="quality-view" role="tab" aria-selected="false">
+                    <span class="tab-icon">🛡️</span>
+                    <span>Data Quality</span>
+                    <span class="badge-counter badge-amber" id="quality-issues-count-badge">0</span>
+                </button>
+
+                <!-- 4. Cleaning Studio -->
+                <button class="studio-tab-btn" id="tab-cleaning-btn" data-tab="cleaning-view" role="tab" aria-selected="false">
+                    <span class="tab-icon">🧹</span>
+                    <span>Cleaning</span>
+                </button>
+
+                <!-- 5. Statistics -->
+                <button class="studio-tab-btn" id="tab-statistics-btn" data-tab="statistics-view" role="tab" aria-selected="false">
+                    <span class="tab-icon">📈</span>
+                    <span>Statistics</span>
+                </button>
+
+                <!-- 6. Correlations -->
+                <button class="studio-tab-btn" id="tab-correlation-btn" data-tab="correlation-view" role="tab" aria-selected="false">
+                    <span class="tab-icon">🔗</span>
+                    <span>Correlations</span>
+                    <span class="badge-counter badge-indigo" id="correlation-count-badge">0</span>
+                </button>
+
+                <!-- 7. Outliers -->
+                <button class="studio-tab-btn" id="tab-outliers-btn" data-tab="outliers-view" role="tab" aria-selected="false">
+                    <span class="tab-icon">🎯</span>
+                    <span>Outliers</span>
+                    <span class="badge-counter badge-rose" id="outliers-count-badge">0</span>
+                </button>
+
+                <!-- 8. Visualizations -->
+                <button class="studio-tab-btn" id="tab-visualization-btn" data-tab="visualization-view" role="tab" aria-selected="false">
+                    <span class="tab-icon">📉</span>
+                    <span>Visualizations</span>
+                    <span class="badge-counter badge-cyan" id="viz-count-badge">0</span>
+                </button>
+
+                <!-- 9. AI Insights -->
+                <button class="studio-tab-btn studio-tab-btn-ai" id="tab-insights-btn" data-tab="insights-view" role="tab" aria-selected="false">
+                    <span class="tab-icon ai-sparkle">✨</span>
+                    <span>AI Insights</span>
+                    <span class="badge-pill-ai" id="insights-ready-badge">Ready</span>
+                </button>
+
+                <!-- 10. Ask Dataset -->
+                <button class="studio-tab-btn studio-tab-btn-chat" id="tab-chat-btn" data-tab="chat-view" role="tab" aria-selected="false">
+                    <span class="tab-icon">💬</span>
+                    <span>Ask Dataset</span>
+                </button>
+
+                <!-- 11. Reports -->
+                <button class="studio-tab-btn" id="tab-reports-btn" data-tab="reports-view" role="tab" aria-selected="false">
+                    <span class="tab-icon">📋</span>
+                    <span>Reports</span>
+                </button>
+            </nav>
+        </div>
+    </div>
+
     <!-- Main Container -->
-    <main class="container dashboard-main">
-        <!-- Top Toolbar: Dataset Selector & Actions -->
-        <section class="dashboard-toolbar">
-            <div class="dataset-meta-info">
-                <div class="dataset-icon">📊</div>
-                <div>
-                    <h1 class="dataset-title" id="active-dataset-name">Loading Dataset Profile...</h1>
-                    <div class="dataset-sub-meta">
-                        <span id="active-dataset-id" class="meta-tag">{{ dataset_id if dataset_id else 'No dataset loaded' }}</span>
-                        <span id="active-dataset-size" class="meta-tag">-- KB</span>
-                        <span id="active-dataset-status" class="meta-tag meta-tag-accent hidden">Cleaned Dataset Available</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="toolbar-actions">
-                <div class="select-wrapper">
-                    <select id="dataset-selector" class="custom-select" title="Switch Dataset">
-                        <option value="">Select an uploaded dataset...</option>
-                    </select>
-                </div>
-                <a href="/" class="btn btn-outline" id="upload-new-btn">
-                    <span>+ Upload CSV</span>
-                </a>
-                <a href="/chat{% if dataset_id %}?dataset_id={{ dataset_id }}{% endif %}" class="btn btn-primary" id="open-chat-btn">
-                    <span>💬 Ask Your Dataset</span>
-                </a>
-            </div>
-        </section>
-
-            <button class="studio-tab-btn studio-tab-btn-ai" id="tab-insights-btn" data-tab="insights-view">
-                <span class="ai-sparkle">✨</span>
-                <span>AI Insights Engine</span>
-                <span class="badge-pill-ai" id="insights-ready-badge">Ready</span>
-            </button>
-            <button class="studio-tab-btn" id="tab-profiler-btn" data-tab="profiler-view">
-                <span>📊 Dataset Profiler & Overview</span>
-            </button>
-            <button class="studio-tab-btn" id="tab-statistics-btn" data-tab="statistics-view">
-                <span>📈 Statistical Analysis</span>
-            </button>
-            <button class="studio-tab-btn" id="tab-correlation-btn" data-tab="correlation-view">
-                <span>🔗 Correlation Analysis</span>
-            </button>
-            <button class="studio-tab-btn" id="tab-outliers-btn" data-tab="outliers-view">
-                <span>🎯 Outlier Detection</span>
-                <span class="badge-counter" id="outliers-count-badge">0</span>
-            </button>
-            <button class="studio-tab-btn" id="tab-visualization-btn" data-tab="visualization-view">
-                <span>📈 Visualizations</span>
-                <span class="badge-counter" id="viz-count-badge">0</span>
-            </button>
-            <button class="studio-tab-btn" id="tab-cleaning-btn" data-tab="cleaning-view">
-                <span>🧹 Data Quality & Cleaning Studio</span>
-                <span class="badge-counter" id="cleaning-issues-badge">0</span>
-            </button>
-            <button class="studio-tab-btn" id="tab-preview-btn" data-tab="preview-view">
-                <span>📑 Data Explorer</span>
-            </button>
-        </section>
-
+    <main class="container-fluid dashboard-main">
         <!-- Loading State Indicator -->
         <div class="dashboard-loading" id="dashboard-loading">
             <div class="spinner"></div>
-            <p>Running automated dataset profiling, auditing 12 data quality defect categories, and computing statistical bounds...</p>
+            <div class="loading-text">
+                <h3>Profiling & Computing Analytics...</h3>
+                <p>Running automated dataset profiling, auditing 12 data quality defect rules, calculating statistical moments, correlations, and outlier bounds...</p>
+            </div>
         </div>
 
         <!-- Error State Indicator -->
@@ -118,8 +164,11 @@
             <div class="error-card">
                 <div class="error-icon">⚠️</div>
                 <h3 id="error-title">No Dataset Loaded</h3>
-                <p id="error-message">Please select an existing dataset or upload a new CSV file to view automated profiling analytics.</p>
-                <a href="/" class="btn btn-primary">Go to CSV Upload</a>
+                <p id="error-message">Please select an existing dataset or upload a new CSV file to view automated analytics.</p>
+                <div class="error-actions">
+                    <a href="/" class="btn btn-primary">Go to CSV Upload</a>
+                    <button class="btn btn-outline" id="btn-load-sample-err">Load Sample Dataset</button>
+                </div>
             </div>
         </div>
 
@@ -127,13 +176,36 @@
         <div class="dashboard-content hidden" id="dashboard-content">
             
             <!-- ========================================================= -->
-            <!-- TAB 1: DATASET PROFILER VIEW -->
+            <!-- VIEW 1: EXECUTIVE DASHBOARD (10 MANDATORY WIDGETS) -->
             <!-- ========================================================= -->
-            <div class="studio-tab-content active" id="profiler-view">
-                <!-- 1. DATASET OVERVIEW CARDS -->
-                <section class="overview-section">
+            <div class="studio-tab-content active" id="dashboard-view" role="tabpanel">
+                
+                <!-- Dashboard Welcome & Meta Header -->
+                <div class="dash-hero-banner">
+                    <div class="dash-hero-info">
+                        <div class="dash-hero-title-row">
+                            <h1 class="dash-hero-title" id="dash-active-dataset-name">Dataset Executive Dashboard</h1>
+                            <span class="badge-status-processed hidden" id="dash-processed-badge">Cleaned Processed Dataset</span>
+                        </div>
+                        <p class="dash-hero-desc" id="dash-active-dataset-desc">Comprehensive structural metrics, data health audit, statistical findings, top correlations, outlier summary, AI executive takeaways, and recommended visualizations.</p>
+                    </div>
+                    <div class="dash-hero-actions">
+                        <button class="btn btn-outline btn-sm" id="dash-btn-inspect-context" title="View Exact Python Facts Context">
+                            <span>🔍 Grounding Context</span>
+                        </button>
+                        <button class="btn btn-primary btn-sm" id="dash-btn-jump-reports">
+                            <span>📋 Export Report</span>
+                        </button>
+                        <button class="btn btn-ai btn-sm" id="dash-btn-jump-chat">
+                            <span>💬 Ask AI</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 1. DATASET OVERVIEW CARDS (6 Metrics) -->
+                <section class="dash-section">
                     <div class="section-title-wrap">
-                        <h2 class="section-title">Dataset Overview</h2>
+                        <h2 class="section-title">1. Dataset Overview</h2>
                         <span class="section-badge">Structural Metrics</span>
                     </div>
                     <div class="kpi-grid">
@@ -142,7 +214,7 @@
                             <div class="kpi-meta">
                                 <div class="kpi-label">Total Rows</div>
                                 <div class="kpi-value" id="kpi-rows">--</div>
-                                <div class="kpi-hint">Observational records</div>
+                                <div class="kpi-hint" id="kpi-rows-hint">Observational records</div>
                             </div>
                         </div>
                         <div class="kpi-card">
@@ -150,146 +222,535 @@
                             <div class="kpi-meta">
                                 <div class="kpi-label">Total Columns</div>
                                 <div class="kpi-value" id="kpi-cols">--</div>
-                                <div class="kpi-hint">Features / Dimensions</div>
+                                <div class="kpi-hint" id="kpi-cols-hint">Features / Dimensions</div>
                             </div>
                         </div>
                         <div class="kpi-card">
-                            <div class="kpi-icon-wrap icon-purple">💾</div>
+                            <div class="kpi-icon-wrap icon-purple">🔢</div>
                             <div class="kpi-meta">
-                                <div class="kpi-label">Memory Usage</div>
+                                <div class="kpi-label">Total Data Cells</div>
+                                <div class="kpi-value" id="kpi-cells">--</div>
+                                <div class="kpi-hint">Matrix entries ($N \times M$)</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-icon-wrap icon-indigo">💾</div>
+                            <div class="kpi-meta">
+                                <div class="kpi-label">Memory Footprint</div>
                                 <div class="kpi-value" id="kpi-memory">--</div>
-                                <div class="kpi-hint" id="kpi-memory-bytes">In-memory footprint</div>
+                                <div class="kpi-hint" id="kpi-memory-bytes">In-memory RAM footprint</div>
                             </div>
                         </div>
                         <div class="kpi-card">
-                            <div class="kpi-icon-wrap icon-amber">❓</div>
+                            <div class="kpi-icon-wrap icon-amber">🗂️</div>
                             <div class="kpi-meta">
-                                <div class="kpi-label">Missing Cells</div>
-                                <div class="kpi-value" id="kpi-missing">--</div>
-                                <div class="kpi-hint" id="kpi-missing-hint">0.0% overall missingness</div>
+                                <div class="kpi-label">File Type & Size</div>
+                                <div class="kpi-value" id="kpi-file-size">--</div>
+                                <div class="kpi-hint" id="kpi-file-format">CSV Format (UTF-8)</div>
                             </div>
                         </div>
-                        <div class="kpi-card">
-                            <div class="kpi-icon-wrap icon-rose">🔁</div>
+                        <div class="kpi-card kpi-card-status">
+                            <div class="kpi-icon-wrap icon-emerald">🛡️</div>
                             <div class="kpi-meta">
-                                <div class="kpi-label">Duplicate Rows</div>
-                                <div class="kpi-value" id="kpi-duplicates">--</div>
-                                <div class="kpi-hint" id="kpi-duplicates-hint">0.0% redundancy rate</div>
-                            </div>
-                        </div>
-                        <div class="kpi-card kpi-card-quality">
-                            <div class="kpi-icon-wrap icon-emerald">⭐</div>
-                            <div class="kpi-meta">
-                                <div class="kpi-label">Data Health Grade</div>
-                                <div class="kpi-value quality-grade-val" id="kpi-health-grade">--</div>
-                                <div class="kpi-hint" id="kpi-health-score">Score: --/100</div>
+                                <div class="kpi-label">Processing Status</div>
+                                <div class="kpi-value status-text" id="kpi-processing-status">Raw Upload</div>
+                                <div class="kpi-hint" id="kpi-processing-hint">Immutable in data/uploads/</div>
                             </div>
                         </div>
                     </div>
                 </section>
 
-                <!-- 2. DATA QUALITY SUMMARY -->
-                <section class="quality-summary-section">
-                    <div class="quality-card">
-                        <div class="quality-header">
-                            <div>
-                                <h2 class="section-title">Data Quality & Health Summary</h2>
-                                <p class="quality-subtitle">Automated integrity scoring across completeness, uniqueness, and feature distributions</p>
+                <!-- 2, 3, 4, 5. QUALITY SCORE, MISSING VALUES, DUPLICATES, COLUMN BREAKDOWN (2x2 Grid) -->
+                <div class="dash-grid-2x2">
+                    
+                    <!-- 2. DATA QUALITY SCORE -->
+                    <div class="dash-card quality-score-card">
+                        <div class="dash-card-header">
+                            <div class="header-left">
+                                <span class="dash-card-icon icon-emerald">⭐</span>
+                                <div>
+                                    <h3 class="dash-card-title">2. Data Quality Score</h3>
+                                    <p class="dash-card-subtitle">Automated integrity scoring across 12 quality rules</p>
+                                </div>
                             </div>
-                            <div class="quality-status-badge" id="quality-status-badge">
-                                <span class="status-indicator"></span>
-                                <span id="quality-status-text">Analyzing Quality...</span>
+                            <span class="badge-grade" id="dash-quality-grade">A+</span>
+                        </div>
+                        <div class="quality-score-body">
+                            <div class="radial-gauge-wrap">
+                                <svg class="radial-gauge-svg" viewBox="0 0 120 120">
+                                    <circle class="gauge-bg" cx="60" cy="60" r="50"></circle>
+                                    <circle class="gauge-fill" id="dash-gauge-fill" cx="60" cy="60" r="50"></circle>
+                                </svg>
+                                <div class="gauge-center-text">
+                                    <span class="gauge-score" id="dash-quality-score">100</span>
+                                    <span class="gauge-max">/ 100</span>
+                                </div>
+                            </div>
+                            <div class="quality-score-details">
+                                <div class="quality-status-headline" id="dash-quality-status">Optimal Data Health</div>
+                                <div class="quality-stat-row">
+                                    <span class="stat-name">Audit Rules Passed:</span>
+                                    <strong id="dash-rules-passed">12 / 12</strong>
+                                </div>
+                                <div class="quality-stat-row">
+                                    <span class="stat-name">Detected Issues:</span>
+                                    <strong class="text-amber" id="dash-issues-detected">0 issues</strong>
+                                </div>
+                                <button class="btn btn-outline btn-xs" id="dash-btn-view-quality">
+                                    <span>View Quality Audit &rarr;</span>
+                                </button>
                             </div>
                         </div>
+                    </div>
 
-                        <div class="quality-grid">
-                            <div class="quality-meter-col">
-                                <div class="score-circle-wrap">
-                                    <div class="score-number" id="quality-score-display">--</div>
-                                    <div class="score-label">OUT OF 100</div>
-                                </div>
-                                <div class="quality-checks-count" id="quality-checks-count">Passed 5 of 5 checks</div>
-                            </div>
-
-                            <div class="quality-bars-col">
-                                <div class="quality-bar-item">
-                                    <div class="quality-bar-header">
-                                        <span>Completeness Score</span>
-                                        <strong id="completeness-score-val">--%</strong>
-                                    </div>
-                                    <div class="progress-bar-bg">
-                                        <div class="progress-bar-fill fill-emerald" id="completeness-bar-fill" style="width: 0%;"></div>
-                                    </div>
-                                    <span class="quality-bar-hint">100% minus total missing cell percentage</span>
-                                </div>
-
-                                <div class="quality-bar-item">
-                                    <div class="quality-bar-header">
-                                        <span>Uniqueness Score</span>
-                                        <strong id="uniqueness-score-val">--%</strong>
-                                    </div>
-                                    <div class="progress-bar-bg">
-                                        <div class="progress-bar-fill fill-indigo" id="uniqueness-bar-fill" style="width: 0%;"></div>
-                                    </div>
-                                    <span class="quality-bar-hint">100% minus duplicate row rate</span>
+                    <!-- 3. MISSING VALUE SUMMARY -->
+                    <div class="dash-card missing-summary-card">
+                        <div class="dash-card-header">
+                            <div class="header-left">
+                                <span class="dash-card-icon icon-amber">❓</span>
+                                <div>
+                                    <h3 class="dash-card-title">3. Missing Value Summary</h3>
+                                    <p class="dash-card-subtitle">Null / NaN cell distribution & completeness</p>
                                 </div>
                             </div>
+                            <span class="stat-tag-amber" id="dash-missing-badge">0.0% Missing</span>
+                        </div>
+                        <div class="missing-summary-body">
+                            <div class="missing-overview-stats">
+                                <div class="mini-stat-col">
+                                    <span class="mini-stat-label">Total Null Cells</span>
+                                    <span class="mini-stat-val text-amber" id="dash-missing-cells-count">0</span>
+                                </div>
+                                <div class="mini-stat-col">
+                                    <span class="mini-stat-label">Completeness Rate</span>
+                                    <span class="mini-stat-val text-emerald" id="dash-completeness-rate">100.0%</span>
+                                </div>
+                                <div class="mini-stat-col">
+                                    <span class="mini-stat-label">Columns Affected</span>
+                                    <span class="mini-stat-val" id="dash-missing-cols-affected">0 of 0</span>
+                                </div>
+                            </div>
+                            <div class="top-missing-bars" id="dash-top-missing-bars">
+                                <div class="empty-state-text">No missing values detected. Perfect 100% data completeness!</div>
+                            </div>
+                            <button class="btn btn-outline btn-xs" id="dash-btn-clean-missing">
+                                <span>Clean Missing Data &rarr;</span>
+                            </button>
+                        </div>
+                    </div>
 
-                            <div class="quality-insights-col">
-                                <h4 class="insights-title">Quality Insights & Findings</h4>
-                                <ul class="insights-list" id="quality-insights-list">
-                                    <li>Loading quality findings...</li>
-                                </ul>
+                    <!-- 4. DUPLICATE SUMMARY -->
+                    <div class="dash-card duplicate-summary-card">
+                        <div class="dash-card-header">
+                            <div class="header-left">
+                                <span class="dash-card-icon icon-rose">🔁</span>
+                                <div>
+                                    <h3 class="dash-card-title">4. Duplicate Summary</h3>
+                                    <p class="dash-card-subtitle">Record redundancy & uniqueness assessment</p>
+                                </div>
+                            </div>
+                            <span class="stat-tag-emerald" id="dash-dup-badge">0 Duplicates</span>
+                        </div>
+                        <div class="duplicate-summary-body">
+                            <div class="dup-stats-row">
+                                <div class="mini-stat-col">
+                                    <span class="mini-stat-label">Duplicate Rows</span>
+                                    <span class="mini-stat-val" id="dash-dup-rows-count">0</span>
+                                </div>
+                                <div class="mini-stat-col">
+                                    <span class="mini-stat-label">Redundancy Rate</span>
+                                    <span class="mini-stat-val" id="dash-dup-pct">0.0%</span>
+                                </div>
+                                <div class="mini-stat-col">
+                                    <span class="mini-stat-label">Uniqueness Score</span>
+                                    <span class="mini-stat-val text-indigo" id="dash-uniqueness-score">100.0%</span>
+                                </div>
+                            </div>
+                            <p class="dup-summary-text" id="dash-dup-desc">Zero duplicate rows found. Every observational record in the dataset is unique.</p>
+                            <button class="btn btn-outline btn-xs" id="dash-btn-deduplicate">
+                                <span>Deduplicate Dataset &rarr;</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 5. NUMERICAL / CATEGORICAL COLUMN COUNTS -->
+                    <div class="dash-card column-types-card">
+                        <div class="dash-card-header">
+                            <div class="header-left">
+                                <span class="dash-card-icon icon-cyan">🏷️</span>
+                                <div>
+                                    <h3 class="dash-card-title">5. Column Type Breakdown</h3>
+                                    <p class="dash-card-subtitle">Semantic data type classification</p>
+                                </div>
+                            </div>
+                            <span class="stat-tag-cyan" id="dash-total-features-pill">0 Features</span>
+                        </div>
+                        <div class="column-types-body">
+                            <!-- Visual Proportional Distribution Bar -->
+                            <div class="type-dist-bar-wrap">
+                                <div class="type-dist-bar" id="dash-type-dist-bar">
+                                    <div class="type-bar-segment seg-num" style="width: 50%;" title="Numerical"></div>
+                                    <div class="type-bar-segment seg-cat" style="width: 30%;" title="Categorical"></div>
+                                    <div class="type-bar-segment seg-date" style="width: 10%;" title="Datetime"></div>
+                                    <div class="type-bar-segment seg-bool" style="width: 10%;" title="Boolean"></div>
+                                </div>
+                            </div>
+
+                            <!-- Breakdown Pills Grid -->
+                            <div class="type-chips-grid">
+                                <div class="type-chip-card chip-num">
+                                    <span class="chip-icon">🔢</span>
+                                    <div class="chip-info">
+                                        <span class="chip-label">Numerical</span>
+                                        <strong class="chip-count" id="dash-count-num">0</strong>
+                                    </div>
+                                </div>
+                                <div class="type-chip-card chip-cat">
+                                    <span class="chip-icon">🏷️</span>
+                                    <div class="chip-info">
+                                        <span class="chip-label">Categorical</span>
+                                        <strong class="chip-count" id="dash-count-cat">0</strong>
+                                    </div>
+                                </div>
+                                <div class="type-chip-card chip-date">
+                                    <span class="chip-icon">📅</span>
+                                    <div class="chip-info">
+                                        <span class="chip-label">Datetime</span>
+                                        <strong class="chip-count" id="dash-count-date">0</strong>
+                                    </div>
+                                </div>
+                                <div class="type-chip-card chip-bool">
+                                    <span class="chip-icon">⚖️</span>
+                                    <div class="chip-info">
+                                        <span class="chip-label">Boolean</span>
+                                        <strong class="chip-count" id="dash-count-bool">0</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- 6, 7, 8. STATISTICAL FINDINGS, TOP CORRELATIONS, OUTLIER SUMMARY (3 Columns) -->
+                <div class="dash-grid-3col">
+                    
+                    <!-- 6. IMPORTANT STATISTICAL FINDINGS -->
+                    <div class="dash-card stat-findings-card">
+                        <div class="dash-card-header">
+                            <div class="header-left">
+                                <span class="dash-card-icon icon-purple">📈</span>
+                                <div>
+                                    <h3 class="dash-card-title">6. Statistical Findings</h3>
+                                    <p class="dash-card-subtitle">Automated mathematical observations & distribution traits</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-findings-body" id="dash-stat-findings-list">
+                            <div class="finding-item-box">
+                                <span class="finding-badge badge-cyan">Distribution</span>
+                                <p class="finding-text">Computing skewness, variance, and kurtosis observations...</p>
+                            </div>
+                        </div>
+                        <div class="dash-card-footer">
+                            <button class="btn btn-outline btn-xs" id="dash-btn-view-stats">
+                                <span>View Descriptive Statistics Table &rarr;</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 7. TOP CORRELATIONS -->
+                    <div class="dash-card top-corr-card">
+                        <div class="dash-card-header">
+                            <div class="header-left">
+                                <span class="dash-card-icon icon-indigo">🔗</span>
+                                <div>
+                                    <h3 class="dash-card-title">7. Top Correlations</h3>
+                                    <p class="dash-card-subtitle">Strongest linear feature associations (Pearson r)</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="top-corr-body" id="dash-top-corr-container">
+                            <div class="corr-highlight-box pos-corr">
+                                <div class="corr-highlight-header">
+                                    <span class="corr-type-tag tag-pos">Strongest Positive</span>
+                                    <span class="corr-r-val" id="dash-pos-corr-r">+0.00</span>
+                                </div>
+                                <div class="corr-pair-names" id="dash-pos-corr-pair">Feature A & Feature B</div>
+                                <div class="corr-bar-track">
+                                    <div class="corr-bar-fill fill-pos" id="dash-pos-corr-bar" style="width: 0%;"></div>
+                                </div>
+                            </div>
+                            <div class="corr-highlight-box neg-corr">
+                                <div class="corr-highlight-header">
+                                    <span class="corr-type-tag tag-neg">Strongest Negative</span>
+                                    <span class="corr-r-val" id="dash-neg-corr-r">-0.00</span>
+                                </div>
+                                <div class="corr-pair-names" id="dash-neg-corr-pair">Feature X & Feature Y</div>
+                                <div class="corr-bar-track">
+                                    <div class="corr-bar-fill fill-neg" id="dash-neg-corr-bar" style="width: 0%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="dash-card-footer">
+                            <button class="btn btn-outline btn-xs" id="dash-btn-view-corr">
+                                <span>Open Full Correlation Heatmap &rarr;</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 8. OUTLIER SUMMARY -->
+                    <div class="dash-card outlier-summary-card">
+                        <div class="dash-card-header">
+                            <div class="header-left">
+                                <span class="dash-card-icon icon-rose">🎯</span>
+                                <div>
+                                    <h3 class="dash-card-title">8. Outlier Summary</h3>
+                                    <p class="dash-card-subtitle">Anomalous values detected (IQR 1.5x fence)</p>
+                                </div>
+                            </div>
+                            <span class="badge-counter badge-rose" id="dash-outlier-badge-count">0</span>
+                        </div>
+                        <div class="outlier-summary-body">
+                            <div class="outlier-kpi-split">
+                                <div class="mini-stat-col">
+                                    <span class="mini-stat-label">Total Outliers</span>
+                                    <span class="mini-stat-val text-rose" id="dash-outliers-total">0</span>
+                                </div>
+                                <div class="mini-stat-col">
+                                    <span class="mini-stat-label">Affected Features</span>
+                                    <span class="mini-stat-val text-amber" id="dash-outliers-cols-count">0</span>
+                                </div>
+                                <div class="mini-stat-col">
+                                    <span class="mini-stat-label">Rows Impacted</span>
+                                    <span class="mini-stat-val" id="dash-outliers-row-pct">0.0%</span>
+                                </div>
+                            </div>
+                            <div class="outlier-columns-list" id="dash-outliers-columns-list">
+                                <p class="text-muted">No extreme statistical outliers detected.</p>
+                            </div>
+                        </div>
+                        <div class="dash-card-footer">
+                            <button class="btn btn-outline btn-xs" id="dash-btn-view-outliers">
+                                <span>Review & Remediate Outliers &rarr;</span>
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- 9. AI-GENERATED EXECUTIVE SUMMARY -->
+                <section class="dash-section">
+                    <div class="dash-ai-executive-card">
+                        <div class="dash-ai-header">
+                            <div class="dash-ai-title-wrap">
+                                <span class="ai-sparkle-icon">✨</span>
+                                <div>
+                                    <h3 class="dash-ai-title">9. AI-Generated Executive Summary</h3>
+                                    <p class="dash-ai-subtitle">Automated high-level business findings & strategic synthesis grounded in deterministic Python metrics</p>
+                                </div>
+                            </div>
+                            <div class="dash-ai-actions">
+                                <span class="provider-pill" id="dash-ai-provider-pill">Gemini 2.5 Flash</span>
+                                <button class="btn btn-outline btn-xs" id="dash-btn-refresh-ai">
+                                    <span>🔄 Refresh AI</span>
+                                </button>
+                                <button class="btn btn-primary btn-xs" id="dash-btn-view-full-ai">
+                                    <span>Full AI Insights Studio &rarr;</span>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="dash-ai-body">
+                            <div class="dash-ai-summary-text" id="dash-ai-summary-text">
+                                <div class="shimmer-placeholder">Generating executive summary from verified dataset metrics...</div>
+                            </div>
+                            <div class="dash-ai-highlights-grid" id="dash-ai-highlights-grid">
+                                <div class="ai-highlight-box">
+                                    <h4 class="highlight-title">🔍 Key Analytical Finding</h4>
+                                    <p class="highlight-desc" id="dash-ai-key-finding">Analyzing data distributions...</p>
+                                </div>
+                                <div class="ai-highlight-box">
+                                    <h4 class="highlight-title">💡 Strategic Recommendation</h4>
+                                    <p class="highlight-desc" id="dash-ai-key-recommendation">Formulating strategic action items...</p>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </section>
 
-                <!-- 3. COLUMN PROFILING TABLE & INSPECTION -->
-                <section class="profiling-section">
+                <!-- 10. RECOMMENDED VISUALIZATIONS -->
+                <section class="dash-section">
                     <div class="section-header-flex">
                         <div>
-                            <h2 class="section-title">Column Profiling Table</h2>
-                            <p class="section-subtitle">Automatic classification, missingness rates, uniqueness, parametric & non-parametric statistics, and samples.</p>
+                            <h2 class="section-title">10. Recommended Visualizations</h2>
+                            <p class="section-subtitle">Automated, non-redundant Plotly charts tailored to feature distributions & relationships.</p>
                         </div>
-                        <!-- Type Filter Tabs -->
-                        <div class="type-filter-group" id="type-filter-group">
-                            <button class="type-filter-btn active" data-type="all">All (<span id="count-all">0</span>)</button>
-                            <button class="type-filter-btn" data-type="Numerical">🔢 Numerical (<span id="count-numerical">0</span>)</button>
-                            <button class="type-filter-btn" data-type="Categorical">🏷️ Categorical (<span id="count-categorical">0</span>)</button>
-                            <button class="type-filter-btn" data-type="Datetime">📅 Datetime (<span id="count-datetime">0</span>)</button>
-                            <button class="type-filter-btn" data-type="Boolean">⚖️ Boolean (<span id="count-boolean">0</span>)</button>
-                            <button class="type-filter-btn" data-type="Other">🔤 Other (<span id="count-other">0</span>)</button>
+                        <button class="btn btn-primary btn-sm" id="dash-btn-open-viz-studio">
+                            <span>Open Visualization Studio &rarr;</span>
+                        </button>
+                    </div>
+
+                    <!-- Top 3 Chart Grid -->
+                    <div class="dash-recommended-charts-grid" id="dash-recommended-charts-grid">
+                        <div class="dash-chart-card">
+                            <div class="dash-chart-header">
+                                <span class="chart-tag" id="dash-chart-1-tag">Distribution</span>
+                                <h4 class="dash-chart-title" id="dash-chart-1-title">Feature Distribution</h4>
+                            </div>
+                            <div class="dash-chart-container" id="dash-chart-1-plot">
+                                <div class="chart-loading-spinner"></div>
+                            </div>
+                        </div>
+                        <div class="dash-chart-card">
+                            <div class="dash-chart-header">
+                                <span class="chart-tag" id="dash-chart-2-tag">Relationship</span>
+                                <h4 class="dash-chart-title" id="dash-chart-2-title">Bivariate Relationship</h4>
+                            </div>
+                            <div class="dash-chart-container" id="dash-chart-2-plot">
+                                <div class="chart-loading-spinner"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+
+            <!-- ========================================================= -->
+            <!-- VIEW 2: DATA PREVIEW (DATA EXPLORER & SCHEMA) -->
+            <!-- ========================================================= -->
+            <div class="studio-tab-content hidden" id="preview-view" role="tabpanel">
+                <section class="preview-hero-section">
+                    <div class="section-header-flex">
+                        <div>
+                            <h2 class="section-title">Data Preview & Explorer</h2>
+                            <p class="section-subtitle">Paginated records inspection, full-text search, column semantic type classifications, and CSV export.</p>
+                        </div>
+                        <div class="preview-actions-bar">
+                            <div class="toggle-switch-wrap">
+                                <label class="toggle-label">View Cleaned Data</label>
+                                <input type="checkbox" id="preview-cleaned-toggle" class="custom-toggle" />
+                            </div>
+                            <a href="#" class="btn btn-outline btn-sm" id="preview-download-csv-btn">
+                                <span>⬇️ Export CSV</span>
+                            </a>
                         </div>
                     </div>
 
-                    <!-- Column Table Toolbar -->
-                    <div class="column-table-toolbar">
-                        <div class="search-box">
-                            <span class="search-icon">🔎</span>
-                            <input type="text" id="column-search" placeholder="Search columns by name or dtype..." class="search-input" />
+                    <!-- Column Profiling Summary Table -->
+                    <div class="preview-schema-block">
+                        <div class="section-title-wrap">
+                            <h3 class="section-title-sm">Column Profiling & Schema Classification</h3>
+                            <div class="type-filter-group" id="type-filter-group">
+                                <button class="type-filter-btn active" data-type="all">All (<span id="count-all">0</span>)</button>
+                                <button class="type-filter-btn" data-type="Numerical">🔢 Numerical (<span id="count-numerical">0</span>)</button>
+                                <button class="type-filter-btn" data-type="Categorical">🏷️ Categorical (<span id="count-categorical">0</span>)</button>
+                                <button class="type-filter-btn" data-type="Datetime">📅 Datetime (<span id="count-datetime">0</span>)</button>
+                                <button class="type-filter-btn" data-type="Boolean">⚖️ Boolean (<span id="count-boolean">0</span>)</button>
+                                <button class="type-filter-btn" data-type="Other">🔤 Other (<span id="count-other">0</span>)</button>
+                            </div>
                         </div>
-                        <div class="column-table-meta" id="column-table-meta">
-                            Showing 0 columns
+
+                        <!-- Column Search Toolbar -->
+                        <div class="column-table-toolbar">
+                            <div class="search-box">
+                                <span class="search-icon">🔎</span>
+                                <input type="text" id="column-search" placeholder="Search columns by name or dtype..." class="search-input" />
+                            </div>
+                            <div class="column-table-meta" id="column-table-meta">Showing 0 columns</div>
+                        </div>
+
+                        <!-- Columns Table -->
+                        <div class="table-container profiling-table-container">
+                            <table class="data-table profiling-table" id="columns-profile-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 50px;">#</th>
+                                        <th>Column Name & Classification</th>
+                                        <th>Missing Values</th>
+                                        <th>Unique / Duplicates</th>
+                                        <th>Statistical Summary / Range</th>
+                                        <th>Sample Values</th>
+                                        <th style="width: 90px; text-align: center;">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="columns-profile-tbody">
+                                    <!-- Injected dynamically via JS -->
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
-                    <!-- Column Profiling Table Container -->
-                    <div class="table-container profiling-table-container">
-                        <table class="data-table profiling-table" id="columns-profile-table">
+                    <!-- Paginated Tabular Records Grid -->
+                    <div class="preview-records-block">
+                        <div class="section-header-flex">
+                            <h3 class="section-title-sm">Dataset Records Grid</h3>
+                            <div class="pagination-controls-top" id="pagination-top">
+                                <button class="btn btn-outline btn-xs" id="btn-prev-page">Previous</button>
+                                <span class="page-indicator" id="page-indicator">Page 1 of 1</span>
+                                <button class="btn btn-outline btn-xs" id="btn-next-page">Next</button>
+                            </div>
+                        </div>
+
+                        <div class="table-container explorer-table-container">
+                            <table class="data-table explorer-table" id="explorer-data-table">
+                                <thead id="explorer-thead">
+                                    <!-- Populated dynamically -->
+                                </thead>
+                                <tbody id="explorer-tbody">
+                                    <!-- Populated dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- ========================================================= -->
+            <!-- VIEW 3: DATA QUALITY (12-RULE DEFECT AUDIT) -->
+            <!-- ========================================================= -->
+            <div class="studio-tab-content hidden" id="quality-view" role="tabpanel">
+                <section class="quality-audit-hero">
+                    <div class="section-header-flex">
+                        <div>
+                            <h2 class="section-title">Automated Data Quality Audit</h2>
+                            <p class="section-subtitle">Deterministic inspection across 12 data quality defect categories with severity classification and remediation advice.</p>
+                        </div>
+                        <button class="btn btn-primary btn-sm" id="btn-goto-cleaning">
+                            <span>🧹 Go to Cleaning Studio &rarr;</span>
+                        </button>
+                    </div>
+
+                    <!-- Severity Filter Tabs -->
+                    <div class="severity-filter-bar">
+                        <div class="severity-filter-group" id="severity-filter-group">
+                            <button class="sev-filter-btn active" data-sev="all">All Issues (<span id="sev-count-all">0</span>)</button>
+                            <button class="sev-filter-btn sev-critical" data-sev="Critical">Critical (<span id="sev-count-critical">0</span>)</button>
+                            <button class="sev-filter-btn sev-high" data-sev="High">High (<span id="sev-count-high">0</span>)</button>
+                            <button class="sev-filter-btn sev-medium" data-sev="Medium">Medium (<span id="sev-count-medium">0</span>)</button>
+                            <button class="sev-filter-btn sev-low" data-sev="Low">Low (<span id="sev-count-low">0</span>)</button>
+                        </div>
+                    </div>
+
+                    <!-- Issues Table -->
+                    <div class="table-container cleaning-issues-table-container">
+                        <table class="data-table" id="cleaning-issues-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 50px;">#</th>
-                                    <th>Column Name & Classification</th>
-                                    <th>Missing Values</th>
-                                    <th>Unique / Duplicates</th>
-                                    <th>Statistical Summary / Distribution</th>
-                                    <th>Sample Values</th>
-                                    <th style="width: 90px; text-align: center;">Action</th>
+                                    <th style="width: 45px;">#</th>
+                                    <th>Column</th>
+                                    <th>Issue Type & Title</th>
+                                    <th style="width: 130px;">Affected Rows</th>
+                                    <th style="width: 110px;">Severity</th>
+                                    <th>Recommended Action</th>
                                 </tr>
                             </thead>
-                            <tbody id="columns-profile-tbody">
-                                <!-- Injected dynamically via JS -->
+                            <tbody id="cleaning-issues-tbody">
+                                <tr>
+                                    <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                                        Scanning dataset for data quality issues...
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
@@ -297,23 +758,23 @@
             </div>
 
             <!-- ========================================================= -->
-            <!-- TAB 2: AUTOMATED DATA QUALITY & CLEANING STUDIO -->
+            <!-- VIEW 4: CLEANING (INTERACTIVE DATA CLEANING STUDIO) -->
             <!-- ========================================================= -->
-            <div class="studio-tab-content hidden" id="cleaning-view">
+            <div class="studio-tab-content hidden" id="cleaning-view" role="tabpanel">
                 
                 <!-- Cleaning Studio Header Banner -->
                 <section class="cleaning-header-banner">
                     <div class="cleaning-banner-info">
                         <div class="cleaning-banner-icon">🧹</div>
                         <div>
-                            <h2 class="cleaning-banner-title">Automated Data Quality & Cleaning Engine</h2>
-                            <p class="cleaning-banner-desc">Deterministic 12-point quality defect detection, non-destructive transformation preview, configurable cleaning rules, and processed dataset export.</p>
+                            <h2 class="cleaning-banner-title">Data Quality & Cleaning Studio</h2>
+                            <p class="cleaning-banner-desc">Configure transformations, review live before/after previews, execute the non-destructive pipeline, and download cleaned datasets from <code>data/processed/</code>.</p>
                         </div>
                     </div>
                     <div class="cleaning-banner-actions">
                         <button class="btn btn-primary" id="btn-apply-cleaning">
                             <span class="btn-icon">⚡</span>
-                            <span>Apply Cleaning</span>
+                            <span>Apply Cleaning Pipeline</span>
                         </button>
                         <a href="#" class="btn btn-outline" id="btn-download-cleaned" title="Download Cleaned CSV">
                             <span class="btn-icon">⬇️</span>
@@ -328,7 +789,7 @@
                         <div class="summary-box-title">
                             <span class="status-dot status-dot-success"></span>
                             <h3>Cleaning Execution Summary</h3>
-                            <span class="section-badge badge-success">Cleaned & Saved to data/processed/</span>
+                            <span class="section-badge badge-success">Saved to data/processed/</span>
                         </div>
                         <span class="summary-timestamp" id="cleaning-timestamp">Just now</span>
                     </div>
@@ -366,53 +827,12 @@
                     </div>
                 </section>
 
-                <!-- 12-Point Data Quality Audit Results -->
-                <section class="cleaning-audit-section">
-                    <div class="section-header-flex">
-                        <div>
-                            <h2 class="section-title">Detected Data Quality Issues</h2>
-                            <p class="section-subtitle">Automated inspection across 12 data quality defect categories.</p>
-                        </div>
-                        <!-- Severity Filter Tabs -->
-                        <div class="severity-filter-group" id="severity-filter-group">
-                            <button class="sev-filter-btn active" data-sev="all">All (<span id="sev-count-all">0</span>)</button>
-                            <button class="sev-filter-btn sev-critical" data-sev="Critical">Critical (<span id="sev-count-critical">0</span>)</button>
-                            <button class="sev-filter-btn sev-high" data-sev="High">High (<span id="sev-count-high">0</span>)</button>
-                            <button class="sev-filter-btn sev-medium" data-sev="Medium">Medium (<span id="sev-count-medium">0</span>)</button>
-                            <button class="sev-filter-btn sev-low" data-sev="Low">Low (<span id="sev-count-low">0</span>)</button>
-                        </div>
-                    </div>
-
-                    <!-- Issues Table -->
-                    <div class="table-container cleaning-issues-table-container">
-                        <table class="data-table" id="cleaning-issues-table">
-                            <thead>
-                                <tr>
-                                    <th style="width: 45px;">#</th>
-                                    <th>Column</th>
-                                    <th>Issue Type & Title</th>
-                                    <th style="width: 130px;">Affected Rows</th>
-                                    <th style="width: 110px;">Severity</th>
-                                    <th>Recommended Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="cleaning-issues-tbody">
-                                <tr>
-                                    <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">
-                                        Scanning dataset for data quality issues...
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
-
                 <!-- Transformation Preview Box -->
                 <section class="cleaning-preview-section">
                     <div class="section-header-flex">
                         <div>
-                            <h2 class="section-title">Transformation Preview</h2>
-                            <p class="section-subtitle">Proposed value transformations (<code class="code-preview">Original value &rarr; Proposed cleaned value</code>)</p>
+                            <h2 class="section-title">Transformation Previews</h2>
+                            <p class="section-subtitle">Live before-and-after value comparisons (<code class="code-preview">Original &rarr; Cleaned</code>)</p>
                         </div>
                         <span class="section-badge" id="preview-pairs-count">0 sample pairs</span>
                     </div>
@@ -429,7 +849,7 @@
                     <div class="section-header-flex">
                         <div>
                             <h2 class="section-title">Configurable Cleaning Operations</h2>
-                            <p class="section-subtitle">Review and configure automated cleaning operations before applying.</p>
+                            <p class="section-subtitle">Select desired data transformations to apply:</p>
                         </div>
                     </div>
 
@@ -441,7 +861,7 @@
                                 <span class="checkbox-custom"></span>
                                 <span class="checkbox-label">Remove duplicate rows</span>
                             </label>
-                            <p class="config-desc">Deduplicate identical records to prevent skewed distributions and duplicate bias.</p>
+                            <p class="config-desc">Deduplicate identical records to prevent skewed distributions.</p>
                         </div>
 
                         <!-- Rule 2: Numeric Missing Imputation -->
@@ -451,14 +871,14 @@
                                 <span class="checkbox-custom"></span>
                                 <span class="checkbox-label">Fill numerical missing values</span>
                             </label>
-                            <p class="config-desc">Impute empty numerical cells to ensure completeness.</p>
+                            <p class="config-desc">Impute empty numerical cells using robust central tendencies.</p>
                             <div class="config-inline-select">
                                 <label for="cfg-numeric-strategy">Strategy:</label>
                                 <select id="cfg-numeric-strategy" class="custom-select custom-select-sm">
-                                    <option value="median" selected>Median (Robust to outliers)</option>
+                                    <option value="median" selected>Median (Robust)</option>
                                     <option value="mean">Mean (Average)</option>
                                     <option value="zero">Zero (0.0)</option>
-                                    <option value="drop">Drop Rows with Missing</option>
+                                    <option value="drop">Drop Rows</option>
                                 </select>
                             </div>
                         </div>
@@ -470,13 +890,13 @@
                                 <span class="checkbox-custom"></span>
                                 <span class="checkbox-label">Fill categorical missing values</span>
                             </label>
-                            <p class="config-desc">Impute empty text/category cells with most frequent category.</p>
+                            <p class="config-desc">Impute empty text/category cells.</p>
                             <div class="config-inline-select">
                                 <label for="cfg-categorical-strategy">Strategy:</label>
                                 <select id="cfg-categorical-strategy" class="custom-select custom-select-sm">
-                                    <option value="mode" selected>Mode (Most Frequent Category)</option>
+                                    <option value="mode" selected>Mode (Most Frequent)</option>
                                     <option value="unknown">"Unknown" Label</option>
-                                    <option value="drop">Drop Rows with Missing</option>
+                                    <option value="drop">Drop Rows</option>
                                 </select>
                             </div>
                         </div>
@@ -488,7 +908,7 @@
                                 <span class="checkbox-custom"></span>
                                 <span class="checkbox-label">Standardize whitespace</span>
                             </label>
-                            <p class="config-desc">Strip unwanted leading and trailing whitespace from all text columns (e.g. <code>" male " &rarr; "male"</code>).</p>
+                            <p class="config-desc">Trim leading and trailing whitespace from string features.</p>
                         </div>
 
                         <!-- Rule 5: Categorical Casing Standardization -->
@@ -498,7 +918,7 @@
                                 <span class="checkbox-custom"></span>
                                 <span class="checkbox-label">Standardize categorical casing</span>
                             </label>
-                            <p class="config-desc">Normalize inconsistent casing variants into canonical Title Case when confidence is high (e.g. <code>"male" &rarr; "Male"</code>).</p>
+                            <p class="config-desc">Normalize inconsistent casing variants into canonical Title Case.</p>
                         </div>
 
                         <!-- Rule 6: Convert Numeric Strings -->
@@ -506,9 +926,9 @@
                             <label class="custom-checkbox-wrap">
                                 <input type="checkbox" id="cfg-convert-numeric-strings" checked>
                                 <span class="checkbox-custom"></span>
-                                <span class="checkbox-label">Convert numeric strings to numbers</span>
+                                <span class="checkbox-label">Convert numeric strings</span>
                             </label>
-                            <p class="config-desc">Strip currency signs ($, €, £), commas, and percentage symbols, casting columns to numeric dtype.</p>
+                            <p class="config-desc">Strip currency signs and commas, casting columns to numeric dtype.</p>
                         </div>
 
                         <!-- Rule 7: Convert Date Strings -->
@@ -516,7 +936,7 @@
                             <label class="custom-checkbox-wrap">
                                 <input type="checkbox" id="cfg-convert-datetime-strings" checked>
                                 <span class="checkbox-custom"></span>
-                                <span class="checkbox-label">Convert date strings to datetime</span>
+                                <span class="checkbox-label">Convert date strings</span>
                             </label>
                             <p class="config-desc">Parse valid date strings into standardized datetime timestamps.</p>
                         </div>
@@ -528,37 +948,7 @@
                                 <span class="checkbox-custom"></span>
                                 <span class="checkbox-label">Handle invalid numerical values</span>
                             </label>
-                            <p class="config-desc">Replace infinity (inf), sentinel codes (-999, 9999), and domain anomalies with NaN for imputation.</p>
-                        </div>
-
-                        <!-- Rule 9: Drop High Missing Columns (Advanced) -->
-                        <div class="config-card config-card-optional">
-                            <label class="custom-checkbox-wrap">
-                                <input type="checkbox" id="cfg-drop-high-missing">
-                                <span class="checkbox-custom"></span>
-                                <span class="checkbox-label">Drop columns with &gt;50% missing</span>
-                            </label>
-                            <p class="config-desc">Optionally drop features with excessive missingness to streamline downstream processing.</p>
-                        </div>
-
-                        <!-- Rule 10: Drop Constant Columns (Advanced) -->
-                        <div class="config-card config-card-optional">
-                            <label class="custom-checkbox-wrap">
-                                <input type="checkbox" id="cfg-drop-constant-columns">
-                                <span class="checkbox-custom"></span>
-                                <span class="checkbox-label">Drop constant (0-variance) columns</span>
-                            </label>
-                            <p class="config-desc">Remove columns containing only a single unique value across all observations.</p>
-                        </div>
-
-                        <!-- Rule 11: Cap Extreme Outliers (Advanced) -->
-                        <div class="config-card config-card-optional">
-                            <label class="custom-checkbox-wrap">
-                                <input type="checkbox" id="cfg-cap-outliers">
-                                <span class="checkbox-custom"></span>
-                                <span class="checkbox-label">Cap extreme outliers (3x IQR fence)</span>
-                            </label>
-                            <p class="config-desc">Winsorize extreme outliers exceeding [Q1 - 3*IQR, Q3 + 3*IQR] boundaries.</p>
+                            <p class="config-desc">Replace infinity (inf) and sentinel codes (-999, 9999) with NaN.</p>
                         </div>
                     </div>
 
@@ -576,17 +966,16 @@
             </div>
 
             <!-- ========================================================= -->
-            <!-- TAB: STATISTICAL ANALYSIS ENGINE (PHASE 5) -->
+            <!-- VIEW 5: STATISTICS (DESCRIPTIVE & INFERENTIAL ENGINE) -->
             <!-- ========================================================= -->
-            <div class="studio-tab-content hidden" id="statistics-view">
+            <div class="studio-tab-content hidden" id="statistics-view" role="tabpanel">
                 
-                <!-- Section Header Banner -->
                 <section class="stats-header-section">
                     <div class="section-title-wrap">
-                        <h2 class="section-title">Statistical Analysis</h2>
+                        <h2 class="section-title">Descriptive & Inferential Statistics</h2>
                         <span class="section-badge badge-cyan">Deterministic Engine</span>
                     </div>
-                    <p class="section-subtitle">Comprehensive parametric & non-parametric calculations, dispersion metrics, confidence intervals, percentiles, and distribution insights computed in pure Python.</p>
+                    <p class="section-subtitle">Comprehensive parametric & non-parametric moments, dispersion metrics, confidence intervals, percentiles, and distribution insights computed in pure Python.</p>
                     
                     <!-- Stats Quick KPIs -->
                     <div class="stats-kpi-bar" id="stats-kpi-bar">
@@ -600,877 +989,621 @@
                         </div>
                         <div class="stats-kpi-item">
                             <span class="stats-kpi-label">Datetime Features</span>
-                            <strong class="stats-kpi-value" id="stats-kpi-dt-count">--</strong>
+                            <strong class="stats-kpi-value" id="stats-kpi-date-count">--</strong>
                         </div>
                         <div class="stats-kpi-item">
-                            <span class="stats-kpi-label">Outlier Features</span>
-                            <strong class="stats-kpi-value" id="stats-kpi-outliers-count">--</strong>
-                        </div>
-                        <div class="stats-kpi-item">
-                            <span class="stats-kpi-label">Normality Status</span>
-                            <strong class="stats-kpi-value" id="stats-kpi-normal-count">-- Normal</strong>
+                            <span class="stats-kpi-label">Confidence Level</span>
+                            <strong class="stats-kpi-value text-indigo" id="stats-kpi-ci">95.0%</strong>
                         </div>
                     </div>
                 </section>
 
-                <!-- 1. IMPORTANT STATISTICAL OBSERVATIONS -->
+                <!-- Statistical Observations Callout Cards -->
                 <section class="stats-observations-section">
-                    <div class="section-title-wrap">
-                        <h3 class="subsection-title">Important Statistical Observations</h3>
-                        <span class="section-badge">Rule-Based Findings</span>
-                    </div>
-                    <div class="stats-observations-grid" id="stats-observations-grid">
-                        <div class="stats-obs-card info">
-                            <div class="obs-card-header">
-                                <span class="obs-icon">🔍</span>
-                                <h4 class="obs-title">Loading Statistical Insights...</h4>
-                            </div>
-                            <p class="obs-message">Computing moments and evaluating distribution patterns.</p>
+                    <h3 class="section-title-sm">Rule-Based Statistical Observations</h3>
+                    <div class="stats-obs-grid" id="stats-observations-grid">
+                        <div class="obs-card">
+                            <div class="obs-card-icon icon-cyan">ℹ️</div>
+                            <div class="obs-card-text">Computing statistical observations from dataset moments...</div>
                         </div>
                     </div>
                 </section>
 
-                <!-- 2. SUMMARY STATISTICS TABLE -->
-                <section class="summary-stats-section">
+                <!-- Numerical Statistics Master Table -->
+                <section class="stats-table-section">
                     <div class="section-header-flex">
                         <div>
-                            <h3 class="subsection-title">Summary Statistics Table</h3>
-                            <p class="section-subtitle">Parametric moments, non-parametric quartiles, dispersion, and 95% Confidence Intervals.</p>
-                        </div>
-                        <div class="stats-table-search-wrap">
-                            <div class="search-box">
-                                <span class="search-icon">🔎</span>
-                                <input type="text" id="stats-table-search" placeholder="Filter statistical features..." class="search-input" />
-                            </div>
+                            <h3 class="section-title-sm">Numerical Features Descriptive Table</h3>
+                            <p class="section-subtitle">Moments, Quartiles, Range, IQR, Skewness, Kurtosis, and 95% Confidence Intervals.</p>
                         </div>
                     </div>
 
                     <div class="table-container stats-table-container">
-                        <table class="data-table stats-table" id="summary-statistics-table">
+                        <table class="data-table stats-table" id="numerical-stats-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 40px;">#</th>
-                                    <th>Feature</th>
-                                    <th>Valid N</th>
+                                    <th>Column</th>
+                                    <th>Count (Valid)</th>
                                     <th>Mean</th>
-                                    <th>Median</th>
-                                    <th>Mode</th>
                                     <th>Std Dev</th>
-                                    <th>Variance</th>
-                                    <th>Min - Max</th>
-                                    <th>Range</th>
+                                    <th>Min</th>
+                                    <th>25% (Q1)</th>
+                                    <th>Median (50%)</th>
+                                    <th>75% (Q3)</th>
+                                    <th>Max</th>
                                     <th>IQR</th>
                                     <th>Skewness</th>
                                     <th>Kurtosis</th>
-                                    <th>95% Conf. Interval</th>
-                                    <th>Outliers</th>
+                                    <th>95% CI</th>
+                                    <th style="text-align: center;">Drilldown</th>
                                 </tr>
                             </thead>
-                            <tbody id="summary-statistics-tbody">
-                                <!-- Injected via JS -->
+                            <tbody id="numerical-stats-tbody">
+                                <tr>
+                                    <td colspan="14" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                                        Loading numerical descriptive statistics...
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
                 </section>
 
-                <!-- 3. DISTRIBUTION INFORMATION & DEEP DIVE -->
-                <section class="distribution-deep-dive-section">
+                <!-- Categorical Statistics Master Table -->
+                <section class="stats-table-section">
                     <div class="section-header-flex">
                         <div>
-                            <h3 class="subsection-title">Distribution Information & Deep Dive</h3>
-                            <p class="section-subtitle">Percentiles matrix (P1–P99), shape normality classification, dispersion, and category/temporal breakdown.</p>
-                        </div>
-                        <div class="column-select-wrap">
-                            <label for="stats-column-selector" class="select-label">Select Feature:</label>
-                            <select id="stats-column-selector" class="custom-select select-sm">
-                                <option value="">Select a column to inspect distribution...</option>
-                            </select>
+                            <h3 class="section-title-sm">Categorical Features Summary & Entropy</h3>
+                            <p class="section-subtitle">Distinct frequencies, mode dominance, entropy, and top categories.</p>
                         </div>
                     </div>
 
-                    <!-- Column Distribution Details Card -->
-                    <div class="distribution-card" id="distribution-details-card">
-                        <!-- Injected via JS -->
-                        <div class="dist-empty-state">
-                            <p>Select a column from the dropdown above to view its complete percentile distribution, normality diagnosis, and moments breakdown.</p>
-                        </div>
-                    </div>
-                </section>
-            </div>
-
-            <!-- ========================================================= -->
-            <!-- TAB: CORRELATION ANALYSIS ENGINE (PHASE 6) -->
-            <!-- ========================================================= -->
-            <div class="studio-tab-content hidden" id="correlation-view">
-                
-                <!-- Section Header & Non-Causation Disclaimer -->
-                <section class="corr-header-section">
-                    <div class="section-title-wrap">
-                        <h2 class="section-title">Correlation Analysis</h2>
-                        <span class="section-badge badge-cyan">Pearson Engine</span>
-                    </div>
-                    <p class="section-subtitle">Bivariate linear associations, interactive Plotly heatmap matrix, ranked strength tiers, and key correlation highlights.</p>
-                    
-                    <!-- Non-Causation Scientific Guidance Banner -->
-                    <div class="non-causation-alert">
-                        <div class="alert-icon-wrap">
-                            <span>⚠️</span>
-                        </div>
-                        <div class="alert-text-wrap">
-                            <h4 class="alert-heading">Correlation Does Not Imply Causation</h4>
-                            <p class="alert-desc">Correlation measures the statistical linear association between two numerical features. A high positive or negative correlation does <strong>not</strong> prove that one variable causes changes in the other. Confounding variables, reverse causality, or coincidental trends may be present.</p>
-                        </div>
-                    </div>
-
-                    <!-- Correlation Controls & KPI Summary -->
-                    <div class="corr-controls-bar">
-                        <div class="corr-threshold-control">
-                            <div class="threshold-label-row">
-                                <label for="corr-threshold-slider" class="control-label">
-                                    <span>Correlation Threshold (|r| &ge;):</span>
-                                    <strong class="threshold-badge" id="corr-threshold-display">0.00</strong>
-                                </label>
-                            </div>
-                            <input type="range" id="corr-threshold-slider" class="custom-range-slider" min="0" max="1" step="0.05" value="0.00">
-                            <div class="range-ticks">
-                                <span>0.0 (All)</span>
-                                <span>0.2 (Weak)</span>
-                                <span>0.4 (Mod)</span>
-                                <span>0.6 (Strong)</span>
-                                <span>0.8 (V.Strong)</span>
-                                <span>1.0</span>
-                            </div>
-                        </div>
-
-                        <div class="corr-kpi-group">
-                            <div class="corr-kpi-item">
-                                <span class="corr-kpi-label">Numerical Features</span>
-                                <strong class="corr-kpi-value" id="corr-kpi-num-count">--</strong>
-                            </div>
-                            <div class="corr-kpi-item">
-                                <span class="corr-kpi-label">Analyzed Pairs</span>
-                                <strong class="corr-kpi-value" id="corr-kpi-pairs-count">--</strong>
-                            </div>
-                            <div class="corr-kpi-item">
-                                <span class="corr-kpi-label">Strong / V. Strong (|r| &ge; 0.6)</span>
-                                <strong class="corr-kpi-value" id="corr-kpi-strong-count">--</strong>
-                            </div>
-                            <div class="corr-kpi-item">
-                                <span class="corr-kpi-label">Moderate (|r| &ge; 0.4)</span>
-                                <strong class="corr-kpi-value" id="corr-kpi-mod-count">--</strong>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- 1. KEY CORRELATIONS SECTION -->
-                <section class="key-correlations-section">
-                    <div class="section-title-wrap">
-                        <h3 class="subsection-title">Key Correlations</h3>
-                        <span class="section-badge badge-indigo">Prominent Findings</span>
-                    </div>
-                    <p class="section-subtitle">Top positive and inverse statistical associations detected across numerical features (Non-causal statistical associations).</p>
-                    
-                    <div class="key-correlations-grid" id="key-correlations-grid">
-                        <div class="key-corr-empty">
-                            <p>Loading key correlation highlights...</p>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- 2. INTERACTIVE PLOTLY CORRELATION HEATMAP -->
-                <section class="corr-heatmap-section">
-                    <div class="section-header-flex">
-                        <div>
-                            <h3 class="subsection-title">Interactive Correlation Heatmap</h3>
-                            <p class="section-subtitle">Full bivariate Pearson correlation matrix with interactive hover metrics, zoom, and value annotations.</p>
-                        </div>
-                        <div class="heatmap-legend-pills">
-                            <span class="legend-pill pill-neg">Negative (-1.0 to -0.2)</span>
-                            <span class="legend-pill pill-neu">Neutral (-0.2 to +0.2)</span>
-                            <span class="legend-pill pill-pos">Positive (+0.2 to +1.0)</span>
-                        </div>
-                    </div>
-
-                    <div class="heatmap-container-card">
-                        <div id="correlation-heatmap-container" class="plotly-heatmap-wrapper">
-                            <!-- Plotly will render here -->
-                            <div class="heatmap-loading-placeholder">
-                                <div class="spinner"></div>
-                                <p>Generating interactive correlation matrix...</p>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- 3. RANKED CORRELATIONS ASSOCIATION TABLE -->
-                <section class="ranked-correlations-section">
-                    <div class="section-header-flex">
-                        <div>
-                            <h3 class="subsection-title">Ranked Correlations Table</h3>
-                            <p class="section-subtitle">Comprehensive list of variable pairs ranked by absolute correlation strength (|r|).</p>
-                        </div>
-                        <div class="corr-table-search-wrap">
-                            <div class="search-box">
-                                <span class="search-icon">🔎</span>
-                                <input type="text" id="corr-table-search" placeholder="Filter variables in pairs..." class="search-input" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="table-container corr-table-container">
-                        <table class="data-table corr-table" id="ranked-correlations-table">
+                    <div class="table-container stats-table-container">
+                        <table class="data-table stats-table" id="categorical-stats-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 40px;">#</th>
-                                    <th>Variable A</th>
-                                    <th>Variable B</th>
-                                    <th>Pearson Correlation (r)</th>
-                                    <th>Strength Classification</th>
-                                    <th>Direction</th>
-                                    <th>Pairwise Observations (N)</th>
+                                    <th>Column</th>
+                                    <th>Unique Categories</th>
+                                    <th>Top Category (Mode)</th>
+                                    <th>Mode Frequency</th>
+                                    <th>Mode %</th>
+                                    <th>Entropy (Bits)</th>
+                                    <th>Top 3 Distributions</th>
                                 </tr>
                             </thead>
-                            <tbody id="ranked-correlations-tbody">
-                                <!-- Injected via JS -->
+                            <tbody id="categorical-stats-tbody">
+                                <tr>
+                                    <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                                        Loading categorical distribution statistics...
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
                 </section>
-
             </div>
 
             <!-- ========================================================= -->
-            <!-- TAB: OUTLIER & ANOMALY DETECTION ENGINE (PHASE 7) -->
+            <!-- VIEW 6: CORRELATIONS (HEATMAP & PAIRS) -->
             <!-- ========================================================= -->
-            <div class="studio-tab-content hidden" id="outliers-view">
-                
-                <!-- Section Header & Method Selector Bar -->
-                <section class="outliers-header-section">
-                    <div class="section-title-wrap">
-                        <h2 class="section-title">Outlier & Anomaly Detection</h2>
-                        <span class="section-badge badge-rose">Statistical Detection Engine</span>
+            <div class="studio-tab-content hidden" id="correlation-view" role="tabpanel">
+                <section class="correlation-hero-section">
+                    <div class="section-header-flex">
+                        <div>
+                            <h2 class="section-title">Correlation Analysis & Relationships</h2>
+                            <p class="section-subtitle">Interactive Pearson correlation heatmap, strength classifications, and ranked relationship pairs.</p>
+                        </div>
+                        
+                        <!-- Correlation Threshold Filter Slider -->
+                        <div class="corr-filter-slider-wrap">
+                            <label for="corr-threshold-slider">Threshold |r| &ge; <span id="corr-threshold-display">0.00</span></label>
+                            <input type="range" id="corr-threshold-slider" min="0" max="0.9" step="0.05" value="0" class="custom-range" />
+                        </div>
                     </div>
-                    <p class="section-subtitle">Identify numerical outliers, calculate threshold bounds via IQR / Z-Score, distinguish potential extreme values from confirmed data errors, and remediate non-destructively.</p>
-                    
-                    <!-- Method Selector & Controls -->
-                    <div class="outliers-controls-bar">
-                        <div class="method-control-group">
-                            <label for="outlier-method-select" class="control-label">Detection Method:</label>
+
+                    <!-- Non-Causation Guidance Disclaimer -->
+                    <div class="corr-guidance-banner">
+                        <span class="banner-icon">💡</span>
+                        <p class="banner-text"><strong>Correlation &ne; Causation:</strong> Pearson's correlation coefficient measures the degree of linear association between two variables. High correlation does not necessarily imply direct causal influence.</p>
+                    </div>
+
+                    <!-- Interactive Plotly Correlation Heatmap -->
+                    <div class="heatmap-card">
+                        <div class="heatmap-header">
+                            <h3 class="section-title-sm">Pearson Correlation Matrix Heatmap</h3>
+                            <span class="heatmap-badge">Interactive Plotly Engine</span>
+                        </div>
+                        <div class="heatmap-plot-container" id="plotly-correlation-heatmap">
+                            <div class="chart-loading-spinner"></div>
+                        </div>
+                    </div>
+
+                    <!-- Ranked Correlation Pairs Table -->
+                    <div class="corr-pairs-section">
+                        <h3 class="section-title-sm">Ranked Correlation Pairs</h3>
+                        <div class="table-container corr-pairs-table-container">
+                            <table class="data-table" id="corr-pairs-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 50px;">Rank</th>
+                                        <th>Feature A</th>
+                                        <th>Feature B</th>
+                                        <th>Pearson r</th>
+                                        <th>Strength</th>
+                                        <th>Direction</th>
+                                        <th>Absolute |r|</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="corr-pairs-tbody">
+                                    <!-- Injected dynamically via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- ========================================================= -->
+            <!-- VIEW 7: OUTLIERS (DETECTION & REMEDIATION) -->
+            <!-- ========================================================= -->
+            <div class="studio-tab-content hidden" id="outliers-view" role="tabpanel">
+                <section class="outliers-hero-section">
+                    <div class="section-header-flex">
+                        <div>
+                            <h2 class="section-title">Outlier & Anomaly Detection</h2>
+                            <p class="section-subtitle">Multi-method statistical detection (IQR, Z-Score, Modified Z-Score), interactive multi-column Box Plots, and non-destructive remediation.</p>
+                        </div>
+
+                        <!-- Method Switcher -->
+                        <div class="outlier-method-selector">
+                            <label for="outlier-method-select">Detection Method:</label>
                             <select id="outlier-method-select" class="custom-select custom-select-sm">
-                                <option value="iqr" selected>IQR Method (Tukey's Fences - 1.5x IQR)</option>
-                                <option value="iqr_extreme">IQR Extreme Fences (3.0x IQR)</option>
-                                <option value="zscore">Z-Score Method (3.0 Standard Deviations)</option>
-                                <option value="zscore_sensitive">Z-Score Sensitive (2.5 Standard Deviations)</option>
-                                <option value="modified_zscore">Modified Z-Score (3.5 Median Absolute Deviation)</option>
+                                <option value="iqr" selected>IQR Fence (1.5x Standard)</option>
+                                <option value="iqr_extreme">IQR Extreme (3.0x Multiplier)</option>
+                                <option value="zscore">Z-Score (|z| &ge; 3.0)</option>
+                                <option value="modified_zscore">Modified Z-Score (MAD &ge; 3.5)</option>
                             </select>
                         </div>
+                    </div>
 
-                        <div class="param-control-group">
-                            <label for="outlier-param-input" class="control-label" id="outlier-param-label">Multiplier / Threshold:</label>
-                            <div class="input-with-btn">
-                                <input type="number" id="outlier-param-input" class="custom-input custom-input-sm" value="1.5" step="0.1" min="0.1" max="10.0">
-                                <button class="btn btn-outline btn-sm" id="btn-recalc-outliers">
-                                    <span>🔄 Recalculate</span>
-                                </button>
-                            </div>
+                    <!-- Multi-Feature Box Plot Plotly Chart -->
+                    <div class="boxplot-card">
+                        <div class="boxplot-header">
+                            <h3 class="section-title-sm">Multi-Feature Box Plot Distribution</h3>
+                            <span class="boxplot-badge">Plotly Interactive Visualizer</span>
                         </div>
-
-                        <div class="outliers-kpi-bar">
-                            <div class="outlier-kpi-item">
-                                <span class="outlier-kpi-label">Features Analyzed</span>
-                                <strong class="outlier-kpi-value" id="outliers-kpi-num-count">--</strong>
-                            </div>
-                            <div class="outlier-kpi-item">
-                                <span class="outlier-kpi-label">Columns with Outliers</span>
-                                <strong class="outlier-kpi-value text-rose" id="outliers-kpi-affected-cols">--</strong>
-                            </div>
-                            <div class="outlier-kpi-item">
-                                <span class="outlier-kpi-label">Total Outliers</span>
-                                <strong class="outlier-kpi-value text-rose" id="outliers-kpi-total-count">--</strong>
-                            </div>
-                            <div class="outlier-kpi-item">
-                                <span class="outlier-kpi-label">Confirmed Data Errors</span>
-                                <strong class="outlier-kpi-value text-danger" id="outliers-kpi-error-count">--</strong>
-                            </div>
-                            <div class="outlier-kpi-item">
-                                <span class="outlier-kpi-label">Potential Outliers</span>
-                                <strong class="outlier-kpi-value text-amber" id="outliers-kpi-potential-count">--</strong>
-                            </div>
-                            <div class="outlier-kpi-item">
-                                <span class="outlier-kpi-label">Clean Columns</span>
-                                <strong class="outlier-kpi-value text-emerald" id="outliers-kpi-clean-count">--</strong>
-                            </div>
+                        <div class="boxplot-plot-container" id="plotly-outlier-boxplot">
+                            <div class="chart-loading-spinner"></div>
                         </div>
                     </div>
 
-                    <!-- Edge-Case Warnings Container -->
-                    <div class="outliers-warnings-container hidden" id="outliers-warnings-container">
-                        <!-- Injected via JS -->
-                    </div>
-                </section>
+                    <!-- Column Outlier Breakdown Table -->
+                    <div class="outlier-table-section">
+                        <div class="section-header-flex">
+                            <h3 class="section-title-sm">Column Outlier Metrics & Bounds</h3>
+                        </div>
 
-                <!-- 1. INTERACTIVE PLOTLY VISUALIZATIONS SECTION -->
-                <section class="outliers-viz-section">
-                    <div class="section-header-flex">
-                        <div>
-                            <h3 class="subsection-title">Interactive Visualizations</h3>
-                            <p class="section-subtitle">Multi-feature box plots and single-column distribution histograms with threshold boundary zones.</p>
-                        </div>
-                        <div class="viz-view-toggle-bar">
-                            <button class="viz-toggle-btn active" id="view-outlier-boxplot-btn">
-                                <span>📦 Multi-Feature Box Plots</span>
-                            </button>
-                            <button class="viz-toggle-btn" id="view-outlier-dist-btn">
-                                <span>📊 Distribution & Threshold Bounds</span>
-                            </button>
-                            <div class="inline-col-select-wrap hidden" id="outlier-dist-select-wrap">
-                                <select id="outlier-dist-col-select" class="custom-select custom-select-sm">
-                                    <option value="">Select feature to inspect distribution...</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="outlier-chart-card">
-                        <div id="outlier-plotly-chart" class="plotly-chart-wrapper">
-                            <!-- Plotly will render here -->
-                            <div class="chart-loading-placeholder">
-                                <div class="spinner"></div>
-                                <p>Generating interactive outlier visualizations...</p>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- 2. OUTLIER SUMMARY TABLE -->
-                <section class="outliers-summary-section">
-                    <div class="section-header-flex">
-                        <div>
-                            <h3 class="subsection-title">Outlier Summary Table</h3>
-                            <p class="section-subtitle">Column-by-column metrics: Total observations, outlier count, percentage, lower/upper boundaries, and error classification.</p>
-                        </div>
-                        <div class="outlier-table-search-wrap">
-                            <div class="search-box">
-                                <span class="search-icon">🔎</span>
-                                <input type="text" id="outlier-table-search" placeholder="Filter numerical features..." class="search-input" />
-                            </div>
+                        <div class="table-container outlier-table-container">
+                            <table class="data-table" id="outlier-summary-table">
+                                <thead>
+                                    <tr>
+                                        <th>Column Name</th>
+                                        <th>Valid N</th>
+                                        <th>Outlier Count</th>
+                                        <th>Outlier %</th>
+                                        <th>Lower Bound</th>
+                                        <th>Upper Bound</th>
+                                        <th>Confirmed Errors</th>
+                                        <th>Statistical Outliers</th>
+                                        <th style="text-align: center;">Inspect</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="outlier-summary-tbody">
+                                    <!-- Injected dynamically via JS -->
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
-                    <div class="table-container outliers-table-container">
-                        <table class="data-table outliers-table" id="outliers-summary-table">
-                            <thead>
-                                <tr>
-                                    <th style="width: 40px;">#</th>
-                                    <th>Feature</th>
-                                    <th>Method</th>
-                                    <th>Valid N</th>
-                                    <th>Outlier Count</th>
-                                    <th>Outlier %</th>
-                                    <th>Lower Threshold</th>
-                                    <th>Upper Threshold</th>
-                                    <th>Diagnosis</th>
-                                    <th>Warnings</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="outliers-summary-tbody">
-                                <!-- Injected via JS -->
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
-
-                <!-- 3. NON-DESTRUCTIVE REMEDIATION TOOLBAR -->
-                <section class="outliers-remediation-section">
-                    <div class="remediation-card">
+                    <!-- Non-Destructive Outlier Remediation Controls -->
+                    <section class="outlier-remediation-card">
                         <div class="remediation-header">
                             <div class="remediation-title-wrap">
-                                <span class="remediation-icon">🛡️</span>
+                                <span class="remediation-icon">🛠️</span>
                                 <div>
-                                    <h4 class="remediation-title">Outlier Remediation Operations</h4>
-                                    <p class="remediation-subtitle">Outliers are <strong>never automatically deleted</strong>. Any remediation operation produces a new dataset in <code>data/processed/</code>, leaving the raw uploaded CSV completely untouched.</p>
+                                    <h3 class="remediation-title">Non-Destructive Outlier Remediation</h3>
+                                    <p class="remediation-subtitle">Safely remove outlier rows or winsorize bounds. Creates a new processed dataset in <code>data/processed/</code> with full lineage tracking.</p>
                                 </div>
                             </div>
-                            <div class="remediation-badge">Non-Destructive Lineage</div>
                         </div>
 
-                        <div class="remediation-actions-grid">
-                            <div class="remediation-action-item">
-                                <div class="action-item-text">
-                                    <strong>Keep All Outliers (No Removal)</strong>
-                                    <p>Retain all extreme observations as valid domain records. No file created.</p>
-                                </div>
-                                <button class="btn btn-outline" id="btn-outliers-keep">
-                                    <span>✓ Keep All Outliers</span>
-                                </button>
+                        <div class="remediation-controls-row">
+                            <div class="control-group">
+                                <label for="remed-action-select">Remediation Action:</label>
+                                <select id="remed-action-select" class="custom-select custom-select-sm">
+                                    <option value="remove">Remove Outlier Rows (Filter)</option>
+                                    <option value="cap">Cap Values at Bounds (Winsorize)</option>
+                                    <option value="remove_errors_only">Remove Confirmed Data Errors Only</option>
+                                </select>
                             </div>
 
-                            <div class="remediation-action-item">
-                                <div class="action-item-text">
-                                    <strong>Remove Confirmed Data Errors Only</strong>
-                                    <p>Drops rows with impossible sentinel codes, negative ages/prices, etc., while retaining legitimate extreme values.</p>
-                                </div>
-                                <button class="btn btn-warning" id="btn-outliers-remove-errors">
-                                    <span>🧹 Remove Data Errors Only</span>
-                                </button>
-                            </div>
-
-                            <div class="remediation-action-item">
-                                <div class="action-item-text">
-                                    <strong>Cap / Winsorize Outliers to Bounds</strong>
-                                    <p>Clamps extreme values to the lower and upper threshold fences without dropping any rows.</p>
-                                </div>
-                                <button class="btn btn-secondary" id="btn-outliers-cap">
-                                    <span>📏 Cap Outliers to Bounds</span>
-                                </button>
-                            </div>
-
-                            <div class="remediation-action-item">
-                                <div class="action-item-text">
-                                    <strong>Remove All Outlier Rows</strong>
-                                    <p>Drops all observational rows that violate lower or upper thresholds across numerical features.</p>
-                                </div>
-                                <button class="btn btn-danger" id="btn-outliers-remove">
-                                    <span>🗑️ Remove All Outlier Rows</span>
-                                </button>
-                            </div>
+                            <button class="btn btn-primary" id="btn-execute-outlier-remediation">
+                                <span>⚡ Apply Outlier Remediation</span>
+                            </button>
                         </div>
-                    </div>
+                    </section>
                 </section>
-
             </div>
 
             <!-- ========================================================= -->
-            <!-- TAB: AUTOMATIC VISUALIZATION ENGINE (PHASE 8) -->
+            <!-- VIEW 8: VISUALIZATIONS (AUTO RECOMMENDATIONS & BUILDER) -->
             <!-- ========================================================= -->
-            <div class="studio-tab-content hidden" id="visualization-view">
-                
-                <!-- Section Header Banner -->
-                <section class="viz-header-section">
-                    <div class="section-title-wrap">
-                        <h2 class="section-title">Automatic Visualization Engine</h2>
-                        <span class="section-badge badge-indigo">Plotly Recommendation Engine</span>
-                    </div>
-                    <p class="section-subtitle">Intelligent chart recommendations based on column semantics, distributions, pairwise associations, temporal patterns, and an interactive custom chart builder studio.</p>
+            <div class="studio-tab-content hidden" id="visualization-view" role="tabpanel">
+                <section class="visualization-hero-section">
                     
-                    <!-- Visualization Quick KPIs -->
-                    <div class="viz-kpi-bar" id="viz-kpi-bar">
-                        <div class="viz-kpi-item">
-                            <span class="viz-kpi-label">Recommended Charts</span>
-                            <strong class="viz-kpi-value text-indigo" id="viz-kpi-total-count">--</strong>
-                        </div>
-                        <div class="viz-kpi-item">
-                            <span class="viz-kpi-label">Distributions</span>
-                            <strong class="viz-kpi-value" id="viz-kpi-dist-count">--</strong>
-                        </div>
-                        <div class="viz-kpi-item">
-                            <span class="viz-kpi-label">Bivariate Relationships</span>
-                            <strong class="viz-kpi-value" id="viz-kpi-rel-count">--</strong>
-                        </div>
-                        <div class="viz-kpi-item">
-                            <span class="viz-kpi-label">Categorical Breakdown</span>
-                            <strong class="viz-kpi-value" id="viz-kpi-cat-count">--</strong>
-                        </div>
-                        <div class="viz-kpi-item">
-                            <span class="viz-kpi-label">Temporal Trends</span>
-                            <strong class="viz-kpi-value text-cyan" id="viz-kpi-trend-count">--</strong>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- 1. RECOMMENDED VISUALIZATIONS SECTION -->
-                <section class="recommended-viz-section">
+                    <!-- Visualization Section Header -->
                     <div class="section-header-flex">
                         <div>
-                            <h3 class="subsection-title">Recommended Visualizations</h3>
-                            <p class="section-subtitle">Ranked by data relevance, statistical correlation, and feature distribution entropy.</p>
-                        </div>
-                        <!-- Recommendation Filter Pills -->
-                        <div class="viz-filter-group" id="viz-filter-group">
-                            <button class="viz-filter-btn active" data-filter="all">All Charts (<span id="rec-filter-all-count">0</span>)</button>
-                            <button class="viz-filter-btn" data-filter="Distributions">Distributions</button>
-                            <button class="viz-filter-btn" data-filter="Relationships">Relationships</button>
-                            <button class="viz-filter-btn" data-filter="Categorical">Categorical</button>
-                            <button class="viz-filter-btn" data-filter="Trends">Time Trends</button>
+                            <h2 class="section-title">Automated Visualizations & Custom Chart Studio</h2>
+                            <p class="section-subtitle">Ranked, non-redundant Plotly chart recommendations and interactive custom chart generator.</p>
                         </div>
                     </div>
 
-                    <!-- Recommended Charts Grid -->
-                    <div class="recommended-charts-grid" id="recommended-charts-grid">
+                    <!-- Category Filter Tabs for Recommendations -->
+                    <div class="viz-category-filter-bar">
+                        <div class="viz-filter-group" id="viz-category-filter-group">
+                            <button class="viz-filter-btn active" data-category="all">All Charts (<span id="viz-count-all">0</span>)</button>
+                            <button class="viz-filter-btn" data-category="distribution">📊 Distribution (<span id="viz-count-dist">0</span>)</button>
+                            <button class="viz-filter-btn" data-category="relationship">🔗 Relationship (<span id="viz-count-rel">0</span>)</button>
+                            <button class="viz-filter-btn" data-category="categorical">🏷️ Categorical (<span id="viz-count-cat">0</span>)</button>
+                            <button class="viz-filter-btn" data-category="temporal">📅 Temporal (<span id="viz-count-temp">0</span>)</button>
+                        </div>
+                    </div>
+
+                    <!-- Automated Chart Recommendations Grid -->
+                    <div class="viz-recommendations-grid" id="viz-recommendations-grid">
                         <div class="viz-loading-placeholder">
                             <div class="spinner"></div>
-                            <p>Analyzing column schemas and generating intelligent Plotly chart recommendations...</p>
+                            <p>Analyzing schema & computing optimal chart recommendations...</p>
                         </div>
                     </div>
-                </section>
 
-                <!-- 2. BUILD YOUR OWN CHART SECTION -->
-                <section class="custom-chart-builder-section">
-                    <div class="section-header-flex">
-                        <div>
-                            <h3 class="subsection-title">Build Your Own Chart</h3>
-                            <p class="section-subtitle">Select custom X and Y dimensions, color groupings, chart types, and aggregations for on-demand analysis.</p>
+                    <!-- Custom Chart Builder Studio Card -->
+                    <section class="custom-chart-builder-card">
+                        <div class="builder-header">
+                            <div class="builder-title-wrap">
+                                <span class="builder-icon">🎨</span>
+                                <div>
+                                    <h3 class="builder-title">Interactive Custom Chart Builder</h3>
+                                    <p class="builder-subtitle">Construct custom Plotly visualizations by selecting chart types, features, color groupings, and aggregations.</p>
+                                </div>
+                            </div>
                         </div>
-                        <span class="section-badge badge-cyan">Interactive Workbench</span>
-                    </div>
 
-                    <div class="chart-builder-card">
-                        <!-- Controls Toolbar Form -->
-                        <div class="builder-controls-grid">
-                            <!-- X Column -->
-                            <div class="builder-control-item">
-                                <label for="builder-x-col" class="control-label">X-Axis Column <span class="required-star">*</span></label>
-                                <select id="builder-x-col" class="custom-select custom-select-sm">
-                                    <option value="">Select X Column...</option>
+                        <div class="builder-form-grid">
+                            <div class="form-group">
+                                <label for="custom-chart-type">Chart Type:</label>
+                                <select id="custom-chart-type" class="custom-select">
+                                    <option value="bar" selected>Bar Chart</option>
+                                    <option value="line">Line Chart</option>
+                                    <option value="scatter">Scatter Plot</option>
+                                    <option value="histogram">Histogram</option>
+                                    <option value="box">Box Plot</option>
+                                    <option value="pie">Pie / Donut Chart</option>
+                                    <option value="area">Area Chart</option>
                                 </select>
                             </div>
 
-                            <!-- Y Column -->
-                            <div class="builder-control-item">
-                                <label for="builder-y-col" class="control-label">Y-Axis Column <span class="optional-label">(Optional)</span></label>
-                                <select id="builder-y-col" class="custom-select custom-select-sm">
-                                    <option value="">None / Frequency Count</option>
+                            <div class="form-group">
+                                <label for="custom-x-col">X-Axis Column:</label>
+                                <select id="custom-x-col" class="custom-select">
+                                    <option value="">Select feature...</option>
                                 </select>
                             </div>
 
-                            <!-- Chart Type -->
-                            <div class="builder-control-item">
-                                <label for="builder-chart-type" class="control-label">Chart Type</label>
-                                <select id="builder-chart-type" class="custom-select custom-select-sm">
-                                    <option value="bar" selected>Bar Chart (Grouped / Frequency)</option>
-                                    <option value="line">Line Chart (Trend / Time Series)</option>
-                                    <option value="scatter">Scatter Plot (Correlation)</option>
-                                    <option value="histogram">Histogram (Distribution)</option>
-                                    <option value="box">Box Plot (Quartile Spread)</option>
-                                    <option value="pie">Donut / Pie Chart (Proportions)</option>
-                                    <option value="area">Area Chart (Filled Series)</option>
+                            <div class="form-group">
+                                <label for="custom-y-col">Y-Axis Column (Optional):</label>
+                                <select id="custom-y-col" class="custom-select">
+                                    <option value="">None (Count / Frequency)</option>
                                 </select>
                             </div>
 
-                            <!-- Aggregation -->
-                            <div class="builder-control-item">
-                                <label for="builder-aggregation" class="control-label">Aggregation Function</label>
-                                <select id="builder-aggregation" class="custom-select custom-select-sm">
-                                    <option value="none" selected>None (Raw / Automatic)</option>
+                            <div class="form-group">
+                                <label for="custom-color-col">Color Grouping (Optional):</label>
+                                <select id="custom-color-col" class="custom-select">
+                                    <option value="">None</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="custom-aggregation">Aggregation:</label>
+                                <select id="custom-aggregation" class="custom-select">
+                                    <option value="none" selected>None (Raw values)</option>
                                     <option value="mean">Mean (Average)</option>
                                     <option value="sum">Sum (Total)</option>
                                     <option value="median">Median</option>
-                                    <option value="count">Count of Records</option>
-                                    <option value="min">Minimum Value</option>
-                                    <option value="max">Maximum Value</option>
-                                    <option value="std">Standard Deviation</option>
+                                    <option value="count">Count (Frequency)</option>
+                                    <option value="min">Minimum</option>
+                                    <option value="max">Maximum</option>
                                 </select>
                             </div>
 
-                            <!-- Group / Color Column -->
-                            <div class="builder-control-item">
-                                <label for="builder-color-col" class="control-label">Group / Color <span class="optional-label">(Optional)</span></label>
-                                <select id="builder-color-col" class="custom-select custom-select-sm">
-                                    <option value="">No Grouping</option>
-                                </select>
-                            </div>
-
-                            <!-- Custom Title -->
-                            <div class="builder-control-item">
-                                <label for="builder-chart-title" class="control-label">Custom Chart Title</label>
-                                <input type="text" id="builder-chart-title" class="custom-input custom-input-sm" placeholder="e.g. Sales by Department" />
+                            <div class="form-group form-group-action">
+                                <button class="btn btn-primary" id="btn-generate-custom-chart">
+                                    <span>⚡ Generate Chart</span>
+                                </button>
                             </div>
                         </div>
 
-                        <!-- Builder Action Buttons -->
-                        <div class="builder-actions-bar">
-                            <button class="btn btn-primary" id="btn-generate-custom-chart">
-                                <span class="btn-icon">⚡</span>
-                                <span>Generate / Update Chart</span>
-                            </button>
-                            <button class="btn btn-outline btn-sm" id="btn-reset-custom-chart">
-                                <span>↺ Reset Controls</span>
-                            </button>
-                            <span class="builder-hint-text">Charts render dynamically with interactive zoom, hover tooltips, and PNG export.</span>
-                        </div>
-
-                        <!-- Live Plotly Canvas -->
-                        <div class="custom-chart-canvas-wrap">
-                            <div id="custom-plotly-canvas" class="plotly-chart-wrapper">
-                                <div class="builder-empty-placeholder">
-                                    <span class="empty-icon">📊</span>
-                                    <h4>Custom Chart Workbench Ready</h4>
-                                    <p>Select your X and Y columns above and click "Generate / Update Chart" to render an interactive visualization.</p>
-                                </div>
+                        <!-- Custom Generated Chart Container -->
+                        <div class="custom-chart-result-container hidden" id="custom-chart-result-container">
+                            <div class="custom-chart-header">
+                                <h4 class="custom-chart-title" id="custom-chart-title-display">Generated Custom Visualization</h4>
                             </div>
+                            <div class="custom-plot-container" id="plotly-custom-chart"></div>
                         </div>
-                    </div>
+                    </section>
                 </section>
-
             </div>
 
             <!-- ========================================================= -->
-            <!-- TAB 3: DATASET PREVIEW & EXPLORER -->
+            <!-- VIEW 9: AI INSIGHTS (EXECUTIVE SYNTHESIS ENGINE) -->
             <!-- ========================================================= -->
-            <div class="studio-tab-content hidden" id="preview-view">
-                <section class="preview-section">
+            <div class="studio-tab-content hidden" id="insights-view" role="tabpanel">
+                <section class="insights-hero-section">
+                    
                     <div class="section-header-flex">
                         <div>
-                            <h2 class="section-title">Dataset Explorer</h2>
-                            <p class="section-subtitle">Real dataset records with live search filter, pagination, and raw vs. cleaned view toggle.</p>
+                            <h2 class="section-title">AI Analyst Insights Engine</h2>
+                            <p class="section-subtitle">Multi-perspective executive narrative, domain observations, risk flags, and strategic action plans strictly grounded in deterministic Python metrics.</p>
                         </div>
-                        <div class="preview-toggle-wrap">
-                            <button class="preview-toggle-btn active" id="view-raw-data-btn">Raw Dataset</button>
-                            <button class="preview-toggle-btn" id="view-clean-data-btn">Cleaned Dataset</button>
-                        </div>
-                    </div>
-
-                    <div class="explorer-toolbar">
-                        <div class="search-box">
-                            <span class="search-icon">🔎</span>
-                            <input type="text" id="table-search" placeholder="Filter rows in current view..." class="search-input" />
-                        </div>
-                        <div class="pagination-info" id="pagination-info">
-                            Showing page 1 of 1 (0 total rows)
-                        </div>
-                        <div class="pagination-buttons">
-                            <button class="btn btn-outline btn-sm" id="prev-page-btn" disabled>&larr; Previous</button>
-                            <button class="btn btn-outline btn-sm" id="next-page-btn" disabled>Next &rarr;</button>
-                        </div>
-                    </div>
-
-                    <div class="table-container preview-table-container">
-                        <table class="data-table" id="data-preview-table">
-                            <thead id="data-table-head">
-                                <!-- Injected via JS -->
-                            </thead>
-                            <tbody id="data-table-body">
-                                <!-- Injected via JS -->
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
-            <!-- ========================================================= -->
-            <!-- TAB 4: AI INSIGHTS ENGINE VIEW (Phase 9) -->
-            <!-- ========================================================= -->
-            <div class="studio-tab-content hidden" id="insights-view">
-                <!-- AI Insights Header & Control Toolbar -->
-                <section class="insights-toolbar-section">
-                    <div class="insights-header-wrap">
-                        <div class="insights-title-box">
-                            <div class="insights-logo-badge">
-                                <span class="badge-icon">✨</span>
-                                <span>Phase 9 AI Insight Engine</span>
-                            </div>
-                            <h2 class="section-title">Automated Executive Intelligence Report</h2>
-                            <p class="section-subtitle">Natural-language strategic insights synthesized directly from verified Python statistical, quality, correlation, and anomaly engines.</p>
-                        </div>
-                        <div class="insights-grounding-pill">
-                            <span class="grounding-dot"></span>
-                            <span class="grounding-text">Deterministic Grounding: Zero Hallucination Mandate</span>
-                        </div>
-                    </div>
-
-                    <!-- Interactive Generation Toolbar -->
-                    <div class="insights-controls-card">
-                        <div class="insights-controls-left">
-                            <div class="control-group">
-                                <label for="ai-provider-select" class="control-label">AI Engine Provider</label>
-                                <select id="ai-provider-select" class="custom-select custom-select-sm">
-                                    <option value="gemini">Google Gemini (Default)</option>
-                                    <option value="openai">OpenAI (GPT-4o)</option>
-                                    <option value="anthropic">Anthropic Claude (3.5 Sonnet)</option>
-                                    <option value="deterministic_fallback">Deterministic Fallback (No Key)</option>
-                                </select>
-                            </div>
-                            <div class="control-group">
-                                <label for="ai-model-select" class="control-label">Model Target</label>
-                                <select id="ai-model-select" class="custom-select custom-select-sm">
-                                    <option value="gemini-1.5-pro">gemini-1.5-pro</option>
-                                    <option value="gemini-1.5-flash">gemini-1.5-flash</option>
-                                    <option value="gemini-2.0-flash">gemini-2.0-flash</option>
-                                </select>
-                            </div>
-                            <div class="provider-status-badge" id="ai-provider-status-badge">
-                                <span class="status-indicator"></span>
-                                <span id="ai-provider-status-text">Provider Ready</span>
-                            </div>
-                        </div>
-
-                        <div class="insights-controls-right">
-                            <button class="btn btn-primary" id="btn-generate-insights">
-                                <span class="btn-icon">⚡</span>
-                                <span id="btn-generate-text">Generate AI Insights</span>
-                            </button>
-                            <button class="btn btn-outline btn-sm" id="btn-copy-insights">
-                                <span class="btn-icon">📋</span>
-                                <span>Copy Report</span>
-                            </button>
-                            <button class="btn btn-outline btn-sm" id="btn-view-raw-context">
-                                <span class="btn-icon">🔍</span>
-                                <span>Python Context</span>
+                        
+                        <!-- AI Provider Switcher -->
+                        <div class="ai-provider-controls">
+                            <label for="ai-provider-select">Provider:</label>
+                            <select id="ai-provider-select" class="custom-select custom-select-sm">
+                                <option value="gemini" selected>Google Gemini (Gemini 2.5 Flash)</option>
+                                <option value="groq">Groq (Llama 3.3 70B)</option>
+                                <option value="openai">OpenAI (GPT-4o)</option>
+                                <option value="anthropic">Anthropic (Claude 3.5 Sonnet)</option>
+                                <option value="ollama">Ollama (Local LLM)</option>
+                                <option value="local">Deterministic Python Synthesizer</option>
+                            </select>
+                            <button class="btn btn-ai btn-sm" id="btn-regenerate-insights">
+                                <span class="ai-sparkle">✨</span>
+                                <span>Regenerate Insights</span>
                             </button>
                         </div>
                     </div>
-                </section>
 
-                <!-- Insights Loading State -->
-                <div class="insights-loading hidden" id="insights-loading">
-                    <div class="ai-pulse-spinner">
-                        <div class="pulse-ring"></div>
-                        <div class="pulse-core">✨</div>
+                    <!-- Grounding Transparency Banner -->
+                    <div class="grounding-banner">
+                        <span class="banner-icon">🛡️</span>
+                        <div class="banner-text">
+                            <strong>Zero Hallucination Guarantee:</strong> All insights are strictly grounded on Python analysis metrics.
+                        </div>
+                        <button class="btn btn-outline btn-xs" id="btn-inspect-raw-context">
+                            <span>Inspect JSON Context &rarr;</span>
+                        </button>
                     </div>
-                    <h3 class="loading-title">Synthesizing Dataset Intelligence...</h3>
-                    <p class="loading-desc" id="insights-loading-step">Assembling structured analysis results from Python profiler, statistics, and correlation engines...</p>
-                </div>
 
-                <!-- Insights Results Container -->
-                <div class="insights-container" id="insights-container">
-                    <!-- 1. Executive Summary Hero Banner -->
-                    <section class="insights-hero-card" id="card-executive-summary">
-                        <div class="hero-card-header">
-                            <div class="hero-title-group">
-                                <span class="section-num-badge">01</span>
-                                <div>
-                                    <h3 class="hero-card-title">Executive Summary</h3>
-                                    <p class="hero-card-subtitle">Strategic overview of dataset volume, business health, and structural integrity</p>
+                    <!-- Insights 8 Structured Sections Grid -->
+                    <div class="insights-sections-grid" id="insights-cards-grid">
+                        
+                        <!-- Section 1: Executive Summary -->
+                        <div class="insight-card insight-card-hero" id="card-executive-summary">
+                            <div class="insight-card-header">
+                                <div class="header-left">
+                                    <span class="card-icon-wrap icon-indigo">✨</span>
+                                    <div>
+                                        <h4 class="card-title">Executive Summary</h4>
+                                        <span class="card-badge">Section 01 • High-Level Synthesis</span>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="hero-tags">
-                                <span class="meta-pill pill-indigo" id="pill-dataset-dims">-- Rows × -- Cols</span>
-                                <span class="meta-pill pill-emerald" id="pill-dataset-health">Health Grade --</span>
-                                <span class="meta-pill pill-cyan" id="pill-engine-provider">Provider: --</span>
+                            <div class="insight-card-body markdown-rendered" id="content-executive-summary">
+                                <p class="placeholder-text">Generating grounded executive summary...</p>
                             </div>
                         </div>
-                        <div class="hero-card-body markdown-rendered" id="content-executive-summary">
-                            <p class="placeholder-text">Click "Generate AI Insights" above to synthesize an executive overview of this dataset.</p>
-                        </div>
-                    </section>
 
-                    <!-- 2. Structured Section Grid (7 remaining sections) -->
-                    <div class="insights-sections-grid">
-                        
                         <!-- Section 2: Key Findings -->
                         <div class="insight-card" id="card-key-findings">
                             <div class="insight-card-header">
                                 <div class="header-left">
-                                    <span class="card-icon-wrap icon-blue">🎯</span>
+                                    <span class="card-icon-wrap icon-cyan">📊</span>
                                     <div>
-                                        <h4 class="card-title">Key Findings</h4>
-                                        <span class="card-badge">Section 02 • Statistical Highlights</span>
+                                        <h4 class="card-title">Key Analytical Findings</h4>
+                                        <span class="card-badge">Section 02 • Core Distributions</span>
                                     </div>
                                 </div>
                             </div>
                             <div class="insight-card-body markdown-rendered" id="content-key-findings">
-                                <p class="placeholder-text">Loading key statistical highlights...</p>
+                                <p class="placeholder-text">Extracting key findings from descriptive statistics...</p>
                             </div>
                         </div>
 
-                        <!-- Section 3: Important Trends -->
-                        <div class="insight-card" id="card-important-trends">
-                            <div class="insight-card-header">
-                                <div class="header-left">
-                                    <span class="card-icon-wrap icon-cyan">📈</span>
-                                    <div>
-                                        <h4 class="card-title">Important Trends</h4>
-                                        <span class="card-badge">Section 03 • Distributions & Dynamics</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="insight-card-body markdown-rendered" id="content-important-trends">
-                                <p class="placeholder-text">Loading distribution and temporal trends...</p>
-                            </div>
-                        </div>
-
-                        <!-- Section 4: Important Relationships -->
-                        <div class="insight-card" id="card-important-relationships">
+                        <!-- Section 3: Correlations & Patterns -->
+                        <div class="insight-card" id="card-correlations-patterns">
                             <div class="insight-card-header">
                                 <div class="header-left">
                                     <span class="card-icon-wrap icon-purple">🔗</span>
                                     <div>
-                                        <h4 class="card-title">Important Relationships</h4>
-                                        <span class="card-badge">Section 04 • Correlation & Association</span>
+                                        <h4 class="card-title">Correlations & Patterns</h4>
+                                        <span class="card-badge">Section 03 • Bivariate Relationships</span>
                                     </div>
                                 </div>
                             </div>
-                            <div class="non-causation-alert">
-                                <span class="alert-icon">ℹ️</span>
-                                <span>Note: Statistical correlation indicates co-movement and does not establish causation.</span>
-                            </div>
-                            <div class="insight-card-body markdown-rendered" id="content-important-relationships">
-                                <p class="placeholder-text">Loading correlation and relationship insights...</p>
+                            <div class="insight-card-body markdown-rendered" id="content-correlations-patterns">
+                                <p class="placeholder-text">Analyzing significant correlation pairs...</p>
                             </div>
                         </div>
 
-                        <!-- Section 5: Data Quality Concerns -->
+                        <!-- Section 4: Data Quality Concerns -->
                         <div class="insight-card" id="card-data-quality-concerns">
                             <div class="insight-card-header">
                                 <div class="header-left">
                                     <span class="card-icon-wrap icon-amber">🛡️</span>
                                     <div>
                                         <h4 class="card-title">Data Quality Concerns</h4>
-                                        <span class="card-badge">Section 05 • Integrity & Cleanliness</span>
+                                        <span class="card-badge">Section 04 • Integrity & Cleanliness</span>
                                     </div>
                                 </div>
                             </div>
                             <div class="insight-card-body markdown-rendered" id="content-data-quality-concerns">
-                                <p class="placeholder-text">Loading data quality audit concerns...</p>
+                                <p class="placeholder-text">Auditing data quality issues...</p>
                             </div>
                         </div>
 
-                        <!-- Section 6: Potential Outlier Findings -->
+                        <!-- Section 5: Anomalies & Risks -->
                         <div class="insight-card" id="card-potential-outliers">
                             <div class="insight-card-header">
                                 <div class="header-left">
                                     <span class="card-icon-wrap icon-rose">⚠️</span>
                                     <div>
-                                        <h4 class="card-title">Potential Outlier Findings</h4>
-                                        <span class="card-badge">Section 06 • Anomalies & Extreme Tails</span>
+                                        <h4 class="card-title">Anomalies & Potential Risks</h4>
+                                        <span class="card-badge">Section 05 • Outlier Tails & Risks</span>
                                     </div>
                                 </div>
                             </div>
                             <div class="insight-card-body markdown-rendered" id="content-potential-outliers">
-                                <p class="placeholder-text">Loading outlier and anomaly findings...</p>
+                                <p class="placeholder-text">Scanning anomaly patterns...</p>
                             </div>
                         </div>
 
-                        <!-- Section 7: Business Recommendations -->
+                        <!-- Section 6: Business Recommendations -->
                         <div class="insight-card insight-card-accent" id="card-business-recommendations">
                             <div class="insight-card-header">
                                 <div class="header-left">
                                     <span class="card-icon-wrap icon-emerald">💡</span>
                                     <div>
-                                        <h4 class="card-title">Business & Data Recommendations</h4>
-                                        <span class="card-badge">Section 07 • Actionable Strategy</span>
+                                        <h4 class="card-title">Strategic Business Recommendations</h4>
+                                        <span class="card-badge">Section 06 • Actionable Strategy</span>
                                     </div>
                                 </div>
                             </div>
                             <div class="insight-card-body markdown-rendered" id="content-business-recommendations">
-                                <p class="placeholder-text">Loading strategic business and data recommendations...</p>
-                            </div>
-                        </div>
-
-                        <!-- Section 8: Suggested Follow-up Analysis -->
-                        <div class="insight-card insight-card-accent" id="card-suggested-follow-up">
-                            <div class="insight-card-header">
-                                <div class="header-left">
-                                    <span class="card-icon-wrap icon-indigo">🔬</span>
-                                    <div>
-                                        <h4 class="card-title">Suggested Follow-up Analysis</h4>
-                                        <span class="card-badge">Section 08 • Recommended Deep-Dives</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="insight-card-body markdown-rendered" id="content-suggested-follow-up">
-                                <p class="placeholder-text">Loading suggested analytical next steps...</p>
+                                <p class="placeholder-text">Formulating strategic business takeaways...</p>
                             </div>
                         </div>
 
                     </div>
-                </div>
+                </section>
+            </div>
+
+            <!-- ========================================================= -->
+            <!-- VIEW 10: ASK DATASET (CONVERSATIONAL AI ANALYST) -->
+            <!-- ========================================================= -->
+            <div class="studio-tab-content hidden" id="chat-view" role="tabpanel">
+                <section class="chat-studio-container">
+                    
+                    <!-- Chat Header -->
+                    <div class="chat-header-bar">
+                        <div class="chat-header-info">
+                            <span class="chat-icon">💬</span>
+                            <div>
+                                <h2 class="chat-title">Ask Your Dataset (Conversational AI Analyst)</h2>
+                                <p class="chat-subtitle">Ask questions in natural language. Powered by deterministic tool execution and automated Plotly chart synthesis.</p>
+                            </div>
+                        </div>
+                        <div class="chat-header-actions">
+                            <span class="tool-policy-pill">Strict Python Tool Sandbox</span>
+                            <button class="btn btn-outline btn-xs" id="btn-clear-chat-history">
+                                <span>Clear History</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Suggested Questions Quick Bar -->
+                    <div class="suggested-questions-bar">
+                        <span class="suggested-label">💡 Suggested Questions:</span>
+                        <div class="suggested-chips-container" id="chat-suggested-chips">
+                            <button class="chip-btn" data-query="Give me a comprehensive summary of this dataset">📋 Summary Overview</button>
+                            <button class="chip-btn" data-query="Which feature has the strongest correlation with other features?">🔗 Strongest Correlations</button>
+                            <button class="chip-btn" data-query="Are there any extreme outliers or anomalous values?">🎯 Outlier Check</button>
+                            <button class="chip-btn" data-query="What is the distribution and breakdown of categorical features?">🏷️ Category Breakdown</button>
+                        </div>
+                    </div>
+
+                    <!-- Messages Stream Container -->
+                    <div class="chat-messages-container" id="chat-messages-container">
+                        <div class="chat-message message-agent">
+                            <div class="message-avatar">⚡</div>
+                            <div class="message-content-wrap">
+                                <div class="message-sender-name">AI Data Analyst</div>
+                                <div class="message-text">
+                                    Hello! I am ready to analyze your dataset. Ask me any analytical question, request group aggregations, identify correlations, inspect outliers, or explore distributions.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chat Input Bar -->
+                    <div class="chat-input-bar">
+                        <div class="input-wrapper">
+                            <input type="text" id="chat-query-input" placeholder="Ask a question about your dataset (e.g., 'What is the average sales by region?', 'Show correlation between age and salary')..." class="chat-input-field" />
+                            <button class="btn btn-primary" id="chat-send-btn">
+                                <span>Send Question</span>
+                                <span class="btn-loader hidden" id="chat-loader"></span>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- ========================================================= -->
+            <!-- VIEW 11: REPORTS (EXECUTIVE REPORT GENERATOR) -->
+            <!-- ========================================================= -->
+            <div class="studio-tab-content hidden" id="reports-view" role="tabpanel">
+                <section class="reports-studio-section">
+                    
+                    <div class="section-header-flex">
+                        <div>
+                            <h2 class="section-title">Executive Analytics Report Generator</h2>
+                            <p class="section-subtitle">Compile comprehensive executive reports containing overview statistics, data quality audit, key correlations, outlier analysis, and AI strategic takeaways.</p>
+                        </div>
+
+                        <!-- Report Action Buttons -->
+                        <div class="report-actions-group">
+                            <button class="btn btn-outline btn-sm" id="btn-copy-report-md">
+                                <span>📋 Copy Markdown</span>
+                            </button>
+                            <a href="#" class="btn btn-outline btn-sm" id="btn-download-report-md">
+                                <span>⬇️ Download .MD</span>
+                            </a>
+                            <a href="#" class="btn btn-primary btn-sm" id="btn-download-report-html">
+                                <span>📄 Download Styled HTML</span>
+                            </a>
+                            <button class="btn btn-outline btn-sm" id="btn-print-report">
+                                <span>🖨️ Print / PDF</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Format View Mode Tabs -->
+                    <div class="report-view-mode-bar">
+                        <button class="report-mode-btn active" id="btn-report-view-html">Styled Presentation View</button>
+                        <button class="report-mode-btn" id="btn-report-view-md">Markdown Source</button>
+                    </div>
+
+                    <!-- Report Presentation Container -->
+                    <div class="report-presentation-container" id="report-html-preview">
+                        <div class="report-loading-state">
+                            <div class="spinner"></div>
+                            <p>Compiling executive report across all analysis engines...</p>
+                        </div>
+                    </div>
+
+                    <!-- Markdown Source Container (Hidden by default) -->
+                    <div class="report-markdown-container hidden" id="report-md-preview">
+                        <pre><code class="markdown-code-block" id="report-md-content">Loading report markdown...</code></pre>
+                    </div>
+                </section>
             </div>
 
         </div>
     </main>
 
-    <!-- Raw Grounding Python Context Modal (Phase 9) -->
+    <!-- Raw Grounding Python Context Modal (Zero Hallucination Audit) -->
     <div class="modal-backdrop hidden" id="raw-context-modal">
         <div class="modal-dialog modal-dialog-lg">
             <div class="modal-header">
@@ -1489,7 +1622,6 @@
             </div>
         </div>
     </div>
-
 
     <!-- Outlier Records Drill-Down Inspector Modal -->
     <div class="modal-backdrop hidden" id="outlier-inspector-modal">
@@ -1542,17 +1674,23 @@
         </div>
     </div>
 
+    <!-- Toast Notification Banner -->
+    <div class="toast-notification hidden" id="toast-notification">
+        <span class="toast-icon" id="toast-icon">ℹ️</span>
+        <span class="toast-message" id="toast-message">Notification message</span>
+    </div>
+
     <!-- Footer -->
     <footer class="main-footer">
-        <div class="container footer-content">
+        <div class="container-fluid footer-content">
             <div class="footer-left">
-                <span class="footer-title">AI Data Analyst Agent</span>
-                <span class="footer-desc">Production-Grade Automated Dataset Profiler & Data Quality Cleaning Engine.</span>
+                <span class="footer-title">AI Data Analyst Studio</span>
+                <span class="footer-desc">Professional Portfolio Analytics Application &bull; Automated Profiling, Quality Auditing, Statistical Modeling, Interactive Plotly Visualizations & Executive Reports.</span>
             </div>
             <div class="footer-right">
-                <span>Phase 4: Automated Data Quality & Cleaning Engine</span>
-                <span>•</span>
-                <span>Python / Flask / Pandas</span>
+                <span>Phase 12: Professional Analytics Dashboard UI</span>
+                <span>&bull;</span>
+                <span>Python / Flask / Pandas / Plotly.js</span>
             </div>
         </div>
     </footer>
