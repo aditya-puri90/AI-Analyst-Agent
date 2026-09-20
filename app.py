@@ -17,6 +17,7 @@ from utils.file_handler import (
     load_dataset,
     get_dataset_summary,
     list_uploaded_datasets,
+    get_dataset_metadata,
     get_file_path,
     save_processed_dataset,
     get_latest_processed_file,
@@ -160,7 +161,7 @@ def create_app() -> Flask:
         return jsonify({
             "status": "healthy",
             "service": "AI Data Analyst Agent",
-            "phase": "Phase 12: Professional Analytics Dashboard UI",
+            "phase": "Phase 13: Automated Analysis Report (Building on Phase 12 Dashboard)",
             "capabilities": [
                 "dataset_profiling",
                 "data_quality_auditing",
@@ -176,6 +177,9 @@ def create_app() -> Flask:
                 "controlled_python_tool_registry",
                 "executive_reports",
                 "professional_dashboard_ui",
+                "automated_analysis_reports",
+                "category_tagged_insights",
+                "multi_format_export",
             ],
             "max_upload_mb": Config.MAX_CONTENT_LENGTH / (1024 * 1024),
             "allowed_extensions": list(Config.ALLOWED_EXTENSIONS),
@@ -238,6 +242,16 @@ def create_app() -> Flask:
 
         profiler = DatasetProfiler(df, dataset_id=dataset_id)
         profile = profiler.to_dict()
+
+        # Attach original_filename and metadata from registry if available
+        meta = get_dataset_metadata(dataset_id)
+        if meta:
+            profile["original_filename"] = meta.get("original_name") or meta.get("original_filename") or dataset_id
+            profile["is_processed"] = meta.get("is_processed", False)
+        else:
+            profile["original_filename"] = dataset_id
+            profile["is_processed"] = False
+
         return jsonify({"success": True, "profile": profile})
 
     @app.route("/api/profile/<dataset_id>/columns", methods=["GET"])
@@ -1110,13 +1124,14 @@ def create_app() -> Flask:
         })
 
     # -------------------------------------------------------------
-    # Phase 12: Executive Report Generation & Export API Routes
+    # Phase 13: Automated Analysis Report Generation & Export API Routes
     # -------------------------------------------------------------
     @app.route("/api/report/generate/<dataset_id>", methods=["GET", "POST"])
+    @app.route("/api/reports/generate/<dataset_id>", methods=["GET", "POST"])
     def generate_report_route(dataset_id: str):
         """
-        Compile comprehensive executive report for the dataset in structured JSON,
-        formatted Markdown, and standalone styled HTML.
+        Compile comprehensive 9-section executive report for the dataset in structured JSON,
+        formatted Markdown, and standalone styled HTML with taxonomy badges.
         """
         df, error = load_dataset(dataset_id)
         if error or df is None:
@@ -1136,22 +1151,33 @@ def create_app() -> Flask:
         })
 
     @app.route("/api/report/download/<dataset_id>", methods=["GET"])
-    def download_report_route(dataset_id: str):
+    @app.route("/api/reports/download/<dataset_id>", methods=["GET"])
+    @app.route("/api/report/download/<dataset_id>/<report_format>", methods=["GET"])
+    @app.route("/api/reports/download/<dataset_id>/<report_format>", methods=["GET"])
+    def download_report_route(dataset_id: str, report_format: str = None):
         """
-        Download executive report as .html or .md attachment.
-        Query param 'format': 'html' (default) or 'md'.
+        Download executive report as .html, .md, or .json attachment.
+        Query param 'format' or path param 'report_format': 'html' (default), 'md', or 'json'.
         """
-        report_format = request.args.get("format", "html").lower().strip()
+        import json as json_lib
+        if not report_format:
+            report_format = request.args.get("format", "html")
+        report_format = report_format.lower().strip()
+        
         df, error = load_dataset(dataset_id)
         if error or df is None:
             return jsonify({"success": False, "error": error or "Dataset not found."}), 404
 
         generator = ReportGenerator(df, dataset_id=dataset_id)
         
-        if report_format == "md" or report_format == "markdown":
+        if report_format in ["md", "markdown"]:
             content = generator.generate_markdown_report()
             mimetype = "text/markdown"
             filename = f"report_{dataset_id}.md"
+        elif report_format in ["json"]:
+            content = json_lib.dumps(generator.generate_structured_report(), indent=2)
+            mimetype = "application/json"
+            filename = f"report_{dataset_id}.json"
         else:
             content = generator.generate_html_report()
             mimetype = "text/html"
