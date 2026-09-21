@@ -144,17 +144,25 @@ def save_uploaded_file(file_storage: FileStorage) -> Tuple[Optional[str], Option
         # 5. Record metadata in registry
         file_size_bytes = target_path.stat().st_size
         registry = _read_registry()
+        rows_est = metadata.get("row_count", 0)
+        cols_cnt = metadata.get("column_count", 0)
         registry[dataset_id] = {
             "id": dataset_id,
+            "dataset_id": dataset_id,
             "filename": disk_filename,
             "original_name": original_filename,
+            "original_filename": original_filename,
             "uploaded_at": datetime.utcnow().isoformat(),
             "size_bytes": file_size_bytes,
             "size_formatted": _format_bytes(file_size_bytes),
             "encoding": metadata.get("encoding", "utf-8"),
             "delimiter": metadata.get("delimiter", ","),
-            "columns_count": metadata.get("column_count", 0),
-            "rows_estimate": metadata.get("row_count", 0),
+            "columns_count": cols_cnt,
+            "columns": cols_cnt,
+            "total_columns": cols_cnt,
+            "rows_estimate": rows_est,
+            "rows": rows_est,
+            "total_rows": rows_est,
         }
         _write_registry(registry)
 
@@ -298,22 +306,83 @@ def list_uploaded_datasets() -> List[Dict[str, Any]]:
     List all uploaded datasets in the system sorted by upload timestamp descending.
     
     Returns:
-        List[Dict[str, Any]]: List of metadata objects.
+        List[Dict[str, Any]]: List of normalized metadata objects.
     """
     registry = _read_registry()
     datasets = []
 
-    for dataset_id, meta in sorted(
+    for dataset_id, raw_meta in sorted(
         registry.items(),
         key=lambda item: item[1].get("uploaded_at", ""),
         reverse=True,
     ):
-        if not meta.get("is_processed", False):
-            file_path = Config.UPLOAD_FOLDER / meta["filename"]
+        if not raw_meta.get("is_processed", False):
+            filename = raw_meta.get("filename", "")
+            file_path = Config.UPLOAD_FOLDER / filename
             if file_path.exists():
+                ds_id = raw_meta.get("id") or raw_meta.get("dataset_id") or dataset_id
+                orig_name = raw_meta.get("original_name") or raw_meta.get("original_filename") or filename
+                rows = raw_meta.get("rows_estimate") or raw_meta.get("total_rows") or raw_meta.get("rows") or 0
+                cols = raw_meta.get("columns_count") or raw_meta.get("total_columns") or raw_meta.get("columns") or 0
+                
+                meta = dict(raw_meta)
+                meta.update({
+                    "id": ds_id,
+                    "dataset_id": ds_id,
+                    "filename": filename,
+                    "original_name": orig_name,
+                    "original_filename": orig_name,
+                    "rows_estimate": rows,
+                    "rows": rows,
+                    "total_rows": rows,
+                    "columns_count": cols,
+                    "columns": cols,
+                    "total_columns": cols,
+                })
                 datasets.append(meta)
 
     return datasets
+
+
+def get_dataset_metadata(file_identifier: str) -> Optional[Dict[str, Any]]:
+    """
+    Retrieve normalized metadata dict for a dataset from registry.
+    
+    Args:
+        file_identifier: Dataset ID or filename.
+        
+    Returns:
+        Optional[Dict[str, Any]]: Metadata object or None.
+    """
+    registry = _read_registry()
+    meta = registry.get(file_identifier)
+    if not meta:
+        for k, v in registry.items():
+            if v.get("id") == file_identifier or v.get("filename") == file_identifier:
+                meta = v
+                break
+    if not meta:
+        return None
+
+    ds_id = meta.get("id") or meta.get("dataset_id") or file_identifier
+    orig_name = meta.get("original_name") or meta.get("original_filename") or meta.get("filename", ds_id)
+    rows = meta.get("rows_estimate") or meta.get("total_rows") or meta.get("rows") or 0
+    cols = meta.get("columns_count") or meta.get("total_columns") or meta.get("columns") or 0
+
+    normalized = dict(meta)
+    normalized.update({
+        "id": ds_id,
+        "dataset_id": ds_id,
+        "original_name": orig_name,
+        "original_filename": orig_name,
+        "rows_estimate": rows,
+        "rows": rows,
+        "total_rows": rows,
+        "columns_count": cols,
+        "columns": cols,
+        "total_columns": cols,
+    })
+    return normalized
 
 
 def save_processed_dataset(
