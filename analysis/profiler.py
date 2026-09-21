@@ -246,6 +246,7 @@ class DatasetProfiler:
             "memory_usage_mb": memory_mb,
             "memory_usage_formatted": memory_formatted,
             "total_missing_cells": total_missing_cells,
+            "missing_cells": total_missing_cells,
             "missing_cells_percentage": missing_cells_pct,
             "rows_with_missing": rows_with_missing,
             "rows_with_missing_percentage": rows_with_missing_pct,
@@ -406,6 +407,7 @@ class DatasetProfiler:
 
         base_profile: Dict[str, Any] = {
             "name": str(col_name),
+            "column_name": str(col_name),
             "data_type": str(series.dtype),
             "pandas_dtype": str(series.dtype),
             "classified_type": col_type,
@@ -747,6 +749,9 @@ def get_dataset_preview(df: pd.DataFrame, page: int = 1, page_size: int = 20) ->
     return {
         "columns": [str(c) for c in df.columns],
         "rows": clean_records,
+        "records": clean_records,
+        "total_rows": total_rows,
+        "total_pages": total_pages,
         "pagination": {
             "current_page": page,
             "page_size": page_size,
