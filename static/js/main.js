@@ -191,8 +191,19 @@ document.addEventListener('DOMContentLoaded', () => {
             }).join('');
         }
 
-        // Set Dashboard Link
-        if (goToDashboardBtn) {
+        // Set Dashboard & Chat Links and persist in localStorage
+        if (data.dataset_id) {
+            try {
+                localStorage.setItem('active_dataset_id', data.dataset_id);
+            } catch (e) {}
+
+            const navDash = document.getElementById('nav-dashboard');
+            if (navDash) navDash.href = `/dashboard?dataset_id=${encodeURIComponent(data.dataset_id)}`;
+            const navChat = document.getElementById('nav-chat');
+            if (navChat) navChat.href = `/chat?dataset_id=${encodeURIComponent(data.dataset_id)}`;
+        }
+
+        if (goToDashboardBtn && data.dataset_id) {
             goToDashboardBtn.href = `/dashboard?dataset_id=${encodeURIComponent(data.dataset_id)}`;
         }
 
@@ -284,4 +295,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sampleEmployeeBtn) {
         sampleEmployeeBtn.addEventListener('click', () => loadSample('employee', sampleEmployeeBtn));
     }
+
+    // Initialize navbar links if an active dataset exists in storage
+    try {
+        const savedDatasetId = localStorage.getItem('active_dataset_id');
+        if (savedDatasetId) {
+            const navDash = document.getElementById('nav-dashboard');
+            if (navDash) navDash.href = `/dashboard?dataset_id=${encodeURIComponent(savedDatasetId)}`;
+            const navChat = document.getElementById('nav-chat');
+            if (navChat) navChat.href = `/chat?dataset_id=${encodeURIComponent(savedDatasetId)}`;
+        }
+    } catch (e) {}
 });

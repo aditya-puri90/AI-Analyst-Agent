@@ -19,6 +19,15 @@ async function initChatInterface() {
     const urlParams = new URLSearchParams(window.location.search);
     currentDatasetId = urlParams.get('dataset_id') || '';
 
+    if (!currentDatasetId) {
+        try {
+            const stored = localStorage.getItem('active_dataset_id');
+            if (stored && stored !== 'undefined') {
+                currentDatasetId = stored;
+            }
+        } catch (e) {}
+    }
+
     setupEventListeners();
     await loadAvailableDatasets();
 
@@ -87,9 +96,12 @@ async function loadAvailableDatasets() {
             select.innerHTML = '<option value="">-- Select Active Dataset --</option>';
             datasets.forEach(ds => {
                 const opt = document.createElement('option');
-                opt.value = ds.dataset_id;
-                opt.textContent = `${ds.original_filename} (${ds.total_rows || 0} rows)`;
-                if (ds.dataset_id === currentDatasetId) {
+                const dsId = ds.id || ds.dataset_id;
+                const name = ds.original_name || ds.original_filename || ds.filename || dsId;
+                const rows = ds.rows_estimate || ds.total_rows || ds.rows || 0;
+                opt.value = dsId;
+                opt.textContent = `${name} (${rows} rows)`;
+                if (dsId === currentDatasetId) {
                     opt.selected = true;
                 }
                 select.appendChild(opt);
@@ -97,7 +109,7 @@ async function loadAvailableDatasets() {
 
             // If no dataset selected in URL, default to the most recent uploaded dataset
             if (!currentDatasetId && datasets.length > 0) {
-                currentDatasetId = datasets[0].dataset_id;
+                currentDatasetId = datasets[0].id || datasets[0].dataset_id;
                 select.value = currentDatasetId;
                 window.history.replaceState({}, '', `/chat?dataset_id=${encodeURIComponent(currentDatasetId)}`);
                 await loadDatasetContext(currentDatasetId);
@@ -121,6 +133,10 @@ async function loadDatasetContext(datasetId) {
 
     if (dsIdEl) dsIdEl.textContent = datasetId;
     if (dashLink) dashLink.href = `/dashboard?dataset_id=${encodeURIComponent(datasetId)}`;
+
+    try {
+        localStorage.setItem('active_dataset_id', datasetId);
+    } catch (e) {}
 
     try {
         const res = await fetch(`/api/visualization/schema/${encodeURIComponent(datasetId)}`);
