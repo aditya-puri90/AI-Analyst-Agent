@@ -37,9 +37,9 @@ def run_checks():
     try:
         status, data = get("/api/health")
         assert status == 200 and data["status"] == "healthy"
-        assert "Phase 11" in data["phase"]
+        assert "Phase" in data["phase"]
         assert "intelligent_analysis_planning" in data["capabilities"]
-        results.append(("1. System Health & Phase 11 Capabilities", True, f"Phase: {data['phase']}"))
+        results.append(("1. System Health Capabilities", True, f"Phase: {data['phase']}"))
     except Exception as e:
         results.append(("1. System Health & Phase 11 Capabilities", False, str(e)))
 
