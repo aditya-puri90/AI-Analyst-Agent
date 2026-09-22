@@ -66,12 +66,15 @@ class TestReportGeneratorEngine:
         md = generator.generate_markdown_report()
 
         assert "# Executive Data Analysis & Quality Report" in md
-        assert "## 1. Executive Summary & AI Findings" in md
-        assert "## 2. Dataset Overview & Vital Statistics" in md
-        assert "## 3. Data Quality & Integrity Score" in md
-        assert "## 4. Key Statistical Observations" in md
-        assert "## 5. Top Feature Correlations" in md
-        assert "## 6. Outlier & Anomaly Summary" in md
+        assert "## 1. Dataset Overview" in md
+        assert "## 2. Data Quality Assessment" in md
+        assert "## 3. Cleaning Summary" in md
+        assert "## 4. Statistical Analysis" in md
+        assert "## 5. Correlation Analysis" in md
+        assert "## 6. Outlier Analysis" in md
+        assert "## 7. Important Visualizations" in md
+        assert "## 8. AI-Generated Insights" in md
+        assert "## 9. Recommendations" in md
 
     def test_html_report_formatting(self, test_df):
         generator = ReportGenerator(test_df, dataset_id="test_dataset_12")
