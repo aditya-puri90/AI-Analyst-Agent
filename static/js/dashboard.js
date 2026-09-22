@@ -196,9 +196,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 datasetSelector.innerHTML = '<option value="">Select an uploaded dataset...</option>';
                 data.datasets.forEach(d => {
                     const opt = document.createElement('option');
-                    opt.value = d.dataset_id;
-                    opt.textContent = `${d.original_filename} (${d.rows || 0} rows, ${d.columns || 0} cols)`;
-                    if (d.dataset_id === activeDatasetId) {
+                    const dsId = d.id || d.dataset_id;
+                    const name = d.original_name || d.original_filename || d.filename || dsId;
+                    const rows = d.rows_estimate || d.total_rows || d.rows || 0;
+                    const cols = d.columns_count || d.total_columns || d.columns || 0;
+                    opt.value = dsId;
+                    opt.textContent = `${name} (${rows} rows, ${cols} cols)`;
+                    if (dsId === activeDatasetId) {
                         opt.selected = true;
                     }
                     datasetSelector.appendChild(opt);
@@ -210,7 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function loadFullDatasetAnalytics(datasetId) {
-        if (!datasetId) {
+        if (!datasetId || datasetId === 'undefined') {
             loadingState.classList.add('hidden');
             contentState.classList.add('hidden');
             errorState.classList.remove('hidden');
@@ -218,6 +222,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         activeDatasetId = datasetId;
+        try {
+            localStorage.setItem('active_dataset_id', datasetId);
+        } catch (e) {}
+
+        if (datasetSelector) {
+            datasetSelector.value = datasetId;
+        }
         loadingState.classList.remove('hidden');
         errorState.classList.add('hidden');
         contentState.classList.add('hidden');
@@ -228,56 +239,86 @@ document.addEventListener('DOMContentLoaded', () => {
             newUrl.searchParams.set('dataset_id', datasetId);
             window.history.replaceState({}, '', newUrl);
 
-            // 1. Fetch Profile & Overview
+            // 1. Fetch Profile & Overview (Primary requirement)
             const profRes = await fetch(`/api/profile/${datasetId}`);
             const profData = await profRes.json();
             if (!profData.success) throw new Error(profData.error || 'Failed to profile dataset');
             currentProfile = profData.profile;
             allColumnsProfile = currentProfile.columns || [];
 
-            // 2. Fetch Data Quality Audit
-            const qualRes = await fetch(`/api/cleaning/audit/${datasetId}`);
-            const qualData = await qualRes.json();
+            // 2. Fetch Data Quality Audit (Fault-tolerant)
+            let qualData = { success: false, issues: [] };
+            try {
+                const qualRes = await fetch(`/api/cleaning/audit/${datasetId}`);
+                qualData = await qualRes.json();
+            } catch (e) {
+                console.warn('Quality audit fetch warning:', e);
+            }
             allDetectedIssues = qualData.success ? qualData.issues : [];
 
-            // 3. Fetch Descriptive Statistics
-            const statsRes = await fetch(`/api/statistics/${datasetId}`);
-            const statsData = await statsRes.json();
+            // 3. Fetch Descriptive Statistics (Fault-tolerant)
+            let statsData = { success: false, statistics: null };
+            try {
+                const statsRes = await fetch(`/api/statistics/${datasetId}`);
+                statsData = await statsRes.json();
+            } catch (e) {
+                console.warn('Statistics fetch warning:', e);
+            }
             currentStatistics = statsData.success ? statsData.statistics : null;
 
-            // 4. Fetch Correlation Analysis & Heatmap
-            const corrRes = await fetch(`/api/correlation/${datasetId}`);
-            const corrData = await corrRes.json();
+            // 4. Fetch Correlation Analysis & Heatmap (Fault-tolerant)
+            let corrData = { success: false, correlation: null, heatmap_spec: null };
+            try {
+                const corrRes = await fetch(`/api/correlation/${datasetId}`);
+                corrData = await corrRes.json();
+            } catch (e) {
+                console.warn('Correlation fetch warning:', e);
+            }
             currentCorrelation = corrData.success ? corrData.correlation : null;
             currentHeatmapSpec = corrData.success ? corrData.heatmap_spec : null;
 
-            // 5. Fetch Outlier Detection
-            const outRes = await fetch(`/api/outliers/${datasetId}?method=${activeOutlierMethod}`);
-            const outData = await outRes.json();
+            // 5. Fetch Outlier Detection (Fault-tolerant)
+            let outData = { success: false, outliers: null, boxplot_spec: null };
+            try {
+                const outRes = await fetch(`/api/outliers/${datasetId}?method=${activeOutlierMethod}`);
+                outData = await outRes.json();
+            } catch (e) {
+                console.warn('Outliers fetch warning:', e);
+            }
             currentOutliers = outData.success ? outData.outliers : null;
 
-            // 6. Fetch Chart Recommendations & Schema
-            const vizRes = await fetch(`/api/visualization/recommendations/${datasetId}`);
-            const vizData = await vizRes.json();
+            // 6. Fetch Chart Recommendations & Schema (Fault-tolerant)
+            let vizData = { success: false, recommendations: [], schema: null };
+            try {
+                const vizRes = await fetch(`/api/visualization/recommendations/${datasetId}`);
+                vizData = await vizRes.json();
+            } catch (e) {
+                console.warn('Visualizations fetch warning:', e);
+            }
             allRecommendations = vizData.success ? vizData.recommendations : [];
             vizSchema = vizData.success ? vizData.schema : null;
 
-            // 7. Fetch AI Insights
-            const aiRes = await fetch(`/api/insights/${datasetId}`);
-            const aiData = await aiRes.json();
+            // 7. Fetch AI Insights (Fault-tolerant)
+            let aiData = { success: false, insights: null };
+            try {
+                const aiRes = await fetch(`/api/insights/${datasetId}`);
+                aiData = await aiRes.json();
+            } catch (e) {
+                console.warn('AI Insights fetch warning:', e);
+            }
             currentInsights = aiData.success ? aiData.insights : null;
 
-            // 8. Render All Views
-            renderHeaderMeta();
-            renderDashboardExecutiveWidgets();
-            renderDataPreviewExplorer();
-            renderDataQualityAudit();
-            renderCleaningStudio(qualData);
-            renderStatisticsView();
-            renderCorrelationView();
-            renderOutliersView(outData.boxplot_spec);
-            renderVisualizationsView();
-            renderAiInsightsView();
+            // 8. Render All Views safely
+            try { renderHeaderMeta(); } catch (e) { console.error('Error in renderHeaderMeta:', e); }
+            try { renderDashboardExecutiveWidgets(); } catch (e) { console.error('Error in renderDashboardExecutiveWidgets:', e); }
+            try { renderDataPreviewExplorer(); } catch (e) { console.error('Error in renderDataPreviewExplorer:', e); }
+            try { renderDataQualityAudit(); } catch (e) { console.error('Error in renderDataQualityAudit:', e); }
+            try { renderCleaningStudio(qualData); } catch (e) { console.error('Error in renderCleaningStudio:', e); }
+            try { renderStatisticsView(); } catch (e) { console.error('Error in renderStatisticsView:', e); }
+            try { renderCorrelationView(); } catch (e) { console.error('Error in renderCorrelationView:', e); }
+            try { renderOutliersView(outData.boxplot_spec); } catch (e) { console.error('Error in renderOutliersView:', e); }
+            try { renderVisualizationsView(); } catch (e) { console.error('Error in renderVisualizationsView:', e); }
+            try { renderAiInsightsView(); } catch (e) { console.error('Error in renderAiInsightsView:', e); }
 
             // Reveal UI
             loadingState.classList.add('hidden');
@@ -289,8 +330,10 @@ document.addEventListener('DOMContentLoaded', () => {
             loadingState.classList.add('hidden');
             contentState.classList.add('hidden');
             errorState.classList.remove('hidden');
-            document.getElementById('error-title').textContent = 'Analysis Ingestion Error';
-            document.getElementById('error-message').textContent = err.message || 'Could not load dataset analytics.';
+            const errTitle = document.getElementById('error-title');
+            const errMsg = document.getElementById('error-message');
+            if (errTitle) errTitle.textContent = 'Analysis Ingestion Error';
+            if (errMsg) errMsg.textContent = err.message || 'Could not load dataset analytics.';
         }
     }
 
@@ -300,8 +343,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderHeaderMeta() {
         if (!currentProfile) return;
         const ov = currentProfile.overview || {};
-        const qual = currentProfile.quality_summary || {};
-        const filename = currentProfile.original_filename || activeDatasetId;
+        const qual = currentProfile.quality || currentProfile.quality_summary || {};
+        const filename = currentProfile.original_filename || currentProfile.file_name || activeDatasetId;
 
         if (headerDatasetName) headerDatasetName.textContent = filename;
         if (headerDatasetStatus) {
@@ -330,7 +373,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderDashboardExecutiveWidgets() {
         if (!currentProfile) return;
         const ov = currentProfile.overview || {};
-        const qual = currentProfile.quality_summary || {};
+        const qual = currentProfile.quality || currentProfile.quality_summary || {};
         const cols = currentProfile.columns || [];
 
         // Widget 1: Dataset Overview Cards
@@ -352,7 +395,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Widget 2: Data Quality Score
-        const score = Math.round(qual.overall_score !== undefined ? qual.overall_score : 100);
+        const score = Math.round(qual.health_score !== undefined ? qual.health_score : (qual.overall_score !== undefined ? qual.overall_score : 100));
         const grade = qual.health_grade || 'A+';
         const qualityScoreEl = document.getElementById('dash-quality-score');
         const qualityGradeEl = document.getElementById('dash-quality-grade');
@@ -381,7 +424,7 @@ document.addEventListener('DOMContentLoaded', () => {
             issuesDetectedEl.className = totalIssuesCount === 0 ? 'text-emerald' : 'text-amber';
         }
         if (qualityStatusEl) {
-            qualityStatusEl.textContent = score >= 90 ? 'Optimal Data Health' : score >= 75 ? 'Good (Minor Defects)' : 'Action Required';
+            qualityStatusEl.textContent = qual.quality_status || (score >= 90 ? 'Optimal Data Health' : score >= 75 ? 'Good (Minor Defects)' : 'Action Required');
             qualityStatusEl.style.color = score >= 90 ? '#34d399' : score >= 75 ? '#fbbf24' : '#fb7185';
         }
 
@@ -390,7 +433,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (qBadge) qBadge.textContent = totalIssuesCount;
 
         // Widget 3: Missing Value Summary
-        const missingCells = ov.missing_cells || 0;
+        const missingCells = ov.total_missing_cells !== undefined ? ov.total_missing_cells : (ov.missing_cells || 0);
         const missingPct = Number(ov.missing_cells_percentage || 0);
         const completeness = Math.max(0, 100 - missingPct);
 
@@ -412,17 +455,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 topMissingBars.innerHTML = '<div class="empty-state-text">✓ Zero missing values detected. Perfect 100% data completeness!</div>';
             } else {
                 colsWithMissing.sort((a, b) => (b.missing_percentage || 0) - (a.missing_percentage || 0));
-                topMissingBars.innerHTML = colsWithMissing.slice(0, 4).map(c => `
+                topMissingBars.innerHTML = colsWithMissing.slice(0, 4).map(c => {
+                    const colName = c.column_name || c.name;
+                    return `
                     <div class="missing-bar-row">
                         <div class="missing-bar-labels">
-                            <span class="missing-bar-col-name">${escapeHtml(c.column_name)}</span>
+                            <span class="missing-bar-col-name">${escapeHtml(colName)}</span>
                             <span class="missing-bar-pct">${c.missing_count} nulls (${Number(c.missing_percentage || 0).toFixed(1)}%)</span>
                         </div>
                         <div class="missing-bar-bg">
                             <div class="missing-bar-fill" style="width: ${Math.min(100, Math.max(4, c.missing_percentage))}%;"></div>
                         </div>
                     </div>
-                `).join('');
+                `;
+                }).join('');
             }
         }
 
@@ -467,11 +513,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const datePct = (dateCount / totalCols) * 100;
         const boolPct = (boolCount / totalCols) * 100;
 
-        document.getElementById('dash-count-num').textContent = numCount;
-        document.getElementById('dash-count-cat').textContent = catCount;
-        document.getElementById('dash-count-date').textContent = dateCount;
-        document.getElementById('dash-count-bool').textContent = boolCount;
-        document.getElementById('dash-total-features-pill').textContent = `${totalCols} Features`;
+        const countNum = document.getElementById('dash-count-num');
+        const countCat = document.getElementById('dash-count-cat');
+        const countDate = document.getElementById('dash-count-date');
+        const countBool = document.getElementById('dash-count-bool');
+        const featPill = document.getElementById('dash-total-features-pill');
+        if (countNum) countNum.textContent = numCount;
+        if (countCat) countCat.textContent = catCount;
+        if (countDate) countDate.textContent = dateCount;
+        if (countBool) countBool.textContent = boolCount;
+        if (featPill) featPill.textContent = `${totalCols} Features`;
 
         const distBar = document.getElementById('dash-type-dist-bar');
         if (distBar) {
@@ -552,12 +603,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
 
-            document.getElementById('dash-outliers-total').textContent = formatNumber(totalOutliers);
-            document.getElementById('dash-outliers-cols-count').textContent = `${affectedCols.length}`;
-            document.getElementById('dash-outlier-badge-count').textContent = totalOutliers;
+            const outTotal = document.getElementById('dash-outliers-total');
+            const outCols = document.getElementById('dash-outliers-cols-count');
+            const outBadge = document.getElementById('dash-outlier-badge-count');
+            const outRowPct = document.getElementById('dash-outliers-row-pct');
+            if (outTotal) outTotal.textContent = formatNumber(totalOutliers);
+            if (outCols) outCols.textContent = `${affectedCols.length}`;
+            if (outBadge) outBadge.textContent = totalOutliers;
             
             const rowPct = ov.total_rows ? ((totalOutliers / ov.total_rows) * 100).toFixed(1) : '0.0';
-            document.getElementById('dash-outliers-row-pct').textContent = `${rowPct}%`;
+            if (outRowPct) outRowPct.textContent = `${rowPct}%`;
 
             const outlierColsList = document.getElementById('dash-outliers-columns-list');
             if (outlierColsList) {
@@ -648,7 +703,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (columnSearchQuery) {
             const q = columnSearchQuery.toLowerCase();
-            filtered = filtered.filter(c => (c.column_name || '').toLowerCase().includes(q) || (c.pandas_dtype || '').toLowerCase().includes(q));
+            filtered = filtered.filter(c => {
+                const colName = (c.column_name || c.name || '').toLowerCase();
+                const dtype = (c.pandas_dtype || '').toLowerCase();
+                return colName.includes(q) || dtype.includes(q);
+            });
         }
 
         document.getElementById('column-table-meta').textContent = `Showing ${filtered.length} of ${allColumnsProfile.length} columns`;
@@ -659,17 +718,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         tbody.innerHTML = filtered.map((c, idx) => {
+            const colName = c.column_name || c.name;
             const badgeClass = c.classified_type === 'Numerical' ? 'badge-indigo' : c.classified_type === 'Categorical' ? 'badge-cyan' : c.classified_type === 'Datetime' ? 'badge-purple' : 'badge-emerald';
             const samples = (c.sample_values || []).slice(0, 3).map(s => `<code class="code-sample">${escapeHtml(String(s))}</code>`).join(' ');
-            const statText = c.classified_type === 'Numerical'
-                ? `Mean: <strong>${Number(c.mean || 0).toFixed(2)}</strong> &bull; Range: [${c.min}, ${c.max}]`
-                : `Unique: <strong>${c.unique_count || 0}</strong> &bull; Top: ${escapeHtml(c.mode || 'N/A')}`;
+            
+            let statText = '--';
+            if (c.classified_type === 'Numerical') {
+                const ns = c.numerical_stats || {};
+                const meanVal = ns.mean !== undefined ? ns.mean : (c.mean || 0);
+                const minVal = ns.min !== undefined ? ns.min : (c.min !== undefined ? c.min : '--');
+                const maxVal = ns.max !== undefined ? ns.max : (c.max !== undefined ? c.max : '--');
+                statText = `Mean: <strong>${Number(meanVal).toFixed(2)}</strong> &bull; Range: [${minVal}, ${maxVal}]`;
+            } else {
+                const cs = c.categorical_stats || {};
+                const topVal = cs.most_frequent_category || c.mode || 'N/A';
+                statText = `Unique: <strong>${c.unique_count || 0}</strong> &bull; Top: ${escapeHtml(String(topVal))}`;
+            }
 
             return `
                 <tr>
                     <td>${idx + 1}</td>
                     <td>
-                        <strong>${escapeHtml(c.column_name)}</strong>
+                        <strong>${escapeHtml(colName)}</strong>
                         <div style="margin-top: 2px;"><span class="badge ${badgeClass}">${c.classified_type}</span> <span style="font-size:11px; color:var(--text-muted);">${c.pandas_dtype}</span></div>
                     </td>
                     <td>
@@ -682,7 +752,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td style="font-size: 12.5px;">${statText}</td>
                     <td>${samples || '--'}</td>
                     <td style="text-align: center;">
-                        <button class="btn btn-outline btn-xs btn-inspect-col" data-col="${escapeHtml(c.column_name)}">Inspect</button>
+                        <button class="btn btn-outline btn-xs btn-inspect-col" data-col="${escapeHtml(colName)}">Inspect</button>
                     </td>
                 </tr>
             `;
@@ -708,11 +778,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await res.json();
             if (!data.success) return;
 
-            const records = data.records || [];
+            const records = data.records || data.rows || [];
             const cols = data.columns || [];
-            const totalPages = data.total_pages || 1;
+            const totalPages = data.total_pages || (data.pagination && data.pagination.total_pages) || 1;
+            const totalRows = data.total_rows || (data.pagination && data.pagination.total_rows) || 0;
 
-            if (pageInd) pageInd.textContent = `Page ${page} of ${totalPages} (${formatNumber(data.total_rows)} rows)`;
+            if (pageInd) pageInd.textContent = `Page ${page} of ${totalPages} (${formatNumber(totalRows)} rows)`;
 
             if (thead) {
                 thead.innerHTML = `<tr><th>#</th>` + cols.map(c => `<th>${escapeHtml(c)}</th>`).join('') + `</tr>`;
@@ -1252,7 +1323,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!xSelect || allColumnsProfile.length === 0) return;
 
-        const optionsHtml = allColumnsProfile.map(c => `<option value="${escapeHtml(c.column_name)}">${escapeHtml(c.column_name)} (${c.classified_type})</option>`).join('');
+        const optionsHtml = allColumnsProfile.map(c => {
+            const colName = c.column_name || c.name;
+            return `<option value="${escapeHtml(colName)}">${escapeHtml(colName)} (${c.classified_type})</option>`;
+        }).join('');
 
         xSelect.innerHTML = `<option value="">Select feature...</option>` + optionsHtml;
         if (ySelect) ySelect.innerHTML = `<option value="">None (Count / Frequency)</option>` + optionsHtml;
@@ -1560,7 +1634,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // -------------------------------------------------------------
     // VIEW 11: REPORTS STUDIO (EXECUTIVE REPORT COMPILER)
     // -------------------------------------------------------------
-    async function loadExecutiveReport() {
+    async function loadExecutiveReport(isManualTrigger = false) {
         const htmlPreview = document.getElementById('report-html-preview');
         const mdContent = document.getElementById('report-md-content');
         if (!htmlPreview) return;
@@ -1568,7 +1642,7 @@ document.addEventListener('DOMContentLoaded', () => {
         htmlPreview.innerHTML = `
             <div class="report-loading-state">
                 <div class="spinner"></div>
-                <p>Compiling executive data analysis report...</p>
+                <p>Compiling 9-section automated analysis report for <strong>${escapeHtml(activeDatasetId)}</strong>...</p>
             </div>
         `;
 
@@ -1582,6 +1656,18 @@ document.addEventListener('DOMContentLoaded', () => {
             // Render HTML preview
             if (data.html) {
                 htmlPreview.innerHTML = data.html;
+                // Execute inline chart scripts within injected HTML
+                const scripts = htmlPreview.querySelectorAll('script');
+                scripts.forEach(s => {
+                    try {
+                        const newScript = document.createElement('script');
+                        newScript.textContent = s.textContent;
+                        document.body.appendChild(newScript);
+                        setTimeout(() => newScript.remove(), 100);
+                    } catch (e) {
+                        console.warn('Inline chart script execution error:', e);
+                    }
+                });
             }
 
             // Render Markdown preview
@@ -1592,13 +1678,24 @@ document.addEventListener('DOMContentLoaded', () => {
             // Wire Download Links
             const dlMd = document.getElementById('btn-download-report-md');
             const dlHtml = document.getElementById('btn-download-report-html');
+            const dlJson = document.getElementById('btn-download-report-json');
             if (dlMd) dlMd.href = `/api/report/download/${activeDatasetId}?format=md`;
             if (dlHtml) dlHtml.href = `/api/report/download/${activeDatasetId}?format=html`;
+            if (dlJson) dlJson.href = `/api/report/download/${activeDatasetId}?format=json`;
+
+            if (isManualTrigger) {
+                showToast('Executive Analysis Report generated successfully!', '✓');
+            }
         } catch (err) {
             console.error('Report error:', err);
             htmlPreview.innerHTML = `<div class="error-card"><p>Failed to generate report: ${err.message}</p></div>`;
         }
     }
+
+    // Explicit "Generate Report" Button Click
+    document.getElementById('btn-generate-report')?.addEventListener('click', () => {
+        loadExecutiveReport(true);
+    });
 
     // Report Mode Switcher (HTML Presentation vs Markdown Source)
     document.getElementById('btn-report-view-html')?.addEventListener('click', () => {
@@ -1639,10 +1736,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const bodyEl = document.getElementById('modal-col-body');
         if (!modal) return;
 
-        const col = allColumnsProfile.find(c => c.column_name === colName);
+        const col = allColumnsProfile.find(c => (c.column_name === colName || c.name === colName));
         if (!col) return;
 
-        titleEl.textContent = col.column_name;
+        const actualColName = col.column_name || col.name;
+        titleEl.textContent = actualColName;
         typeEl.textContent = col.classified_type;
         dtypeEl.textContent = col.pandas_dtype;
 
@@ -1732,7 +1830,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Dataset Selector Switcher
     datasetSelector?.addEventListener('change', (e) => {
         const val = e.target.value;
-        if (val) loadFullDatasetAnalytics(val);
+        if (val && val !== 'undefined') loadFullDatasetAnalytics(val);
     });
 
     // -------------------------------------------------------------
@@ -1740,16 +1838,55 @@ document.addEventListener('DOMContentLoaded', () => {
     // -------------------------------------------------------------
     async function init() {
         await loadDatasetList();
-        if (activeDatasetId) {
-            loadFullDatasetAnalytics(activeDatasetId);
-        } else {
-            // Auto-load first dataset or sample if none selected
+
+        let targetId = activeDatasetId;
+
+        // 1. Check URL parameters
+        if (!targetId || targetId === 'undefined') {
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const queryDsId = urlParams.get('dataset_id');
+                if (queryDsId && queryDsId !== 'undefined') {
+                    targetId = queryDsId;
+                }
+            } catch (e) {}
+        }
+
+        // 2. Check localStorage
+        if (!targetId || targetId === 'undefined') {
+            try {
+                const storedId = localStorage.getItem('active_dataset_id');
+                if (storedId && storedId !== 'undefined') {
+                    // Check if storedId is present in the selector options
+                    let exists = false;
+                    if (datasetSelector && datasetSelector.options) {
+                        for (let i = 0; i < datasetSelector.options.length; i++) {
+                            if (datasetSelector.options[i].value === storedId) {
+                                exists = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (exists || !datasetSelector || datasetSelector.options.length <= 1) {
+                        targetId = storedId;
+                    }
+                }
+            } catch (e) {}
+        }
+
+        // 3. Auto-load first uploaded dataset from selector if none selected yet
+        if (!targetId || targetId === 'undefined') {
             const firstOpt = datasetSelector?.options[1]?.value;
-            if (firstOpt) {
-                loadFullDatasetAnalytics(firstOpt);
-            } else {
-                loadSampleDataset('ecommerce');
+            if (firstOpt && firstOpt !== 'undefined') {
+                targetId = firstOpt;
             }
+        }
+
+        // 4. Load dataset or fallback to bundled sample
+        if (targetId && targetId !== 'undefined') {
+            loadFullDatasetAnalytics(targetId);
+        } else {
+            loadSampleDataset('ecommerce');
         }
     }
 
