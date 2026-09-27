@@ -24,6 +24,7 @@ from utils.validators import (
     detect_encoding_and_delimiter,
     validate_csv_structure,
 )
+from utils.security import safe_path_resolve, validate_safe_identifier, mask_sensitive_data
 from analysis.profiler import infer_column_type
 
 logger = logging.getLogger(__name__)
@@ -91,18 +92,32 @@ def get_file_path(file_identifier: str, is_processed: bool = False) -> Optional[
     Returns:
         Optional[Path]: Resolved Path if exists and valid, None otherwise.
     """
-    base_folder = Config.PROCESSED_FOLDER if is_processed else Config.UPLOAD_FOLDER
-    sanitized = sanitize_filename(file_identifier)
-    target_path = (base_folder / sanitized).resolve()
-
-    # Ensure resolved path is strictly within the allowed directory
-    try:
-        target_path.relative_to(base_folder.resolve())
-    except ValueError:
-        logger.warning("Path traversal attempt detected: %s", file_identifier)
+    if not file_identifier or not isinstance(file_identifier, str):
         return None
 
-    return target_path if target_path.exists() else None
+    base_folder = Config.PROCESSED_FOLDER if is_processed else Config.UPLOAD_FOLDER
+    
+    # 1. First check if it exists in registry
+    registry = _read_registry()
+    if file_identifier in registry:
+        meta_filename = registry[file_identifier].get("filename")
+        if meta_filename:
+            resolved = safe_path_resolve(base_folder, meta_filename)
+            if resolved and resolved.exists():
+                return resolved
+
+    # 2. Try direct safe path resolution with sanitized name
+    clean_name = sanitize_filename(file_identifier)
+    target_path = safe_path_resolve(base_folder, clean_name)
+    if target_path and target_path.exists():
+        return target_path
+
+    # 3. Try safe direct lookup with raw identifier if it doesn't escape
+    direct_target = safe_path_resolve(base_folder, file_identifier)
+    if direct_target and direct_target.exists():
+        return direct_target
+
+    return None
 
 
 def save_uploaded_file(file_storage: FileStorage) -> Tuple[Optional[str], Optional[Path], Optional[str], Optional[Dict[str, Any]]]:

@@ -8,25 +8,64 @@ import logging
 from pathlib import Path
 from typing import Tuple, Optional, Dict, Any, List
 from werkzeug.utils import secure_filename
+
 from config.settings import Config
+from utils.security import is_binary_payload
 
 logger = logging.getLogger(__name__)
+
+# Extensions considered dangerous when chained (e.g. upload.php.csv, script.sh.csv)
+DANGEROUS_INTERMEDIATE_EXTENSIONS = {
+    "exe", "dll", "so", "sh", "bat", "cmd", "ps1", "vbs", "js", "ts",
+    "py", "phtml", "php", "php3", "php4", "php5", "phps", "cgi", "pl",
+    "jar", "war", "ear", "asp", "aspx", "jsp", "jspx", "htm", "html",
+    "shtml", "svg", "xml", "bin", "elf", "scr"
+}
 
 
 def allowed_file(filename: str) -> bool:
     """
-    Check if the uploaded file has an allowed extension (.csv).
+    Check if the uploaded file has an allowed extension (.csv) and is free
+    from malicious double-extensions or hidden suffixes.
     
     Args:
         filename: Name of the uploaded file.
         
     Returns:
-        bool: True if allowed, False otherwise.
+        bool: True if allowed and safe, False otherwise.
     """
-    if not filename or "." not in filename:
+    if not filename or not isinstance(filename, str):
         return False
-    ext = filename.rsplit(".", 1)[1].lower().strip()
-    return ext in Config.ALLOWED_EXTENSIONS
+
+    # Reject null bytes or URL encoded null bytes
+    if "\x00" in filename or "%00" in filename:
+        return False
+
+    # Strip whitespace
+    clean_name = filename.strip()
+    if "." not in clean_name:
+        return False
+
+    # Check for hidden files starting with dot
+    if clean_name.startswith("."):
+        return False
+
+    # Split parts
+    parts = clean_name.lower().split(".")
+    ext = parts[-1].strip()
+
+    # Final extension must be in allowed list
+    if ext not in Config.ALLOWED_EXTENSIONS:
+        return False
+
+    # Check for dangerous multi-part extensions (e.g., evil.php.csv, script.sh.csv)
+    if len(parts) > 2:
+        for intermediate in parts[1:-1]:
+            if intermediate in DANGEROUS_INTERMEDIATE_EXTENSIONS:
+                logger.warning("Rejected file with dangerous intermediate extension: '%s'", filename)
+                return False
+
+    return True
 
 
 def sanitize_filename(filename: str) -> str:
@@ -39,13 +78,24 @@ def sanitize_filename(filename: str) -> str:
     Returns:
         str: Safe, sanitized filename.
     """
-    if not filename:
+    if not filename or not isinstance(filename, str):
         return "dataset.csv"
-    cleaned = secure_filename(filename)
-    if not cleaned or cleaned.startswith("."):
+
+    # Remove null bytes
+    cleaned = filename.replace("\x00", "").replace("%00", "")
+    # Use werkzeug secure_filename
+    cleaned = secure_filename(cleaned)
+
+    if not cleaned or cleaned.startswith(".") or cleaned == "csv":
         cleaned = "dataset.csv"
+
     if not cleaned.lower().endswith(".csv"):
         cleaned += ".csv"
+
+    # Limit filename length
+    if len(cleaned) > 100:
+        cleaned = cleaned[:96] + ".csv"
+
     return cleaned
 
 
@@ -102,6 +152,7 @@ def detect_encoding_and_delimiter(file_path: Path) -> Tuple[str, str]:
 def validate_file_upload(file_storage) -> Tuple[bool, Optional[str]]:
     """
     Validate an incoming Flask FileStorage object before saving to disk.
+    Enforces format, extension, size, empty checks, and binary payload detection.
     
     Args:
         file_storage: Werkzeug FileStorage instance.
@@ -116,7 +167,7 @@ def validate_file_upload(file_storage) -> Tuple[bool, Optional[str]]:
         allowed_str = ", ".join([f".{ext}" for ext in Config.ALLOWED_EXTENSIONS])
         return False, f"Invalid file format '{file_storage.filename}'. Only CSV files ({allowed_str}) are supported."
 
-    # Check for empty content (0 bytes)
+    # Check for empty content (0 bytes) and inspect size
     file_storage.seek(0, 2)  # Seek to end of file
     file_size = file_storage.tell()
     file_storage.seek(0)  # Reset stream position to beginning
@@ -129,6 +180,20 @@ def validate_file_upload(file_storage) -> Tuple[bool, Optional[str]]:
         actual_mb = file_size / (1024 * 1024)
         return False, f"File size ({actual_mb:.1f} MB) exceeds maximum allowed limit of {max_mb:.0f} MB."
 
+    # Inspect first 512 bytes for binary/executable payload disguised as CSV
+    sample_header = b""
+    if hasattr(file_storage, "read") and callable(getattr(file_storage, "read")):
+        try:
+            sample_header = file_storage.read(512)
+            if hasattr(file_storage, "seek"):
+                file_storage.seek(0)  # Reset stream position
+        except Exception:
+            sample_header = b""
+
+    if sample_header and is_binary_payload(sample_header):
+        logger.warning("Rejected binary/executable payload upload for filename '%s'", file_storage.filename)
+        return False, "Binary or executable files are not supported. Please upload a valid plain-text CSV file."
+
     return True, None
 
 
@@ -137,9 +202,11 @@ def validate_csv_structure(file_path: Path) -> Tuple[bool, Optional[str], Option
     Verify that the CSV file can be properly decoded and contains valid tabular data.
     Checks for:
     - Empty or whitespace-only files
+    - Binary payload signatures
     - Missing or all-blank header rows
     - Absence of data rows (header-only CSV)
     - Structural corruption (mismatched quotes, unparseable lines)
+    - DoS limits on maximum allowable columns and rows
     
     Args:
         file_path: Path to the saved CSV file.
@@ -155,6 +222,12 @@ def validate_csv_structure(file_path: Path) -> Tuple[bool, Optional[str], Option
         return False, "The uploaded CSV file is empty (0 bytes).", None
 
     try:
+        # Check binary signature
+        with open(file_path, "rb") as bf:
+            sample_start = bf.read(512)
+        if is_binary_payload(sample_start):
+            return False, "File contains binary or executable content. Only plain-text CSV files are permitted.", None
+
         encoding, delimiter = detect_encoding_and_delimiter(file_path)
 
         with open(file_path, "r", encoding=encoding, errors="replace") as f:
@@ -173,21 +246,30 @@ def validate_csv_structure(file_path: Path) -> Tuple[bool, Optional[str], Option
 
             # Clean header column names
             clean_headers = [str(col).strip() for col in header]
+            expected_cols = len(clean_headers)
+
+            if expected_cols > Config.MAX_COLUMNS_LIMIT:
+                return False, f"Dataset contains {expected_cols} columns, exceeding the maximum allowed limit of {Config.MAX_COLUMNS_LIMIT}.", None
 
             # Count rows and check for corruption
             row_count = 0
             inconsistent_rows = 0
-            expected_cols = len(clean_headers)
 
             for line_idx, row in enumerate(reader, start=2):
                 row_count += 1
                 if len(row) != expected_cols:
                     inconsistent_rows += 1
+                
+                # Check DoS row count limit
+                if row_count > Config.MAX_ROWS_LIMIT:
+                    return False, f"Dataset exceeds the maximum allowed row limit of {Config.MAX_ROWS_LIMIT:,} rows.", None
+
                 # Sample up to first 500 rows for deep integrity validation
                 if line_idx > 500:
-                    # File is large and valid up to 500 rows
                     for _ in reader:
                         row_count += 1
+                        if row_count > Config.MAX_ROWS_LIMIT:
+                            return False, f"Dataset exceeds the maximum allowed row limit of {Config.MAX_ROWS_LIMIT:,} rows.", None
                     break
 
             if row_count == 0:
@@ -207,7 +289,7 @@ def validate_csv_structure(file_path: Path) -> Tuple[bool, Optional[str], Option
 
     except UnicodeError as ue:
         logger.error("Encoding error validating CSV: %s", ue)
-        return False, f"Encoding error: Unable to decode file. Supported encodings are UTF-8, Latin-1, CP1252.", None
+        return False, "Encoding error: Unable to decode file. Supported encodings are UTF-8, Latin-1, CP1252.", None
     except csv.Error as ce:
         logger.error("CSV structural syntax error: %s", ce)
         return False, f"CSV formatting error: {str(ce)}. Please check for unescaped quotes or corrupted lines.", None

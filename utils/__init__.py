@@ -1,5 +1,6 @@
 """
-Utilities package for AI Data Analyst Agent.
+Utilities package for AI Data Analyst Agent (Phase 15).
+Provides file validation, safe storage, path resolution, security filters, and cleanup routines.
 """
 
 from .validators import (
@@ -15,6 +16,22 @@ from .file_handler import (
     get_dataset_summary,
     list_uploaded_datasets,
     get_file_path,
+    save_processed_dataset,
+    get_latest_processed_file,
+    get_dataset_metadata,
+)
+from .security import (
+    safe_path_resolve,
+    validate_safe_identifier,
+    mask_sensitive_data,
+    SensitiveDataFilter,
+    sanitize_input_string,
+    is_binary_payload,
+)
+from .cleanup import (
+    cleanup_old_files,
+    cleanup_dataset,
+    cleanup_temp_files,
 )
 
 __all__ = [
@@ -28,4 +45,16 @@ __all__ = [
     "get_dataset_summary",
     "list_uploaded_datasets",
     "get_file_path",
+    "save_processed_dataset",
+    "get_latest_processed_file",
+    "get_dataset_metadata",
+    "safe_path_resolve",
+    "validate_safe_identifier",
+    "mask_sensitive_data",
+    "SensitiveDataFilter",
+    "sanitize_input_string",
+    "is_binary_payload",
+    "cleanup_old_files",
+    "cleanup_dataset",
+    "cleanup_temp_files",
 ]
