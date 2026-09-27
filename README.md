@@ -5,8 +5,9 @@
 [![Pandas](https://img.shields.io/badge/Pandas-2.0%2B-150458.svg)](https://pandas.pydata.org/)
 [![Plotly](https://img.shields.io/badge/Plotly-5.20%2B-3F4F75.svg)](https://plotly.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Security: Hardened](https://img.shields.io/badge/Security-Hardened%20(Phase%2015)-green.svg)](README.md)
 
-An enterprise-grade, portfolio-ready **AI Data Analyst Agent** web application. It transforms raw, arbitrary CSV datasets into comprehensive exploratory data analysis (EDA), data quality audits, parametric/non-parametric statistics, interactive Plotly visualizations, automated data cleaning pipelines, and natural-language AI insights with strict deterministic grounding.
+An enterprise-grade, portfolio-ready **AI Data Analyst Agent** web application. It transforms raw, arbitrary CSV datasets into comprehensive exploratory data analysis (EDA), data quality audits, parametric/non-parametric statistics, interactive Plotly visualizations, automated data cleaning pipelines, natural-language AI insights with strict deterministic grounding, intelligent analysis planning, and publication-ready multi-format executive reports.
 
 ---
 
@@ -14,24 +15,25 @@ An enterprise-grade, portfolio-ready **AI Data Analyst Agent** web application. 
 
 - [Key Highlights](#-key-highlights)
 - [System Architecture](#-system-architecture)
+- [Security & Reliability Architecture (Phase 15)](#-security--reliability-architecture-phase-15)
 - [Directory Structure](#-directory-structure)
 - [Technology Stack](#-technology-stack)
-- [Development Principles](#-development-principles)
-- [Phased Implementation Roadmap](#-phased-implementation-roadmap)
 - [Installation & Setup](#-installation--setup)
-- [Running the Application](#-running-the-application)
-- [API Reference (Phase 1)](#-api-reference-phase-1)
+- [Production Deployment Guide](#-production-deployment-guide)
+- [Environment Configuration](#-environment-configuration)
+- [Complete REST API Reference](#-complete-rest-api-reference)
 - [Testing & Quality Assurance](#-testing--quality-assurance)
 
 ---
 
 ## 🌟 Key Highlights
 
-1. **Deterministic Core vs. AI Reasoning Layer**: All calculations (quantiles, IQR, correlations, skewness, missingness, isolation forests) are strictly computed by Python, Pandas, SciPy, and Scikit-learn. The LLM acts as an analytical synthesizer, answering user questions and highlighting insights without fabricating numbers.
-2. **Dataset Immutability**: Uploaded raw datasets are treated as strictly immutable read-only records in `data/uploads/`. Cleaned and transformed versions are maintained separately in `data/processed/`.
-3. **Generic & Dynamic Schema Inference**: Works with arbitrary CSV files. Automatically detects numerical, categorical, datetime, boolean, ID/high-cardinality, and text columns without hardcoded column names or assumptions about specific datasets (Titanic, Superstore, Iris, etc.).
-4. **Resilient Ingestion**: Automatic delimiter detection (`,`, `;`, `\t`, `|`), multi-encoding fallback (`utf-8`, `latin-1`, `cp1252`, `iso-8859-1`), secure filename generation, and size limit validations.
-5. **Modern Analytics Dashboard**: Dark-mode glassmorphic UI, responsive metric KPI cards, dynamic column chips, and an interactive data explorer.
+1. **Deterministic Core vs. AI Reasoning Layer**: All calculations (quantiles, IQR, correlations, skewness, missingness, isolation bounds) are strictly computed in Python using Pandas, SciPy, and Scikit-learn. The LLM acts purely as an analytical synthesizer, answering user questions and highlighting insights without fabricating numbers.
+2. **Zero Arbitrary Code Execution**: The agent never executes raw generated Python code, `eval()`, `exec()`, or system commands. All analysis queries route exclusively through a strictly controlled, typed `ToolRegistry`.
+3. **Dataset Immutability & Session Isolation**: Uploaded raw datasets are treated as strictly immutable read-only records in `data/uploads/`. Cleaned and transformed versions are maintained separately in `data/processed/`. Conversation history and cached insights are strictly isolated per dataset.
+4. **Resilient Ingestion & Security Hardening**: Multi-tier file upload validation, magic byte binary detection, path traversal protection, DoS dimension limits, and sensitive data masking in logs.
+5. **Modern Analytics Dashboard**: Dark-mode glassmorphic UI, responsive metric KPI cards, dynamic column chips, correlation heatmaps, box plot anomaly views, and an interactive data explorer.
+6. **Executive Automated Reporting**: 9-section analytical reports with category-tagged findings badges, available for export in standalone styled HTML, Markdown, and structured JSON.
 
 ---
 
@@ -44,13 +46,20 @@ flowchart TD
         Dropzone["Drag & Drop Upload Zone"]
         PlotlyView["Plotly Interactive Charts"]
         Table["Paginated Data Explorer"]
+        ReportView["Executive Report Studio"]
     end
 
-    subgraph Server["Backend Layer (Flask 3.x)"]
+    subgraph Security["Security & Ingestion Layer (utils/)"]
+        Validators["File & CSV Validators (validators.py)"]
+        SecFilter["Sensitive Log Filter & Redaction (security.py)"]
+        PathGuard["Safe Path Resolver (security.py)"]
+        Cleaner["Automated Pruning & Retention (cleanup.py)"]
+    end
+
+    subgraph Server["Backend Layer (Flask 3.x / WSGI)"]
         App["Flask App (app.py)"]
         Config["Configuration (config/settings.py)"]
-        Validators["File & CSV Validators (utils/validators.py)"]
-        FileHandler["Storage & File Handler (utils/file_handler.py)"]
+        FileHandler["Storage & File Handler (file_handler.py)"]
     end
 
     subgraph Analytics["Deterministic Analytics Engines (analysis/)"]
@@ -59,13 +68,11 @@ flowchart TD
         Correlations["Correlation Engine (correlation.py)"]
         Outliers["Outlier Detector (outliers.py)"]
         Cleaning["Data Cleaning Pipeline (cleaning.py)"]
-    end
-
-    subgraph Visualization["Visualization Layer (visualization/)"]
-        Charts["Plotly Chart Generator (charts.py)"]
+        Registry["Controlled ToolRegistry (tool_registry.py)"]
     end
 
     subgraph AI["AI Agent Layer (agent/)"]
+        Planner["Analysis Planner (planner.py)"]
         Router["Question Router (question_router.py)"]
         Agent["Analyst Agent (analyst_agent.py)"]
         Prompts["Engineered Prompts (prompts.py)"]
@@ -74,6 +81,7 @@ flowchart TD
     subgraph Storage["Storage Layer (data/)"]
         Raw["Immutable Uploads (data/uploads/)"]
         Processed["Cleaned Datasets (data/processed/)"]
+        Reports["Generated Reports (data/reports/)"]
     end
 
     Dropzone -->|1. Upload CSV| Validators
@@ -84,12 +92,48 @@ flowchart TD
     App -->|6. JSON Response| UI
 
     UI -->|Analytics Request| Stats & Correlations & Outliers
-    UI -->|Visual Request| Charts
+    UI -->|Visual Request| App
     UI -->|NL Query| Router
-    Router -->|Dispatch Tool| Analytics
+    Router -->|Select Safe Tool| Registry
+    Registry -->|Execute Deterministic Function| Analytics
     Analytics -->|Computed Result| Agent
-    Agent -->|Structured Insight| UI
+    Agent -->|Structured Grounded Insight| UI
 ```
+
+---
+
+## 🔒 Security & Reliability Architecture (Phase 15)
+
+### 1. Secure File Upload Validation
+- **Allowed Extensions**: Strict `.csv` whitelist (configurable via `ALLOWED_EXTENSIONS`), case-insensitive matching.
+- **Double Extension Prevention**: Multi-part extensions containing executable or script extensions (e.g., `.php.csv`, `.exe.csv`, `.sh.csv`, `.phtml.csv`) are rejected.
+- **Binary & Executable Signature Detection**: File headers are inspected for binary magic bytes (e.g., Windows PE `MZ`, Linux `ELF`, Zip `PK\x03\x04`, PDF `%PDF`) to reject non-text files disguised as CSVs.
+- **Null Byte Protection**: Filenames and paths containing `\x00` or `%00` are rejected.
+- **Zero-Byte & Corrupted File Checks**: Empty files and structural corruptions are caught pre-storage.
+
+### 2. Path Traversal & Directory Containment
+- All file resolutions pass through `safe_path_resolve(base_dir, user_path)` which guarantees strict containment inside `data/uploads/`, `data/processed/`, or `data/reports/`.
+- Paths containing `..`, absolute escapes, or Windows Alternate Data Streams are rejected.
+
+### 3. Denial-of-Service (DoS) Safeguards
+- **File Size Limit**: Enforced via Flask `MAX_CONTENT_LENGTH` and streaming validation (default: 50 MB).
+- **Dimension Caps**: Enforced limits on maximum column count (`MAX_COLUMNS_LIMIT = 500`) and maximum row count (`MAX_ROWS_LIMIT = 1,000,000`).
+- **Query Length Caps**: User chat queries are sanitized and truncated to `MAX_QUERY_LENGTH = 5000` characters.
+
+### 4. Zero Arbitrary Code Execution
+- The LLM reasoning layer NEVER executes arbitrary Python scripts, strings, `eval()`, `exec()`, or `subprocess`.
+- Natural language queries map strictly to pre-registered deterministic analytical functions in `ToolRegistry`.
+
+### 5. API Key Protection & Sensitive Data Redaction
+- API keys (Gemini, OpenAI, Anthropic) are read from environment variables.
+- Gemini REST API calls use header authentication (`x-goog-api-key`), ensuring API keys never appear in URL query strings.
+- `SensitiveDataFilter` automatically intercepts and masks API keys, bearer tokens, and credentials in all application logs.
+- The `/api/insights/providers` endpoint reports boolean configuration status without exposing keys.
+
+### 6. Session Isolation & Memory Sliding Window
+- In-memory conversation session history is partitioned per `dataset_id`.
+- `ConversationSessionManager` enforces a FIFO sliding window of 100 turns per dataset to prevent memory exhaustion.
+- Automated cleanup utilities (`utils/cleanup.py`) prune files older than `FILE_RETENTION_HOURS` (default: 24h).
 
 ---
 
@@ -98,213 +142,106 @@ flowchart TD
 ```
 AI-Data-Analyst-Agent/
 │
-├── app.py                      # Flask application factory, routes & API endpoints
-├── requirements.txt            # Project dependencies
-├── README.md                   # Complete architectural & operational documentation
-├── .env.example                # Environment variable configuration template
-├── .gitignore                  # Git exclusions (credentials, cache, upload data)
+├── app.py                      # Flask application factory, error handlers, and REST API routes
+├── wsgi.py                     # Production WSGI entrypoint (Waitress / Gunicorn)
+├── requirements.txt            # Python dependencies (production & testing)
+├── .env.example                # Example environment variables template
+├── .gitignore                  # Git ignore rules for keys, uploads, caches, and logs
 │
 ├── config/
-│   └── settings.py             # Centralized application settings & env loader
+│   ├── __init__.py
+│   └── settings.py             # Central configuration, security settings, and paths
+│
+├── utils/
+│   ├── __init__.py             # Utilities package exports
+│   ├── security.py             # Path traversal guards, sensitive data masking, binary detection
+│   ├── validators.py           # Secure file validation, encoding detection, CSV structure audits
+│   ├── file_handler.py         # Safe dataset loading, metadata registry, processed storage
+│   └── cleanup.py              # Automated file retention and session pruning routines
+│
+├── analysis/
+│   ├── __init__.py
+│   ├── tool_registry.py        # Controlled Python analysis tool sandbox & parameter validation
+│   ├── profiler.py             # Schema inference, missingness, memory, and data profiling
+│   ├── cleaning.py             # 12-point data quality auditor & transformation pipeline
+│   ├── statistics.py           # Descriptive/inferential statistics, CI, distributions
+│   ├── correlation.py          # Pearson correlation matrix & ranked relationship pairs
+│   └── outliers.py             # Multi-method outlier detection (IQR, Z-score, Modified Z-score)
+│
+├── visualization/
+│   ├── __init__.py
+│   └── charts.py               # Plotly chart recommendation engine & custom chart builder
+│
+├── agent/
+│   ├── __init__.py
+│   ├── prompts.py              # System prompts & factual grounding instructions
+│   ├── planner.py              # Deterministic & LLM-assisted Analysis Plan generator
+│   ├── analyst_agent.py        # Executive AI insights synthesizer (Gemini/OpenAI/Anthropic/Fallback)
+│   └── question_router.py      # Natural language Q&A engine & conversational session manager
+│
+├── reports/
+│   ├── __init__.py
+│   └── report_generator.py     # 9-section automated executive reports (HTML, MD, JSON)
+│
+├── templates/
+│   ├── index.html              # Landing & dataset upload interface
+│   ├── dashboard.html          # Analytics dashboard & interactive visualization studio
+│   └── chat.html               # Natural language Q&A interface
+│
+├── static/
+│   ├── css/                    # Glassmorphic dark-theme styles
+│   └── js/                     # Modular frontend controllers
 │
 ├── data/
-│   ├── uploads/                # Immutable raw CSV files (read-only)
-│   └── processed/              # Cleaned / transformed datasets
+│   ├── uploads/                # Immutable raw CSV storage
+│   ├── processed/              # Cleaned & transformed datasets
+│   ├── reports/                # Exported report files
+│   └── temp/                   # Temporary scratch storage
 │
-├── analysis/                   # Deterministic Data Analysis Engines
-│   ├── __init__.py
-│   ├── profiler.py             # Schema detection, data shape, missingness, memory
-│   ├── cleaning.py             # (Phase 4) Deduplication, imputation, type casting
-│   ├── statistics.py           # (Phase 2) Parametric & non-parametric statistics
-│   ├── correlation.py          # (Phase 3) Pearson, Spearman, Cramér's V
-│   ├── outliers.py             # (Phase 3) IQR, Z-Score, Isolation Forest
-│   └── tool_registry.py        # (Phase 11) Controlled tool registry & execution sandbox
-│
-├── visualization/              # Dynamic Chart Generation
-│   ├── __init__.py
-│   └── charts.py               # (Phase 3 & 8) Plotly JSON chart specifications
-│
-├── agent/                      # AI Agent & Natural Language Interface
-│   ├── __init__.py
-│   ├── analyst_agent.py        # (Phase 5 & 9) LLM agent with deterministic tool binding
-│   ├── question_router.py      # (Phase 5 & 10) Intent classification & tool dispatching
-│   ├── planner.py              # (Phase 11) Step-by-step analysis planner & chart decision engine
-│   └── prompts.py              # Analytical prompt templates & instructions
-│
-├── reports/                    # Automated Reporting
-│   └── report_generator.py     # (Phase 5) Markdown / HTML / PDF executive reports
-│
-├── utils/                      # Utilities & Helpers
-│   ├── __init__.py
-│   ├── file_handler.py         # File persistence, encoding/delimiter detection
-│   └── validators.py           # File validation, MIME check, structural sanity
-│
-├── templates/                  # Jinja2 HTML Templates
-│   ├── index.html              # Landing page & CSV upload dropzone
-│   ├── dashboard.html          # Analytics dashboard & dataset explorer
-│   └── chat.html               # Natural language AI analyst conversational view
-│
-├── static/                     # Static Assets
-│   ├── css/
-│   │   └── style.css           # Modern dark-mode glassmorphic design system
-│   └── js/
-│       ├── main.js             # Upload handling, toast notifications, UI controls
-│       └── dashboard.js        # Dataset explorer, column chips, pagination
-│
-└── tests/                      # Automated Unit & Integration Test Suite
-    └── test_basic.py           # Foundation, validator, profiler & route tests
+└── tests/
+    ├── test_basic.py
+    ├── test_upload_ingestion.py
+    ├── test_profiler.py
+    ├── test_cleaning.py
+    ├── test_statistics.py
+    ├── test_correlation.py
+    ├── test_outliers.py
+    ├── test_visualization.py
+    ├── test_analyst_agent.py
+    ├── test_question_router.py
+    ├── test_planning_and_charts.py
+    ├── test_dashboard_ui.py
+    ├── test_report_generator.py
+    ├── test_phase14_comprehensive.py
+    └── test_phase15_security_reliability.py  # Phase 15 security & hardening test suite
 ```
 
 ---
 
 ## 🛠 Technology Stack
 
-| Domain | Technology | Purpose |
-| :--- | :--- | :--- |
-| **Backend Web Framework** | Python 3.10+ & Flask 3.0+ | Lightweight, modular REST API and routing |
-| **Data Manipulation & Analysis** | Pandas 2.0+, NumPy 1.24+ | In-memory tabular processing, vector math |
-| **Statistical Modeling & ML** | SciPy 1.11+, Scikit-learn 1.3+ | Hypothesis testing, distribution fitting, outlier detection |
-| **Interactive Visualizations** | Plotly 5.18+ | Client-side interactive charts and heatmaps |
-| **Frontend Dashboard** | HTML5, Modern CSS3, Vanilla ES6 JS | Fast, glassmorphic dark-mode analytics dashboard |
-| **AI / LLM Integration** | Google Gemini API / OpenAI API | Analytical synthesis, tool calling, report drafting |
-| **Testing** | Pytest, Requests | Automated unit and integration testing |
-
----
-
-## 🎯 Development Principles
-
-1. **Incremental Milestones**: Each phase implements a self-contained, fully testable layer before advancing.
-2. **Deterministic Computation**: Python/Pandas calculates statistical values; the LLM never invents numbers.
-3. **Data Integrity**: Original uploaded files are never overwritten or altered.
-4. **Schema Agnostic**: Zero hardcoded columns; dynamic detection across arbitrary tabular structures.
-5. **Defensive Security**: Safe file names, file size caps, extension checks, and sanitized inputs.
-
----
-
-## 🗺 Phased Implementation Roadmap
-
-- [x] **Phase 1: Project Foundation & Architecture**
-  - [x] Modular project scaffolding & package structure.
-  - [x] Settings management with `.env` and `config/settings.py`.
-  - [x] Secure file upload handler with multi-encoding fallback and delimiter sniffing.
-  - [x] Core dataset profiler (schema inference, missingness, duplicates, memory footprint).
-  - [x] Flask REST API (`/api/upload`, `/api/datasets`, `/api/profile/<filename>`, `/api/preview/<filename>`).
-  - [x] Modern dark-mode dashboard UI with drag-and-drop upload and data explorer.
-  - [x] Unit test suite for Phase 1 components.
-- [x] **Phase 2: Ingestion & Multi-Layer CSV Validation**
-  - [x] Delimiter sniffing, encoding detection, and file integrity validation.
-  - [x] First 10 rows tabular preview and RAM footprint summary.
-- [x] **Phase 3: Automatic Dataset Profiling Engine**
-  - [x] Automated column data type classification (Numerical, Categorical, Datetime, Boolean, Text/ID).
-  - [x] Five-number summaries, missingness percentages, uniqueness metrics, and distinct sample chips.
-- [x] **Phase 4: Automated Data Quality and Cleaning Engine**
-  - [x] 12-point deterministic quality defect inspection (missingness, duplicates, invalid numbers, outliers, whitespace, inconsistent casings, type anomalies).
-  - [x] Live transformation preview engine (`Original value → Proposed cleaned value`).
-  - [x] Configurable cleaning pipeline (deduplication, median/mode imputation, string casting, outlier capping, column filtering).
-  - [x] Strict non-destructive persistence saving processed datasets to `data/processed/`.
-  - [x] Comprehensive cleaning summary KPIs (rows before/after, duplicates removed, missing handled, columns converted, values standardized).
-  - [x] Cleaned CSV download button and preview toggle in Data Explorer.
-- [x] **Phase 5: Statistical Analysis Engine**
-  - [x] Pure Python parametric and non-parametric calculations (Mean, Median, Mode, Std, Variance, Range, IQR, Skewness, Kurtosis).
-  - [x] Inferential statistics: 95% Confidence Intervals for the Mean via Student's t / normal distributions.
-  - [x] Complete percentiles spectrum ($P_1$ to $P_{99}$) and $1.5 \times \text{IQR}$ outlier detection.
-  - [x] Categorical Shannon entropy and temporal datetime cadence analysis.
-  - [x] Deterministic rule-based statistical observations.
-- [x] **Phase 6: Correlation Analysis Engine & Interactive Plotly Heatmaps**
-  - [x] Automatic numerical column identification and symmetric Pearson correlation matrix.
-  - [x] Resilient pairwise missing value handling and constant zero-variance feature safety.
-  - [x] 5-tier correlation strength classification (`Very strong`, `Strong`, `Moderate`, `Weak`, `Very weak`) and direction (`Positive`, `Negative`, `Neutral`).
-  - [x] Interactive threshold filtering slider ($|r| \ge \tau$) with live DOM reactivity.
-  - [x] Interactive dark-mode Plotly correlation heatmap with in-cell annotations and hover details.
-  - [x] Ranked correlation associations table and **Key Correlations** showcase cards with strict non-causation guidance (*"Correlation does not imply causation"*).
-  - [x] Standalone CLI runner `run_correlation_demo.py` and 67 automated pytest test suites.
-- [x] **Phase 7: Outlier Detection Engine & Interactive Plotly Charts**
-  - [x] Interquartile Range (IQR / Tukey's Fences - Standard $1.5\times$ and Extreme $3.0\times$), Parametric Z-Score ($3.0\sigma$ and $2.5\sigma$), and Modified Z-Score (MAD).
-  - [x] Column-level outlier analytics: Total observations, Valid N, Outlier count, Outlier percentage, Lower and Upper bounds.
-  - [x] Statistical edge-case detection & warnings: Zero standard deviation ($\sigma = 0$), Zero IQR ($\text{IQR} = 0$), Small sample sizes ($N < 10, N < 30$), and high skewness.
-  - [x] Domain-aware anomaly classification: Clear distinction between **Potential Statistical Outliers** and **Confirmed Data Errors** (sentinel placeholders, negative age/price/quantity, percentage overflow).
-  - [x] Interactive Plotly visualizations: Multi-feature Box Plots with jittered outlier points and Single-Column Distribution Histograms with threshold dashed lines and shaded outlier zones.
-  - [x] Outlier Records Inspector Modal for row-level drill-down review.
-  - [x] Non-destructive remediation operations (`Remove Outlier Rows`, `Cap Outliers to Bounds`, `Remove Data Errors Only`, `Keep All Outliers`) saving separate datasets to `data/processed/` with parent lineage.
-  - [x] Standalone CLI demo `run_outliers_demo.py` and 89 passing automated pytest suites.
-
-- [x] **Phase 8: Automatic Visualization Engine & Chart Recommendation System**
-  - [x] Schema-aware heuristic chart recommender (Categorical vs Numerical -> Bar, Temporal vs Numerical -> Line, Numerical Distribution -> Histogram, Anomaly -> Box Plot, Feature Pairs -> Correlation Heatmap).
-  - [x] Dynamic Plotly JSON chart specifications with responsive dark-glassmorphic styling.
-- [x] **Phase 9: AI Insight Engine & Executive Summary Synthesis**
-  - [x] Deterministic context builder aggregating statistical moments, correlation networks, outlier thresholds, and quality scores.
-  - [x] Multi-provider LLM integration (Google Gemini, OpenAI GPT-4o, Anthropic Claude 3.5 Sonnet) with zero-key offline deterministic fallback.
-  - [x] 8-section grounded executive report synthesis (Executive Summary, Quality Audit, Key Findings, Anomalies, Correlations, Risk Flags, Strategic Recommendations, Methodological Notes).
-  - [x] Standalone CLI runner `run_insights_demo.py` and regression test suite.
-- [x] **Phase 10: Natural-Language Dataset Q&A ("Ask Your Dataset")**
-  - [x] Conversational analytics layer routing plain-English queries to 9 safe deterministic Python analysis tools.
-  - [x] Safe tools: `dataset_summary()`, `column_summary()`, `groupby_analysis()`, `aggregation_analysis()`, `correlation_analysis()`, `outlier_analysis()`, `time_series_analysis()`, `distribution_analysis()`, `investigate_further()`.
-  - [x] Strict factual grounding: zero numerical hallucinations with every figure directly computed on Pandas DataFrames.
-  - [x] Resilient schema & missing column handling: gracefully explains unsupported queries and suggests valid candidate columns.
-  - [x] Interactive Plotly visualization spec generation matched to tool output (bar, line, heatmap, boxplot, histogram).
-  - [x] Full "Ask Your Dataset" conversational workspace (`/chat`) with session memory, tool badges, JSON inspector drawer, quick prompt chips, and transcript export.
-- [x] **Phase 11: Intelligent Analysis Planning and Chart Generation**
-  - [x] Strict security sandbox: LLM is strictly prohibited from executing arbitrary Python code; all executions pass through a verified `ToolRegistry` with signature checking and AST inspection.
-  - [x] Intelligent `AnalysisPlanner` synthesizing ordered multi-step execution plans (steps 1, 2, 3...) prior to tool dispatch.
-  - [x] Smart Visualization Decision Engine (`requires_visualization: True / False`) recommending optimal chart types (`line`, `scatter`, `bar`, `box`, `histogram`, `heatmap`, `none`).
-  - [x] Reference Analytical Workflow 1: Temporal Trend (*"How have sales changed over time?"* -> Detect date -> Detect sales -> Time aggregation -> Line chart -> Explain trend).
-  - [x] Reference Analytical Workflow 2: Linear Correlation (*"Is advertising spend related to revenue?"* -> Identify ad spend -> Identify revenue -> Pearson correlation -> Scatter plot -> Explain relationship without claiming causation).
-  - [x] Reference Analytical Workflow 3: Category Leaderboard (*"Which category has the highest revenue?"* -> Identify category -> Identify revenue -> Group by category -> Aggregate revenue -> Sort descending -> Bar chart -> Explain result).
-  - [x] UI Execution Plan Stepper with interactive progress cards, step badges, and plan drawer in `/chat`.
-- [x] **Phase 12: Professional Analytics Dashboard UI & Executive Reports**
-  - [x] Modern 11-section unified studio navigation shell with active indicators and URL hash routing: `Dashboard`, `Data Preview`, `Data Quality`, `Cleaning`, `Statistics`, `Correlations`, `Outliers`, `Visualizations`, `AI Insights`, `Ask Dataset`, `Reports`.
-  - [x] 10 Executive Dashboard widgets:
-    - 1. Dataset Overview Cards (Rows, Columns, Cells, Memory, Size, Format, Status).
-    - 2. Data Quality Score Radial Gauge (0-100) & Letter Grade (A+/A/B/C/D).
-    - 3. Missing Value Summary with gradient percentage bars.
-    - 4. Duplicate Redundancy Summary & Uniqueness Rating.
-    - 5. Numerical / Categorical Column Proportional Distribution Bar.
-    - 6. Important Statistical Findings & Mathematical Observations.
-    - 7. Top Correlations (Strongest Positive & Negative associations with visual meters).
-    - 8. Outlier Summary & High-Risk Columns Anomaly Badges.
-    - 9. AI-Generated Executive Summary & Strategic Takeaways.
-    - 10. Top Recommended Interactive Plotly Visualizations.
-  - [x] Executive Report Generator engine (`reports/report_generator.py`) supporting structured JSON, formatted Markdown, and standalone styled printable HTML reports.
-- [x] **Phase 13: Automated Analysis Report**
-  - [x] Comprehensive 9-Section Report Architecture (`reports/report_generator.py`):
-    - 1. Dataset Overview (dimensions, matrix footprint, null count/rate, duplicate count/rate, column schema table).
-    - 2. Data Quality Assessment (composite health score 0-100, health grade A+ to F, completeness/uniqueness/validity scores, categorized defect table).
-    - 3. Cleaning Summary (active session cleaning audit, before/after record deltas, nulls/duplicates purged, recommended remediation pipeline).
-    - 4. Statistical Analysis (descriptive & inferential moments, CI 95%, skewness/kurtosis, categorical frequencies/entropy, distribution anomaly alerts).
-    - 5. Correlation Analysis (Pearson $r$ pairwise associations, ranked correlation table, multicollinearity flags $|r| \ge 0.85$, non-causation disclaimer).
-    - 6. Outlier Analysis (multi-method IQR $1.5\times$ and Z-score detection, threshold boundaries $[Lower, Upper]$, data errors vs statistical extremes).
-    - 7. Important Visualizations (embedded interactive Plotly chart specifications and distribution diagrams).
-    - 8. AI-Generated Insights (grounded executive summary, key trends, pattern recognition, anomaly risks, 100% zero-hallucination guarantee).
-    - 9. Recommendations (actionable cleaning protocols, feature engineering interaction terms, predictive modeling strategies, data governance rules).
-  - [x] 4 Explicit Taxonomy Categories tagged across JSON, Markdown, and HTML:
-    - 🔍 `Observed results` (empirical facts, counts, statistics, charts)
-    - ⚠️ `Potential issues` (quality flags, severe skew, multicollinearity, extreme outliers)
-    - 🧠 `AI interpretation` (grounded analytical deductions, trends, pattern synthesis)
-    - 🎯 `Recommendations` (actionable next steps, remediation protocols, engineering advice)
-  - [x] User Controls & Multi-Format Export:
-    - On-demand "⚡ Generate Report" trigger directly from the active dataset session.
-    - Direct "⬇️ Download Report" options: Standalone Styled HTML (`.html`), Formatted Markdown (`.md`), Structured JSON (`.json`), and Print / PDF.
-  - [x] Standalone CLI Runner: `python run_report_demo.py`
-  - [x] Full test suite with **200 passing automated pytest test cases**.
+- **Backend Framework**: Python 3.10+, Flask 3.0+
+- **WSGI Production Servers**: Waitress (Windows/Cross-Platform), Gunicorn (Linux/macOS)
+- **Data Analysis**: Pandas, NumPy, SciPy, Scikit-learn
+- **Visualization**: Plotly.js / Plotly Python
+- **AI / LLM Integration**: Google Gemini (`gemini-1.5-pro`, `gemini-1.5-flash`), OpenAI (`gpt-4o`, `gpt-4o-mini`), Anthropic Claude (`claude-3-5-sonnet`), and Deterministic Rule-Based Fallback
+- **Testing**: Pytest 8.0+
 
 ---
 
 ## 🚀 Installation & Setup
 
-### Prerequisites
-- Python 3.10 or higher
-- pip package manager
-
-### 1. Clone or Navigate to the Repository
+### 1. Clone the Repository
 ```bash
+git clone https://github.com/your-username/AI-Data-Analyst-Agent.git
 cd AI-Data-Analyst-Agent
 ```
 
-### 2. Create and Activate a Virtual Environment
+### 2. Create and Activate Virtual Environment
 ```bash
-# Windows (PowerShell)
+# Windows
 python -m venv venv
-.\venv\Scripts\Activate.ps1
+venv\Scripts\activate
 
 # Linux / macOS
 python3 -m venv venv
@@ -317,84 +254,166 @@ pip install -r requirements.txt
 ```
 
 ### 4. Configure Environment Variables
-Copy `.env.example` to `.env` and adjust configuration if needed:
+Copy `.env.example` to `.env` and configure your settings:
 ```bash
 cp .env.example .env
 ```
 
 ---
 
-## 🖥 Running the Application
+## 🌐 Production Deployment Guide
 
-Start the Flask development server:
+### Option 1: Serving with Waitress (Recommended for Windows / Cross-Platform)
+Waitress is a production-grade pure-Python WSGI server included in `requirements.txt`:
 ```bash
-python app.py
+# Start Waitress server on port 5000
+waitress-serve --host=127.0.0.1 --port=5000 wsgi:app
 ```
 
-The application will be accessible at:
-👉 **`http://127.0.0.1:5000`**
-
-### Available Pages:
-- **`http://127.0.0.1:5000/`** - Home & CSV Upload Zone
-- **`http://127.0.0.1:5000/dashboard`** - Unified Professional Analytics Studio (11 Navigation Sections)
-- **`http://127.0.0.1:5000/chat`** - "Ask Your Dataset" AI Conversational Workspace
-
-### Standalone CLI Runners:
+### Option 2: Serving with Gunicorn (Recommended for Linux / Containerized Deployments)
 ```bash
-# Phase 6 Correlation Analysis Demo
-python run_correlation_demo.py
+# Install gunicorn (if on Linux)
+pip install gunicorn
 
-# Phase 7 Outlier & Anomaly Detection Demo
-python run_outliers_demo.py
+# Start Gunicorn with 4 worker processes
+gunicorn -w 4 -b 127.0.0.1:5000 wsgi:app
+```
 
-# Phase 9 AI Insight Engine Demo
-python run_insights_demo.py
+### Option 3: Production Reverse Proxy Setup (Nginx)
+Configure Nginx as a reverse proxy in front of Waitress/Gunicorn:
+```nginx
+server {
+    listen 80;
+    server_name data-analyst.yourdomain.com;
+    return 301 https://$host$request_uri;
+}
 
-# Phase 10 Natural-Language Dataset Q&A Demo
-python run_qa_demo.py
+server {
+    listen 443 ssl http2;
+    server_name data-analyst.yourdomain.com;
 
-# Phase 11 Intelligent Analysis Planning & Chart Generation Demo
-python run_planning_demo.py
+    ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+
+    client_max_body_size 50M;
+
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
 ```
 
 ---
 
-## 📡 API Reference
+## ⚙️ Environment Configuration
 
-| Endpoint | Method | Description |
+| Variable | Default | Description |
 | :--- | :--- | :--- |
-| `/api/health` | `GET` | System health check, capabilities, and phase reporting |
-| `/api/upload` | `POST` | Upload and validate a new CSV dataset |
-| `/api/datasets` | `GET` | List all available uploaded datasets |
-| `/api/profile/<dataset_id>` | `GET` | Retrieve metadata profile & schema for a dataset |
-| `/api/preview/<dataset_id>` | `GET` | Retrieve paginated rows for tabular inspection |
-| `/api/sample/<name>` | `POST` | Load bundled sample dataset (`ecommerce`, `employee`) |
-| `/api/cleaning/audit/<dataset_id>` | `GET` | Run 12-point data quality audit and get defect list |
-| `/api/cleaning/preview/<dataset_id>` | `GET` | Generate before-and-after transformation preview pairs |
-| `/api/cleaning/apply/<dataset_id>` | `POST` | Execute configurable cleaning pipeline & persist to `data/processed/` |
-| `/api/cleaning/download/<dataset_id>` | `GET` | Download cleaned CSV file from `data/processed/` |
-| `/api/statistics/<dataset_id>` | `GET` | Descriptive moments, percentiles, skewness, kurtosis, and 95% CI |
-| `/api/correlation/<dataset_id>` | `GET` | Pearson correlation matrix, ranked pairs, and Plotly heatmap spec |
-| `/api/outliers/<dataset_id>` | `GET` | Multi-method outlier analysis (IQR, Z-score) and boxplot specs |
-| `/api/outliers/remediate/<dataset_id>` | `POST` | Execute non-destructive outlier remediation (remove, cap, winsorize) |
-| `/api/visualization/recommendations/<dataset_id>` | `GET` | Automated ranked Plotly chart recommendations |
-| `/api/visualization/custom/<dataset_id>` | `POST` | Generate custom Plotly chart from user-selected features |
-| `/api/insights/<dataset_id>` | `GET` / `POST` | Generate grounded 8-section AI executive summary report |
-| `/api/chat/ask` | `POST` | Ask natural language question, plan steps, execute safe tool, and generate chart |
-| `/api/chat/plan` | `POST` | Preview structured multi-step execution plan and chart decision for a query |
-| `/api/chat/suggested-questions/<dataset_id>` | `GET` | Dynamically generated schema-tailored question chips |
-| `/api/chat/tools` | `GET` | List verified registered analysis tools from Tool Registry |
-| `/api/report/generate/<dataset_id>` | `GET` / `POST` | Compile 9-section executive report in structured JSON, Markdown, and styled HTML |
-| `/api/report/download/<dataset_id>` | `GET` | Download executive report as `.html`, `.md`, or `.json` file |
+| `FLASK_ENV` | `production` | Set to `production` for live deployments or `development` for local testing. |
+| `FLASK_DEBUG` | `False` | Debug mode (automatically disabled when `FLASK_ENV=production`). |
+| `SECRET_KEY` | *(Required in prod)* | Cryptographically random secret key for session signing. |
+| `HOST` | `127.0.0.1` | Host address to bind the web server. |
+| `PORT` | `5000` | Port for the HTTP server. |
+| `LOG_LEVEL` | `INFO` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`). |
+| `MAX_CONTENT_LENGTH_MB` | `50` | Maximum file upload size in megabytes. |
+| `ALLOWED_EXTENSIONS` | `csv` | Comma-separated list of allowed extensions. |
+| `MAX_ROWS_LIMIT` | `1000000` | Maximum allowable rows in uploaded CSV (DoS guard). |
+| `MAX_COLUMNS_LIMIT` | `500` | Maximum allowable columns in uploaded CSV (DoS guard). |
+| `MAX_QUERY_LENGTH` | `5000` | Maximum character length for chat questions. |
+| `FILE_RETENTION_HOURS` | `24` | Retention period for uploads/processed files before automated cleanup. |
+| `AI_PROVIDER` | `gemini` | Primary AI provider (`gemini`, `openai`, `anthropic`, `deterministic_fallback`). |
+| `GEMINI_API_KEY` | `""` | Google Gemini API Key. |
+| `OPENAI_API_KEY` | `""` | OpenAI API Key. |
+| `ANTHROPIC_API_KEY` | `""` | Anthropic Claude API Key. |
+| `LLM_MODEL` | `gemini-1.5-pro` | Default LLM model identifier. |
+
+---
+
+## 📡 Complete REST API Reference
+
+### 1. Ingestion & Storage
+- `POST /api/upload`: Upload and profile a CSV file.
+- `GET /api/datasets`: List all uploaded datasets with metadata.
+- `GET /api/summary/<dataset_id>`: Ingestion summary and first 10 rows.
+- `POST /api/sample/<sample_type>`: Load built-in sample dataset (`ecommerce`, `employee`).
+- `DELETE /api/dataset/<dataset_id>`: Purge dataset, derivatives, reports, and session memory.
+- `POST /api/admin/cleanup`: Trigger automated pruning of expired files.
+
+### 2. Profiling & Preview
+- `GET /api/profile/<dataset_id>`: Full automated dataset profile.
+- `GET /api/profile/<dataset_id>/columns`: Column-level profiling metrics.
+- `GET /api/profile/<dataset_id>/column/<col_name>`: Individual column deep profile.
+- `GET /api/preview/<dataset_id>`: Paginated tabular data preview.
+
+### 3. Data Quality & Cleaning
+- `GET /api/cleaning/audit/<dataset_id>`: 12-point deterministic quality audit.
+- `GET /api/cleaning/preview/<dataset_id>`: Before/after transformation previews.
+- `POST /api/cleaning/apply/<dataset_id>`: Execute non-destructive cleaning pipeline.
+- `GET /api/cleaning/download/<dataset_id>`: Download cleaned CSV file.
+
+### 4. Statistical Analysis
+- `GET /api/statistics/<dataset_id>`: Comprehensive moments, percentiles, and observations.
+- `GET /api/statistics/<dataset_id>/numerical`: Tabular summary of numerical features.
+- `GET /api/statistics/<dataset_id>/column/<col_name>`: Deep univariate statistics.
+- `GET /api/statistics/<dataset_id>/observations`: Rule-based statistical findings.
+
+### 5. Correlation & Outliers
+- `GET /api/correlation/<dataset_id>`: Pearson matrix, ranked pairs, and Plotly heatmap spec.
+- `GET /api/correlation/<dataset_id>/pairs`: Threshold-filtered correlation pairs.
+- `GET /api/outliers/<dataset_id>`: Multi-method outlier analysis and box plot specs.
+- `GET /api/outliers/<dataset_id>/column/<col_name>`: Column outlier distribution specs.
+- `POST /api/outliers/remediate/<dataset_id>`: Non-destructive outlier remediation (`remove`, `cap`).
+
+### 6. Interactive Visualization
+- `GET /api/visualization/recommendations/<dataset_id>`: Automated ranked chart recommendations.
+- `POST /api/visualization/custom/<dataset_id>`: Generate custom Plotly chart specification.
+- `GET /api/visualization/schema/<dataset_id>`: Column taxonomy and visual roles.
+
+### 7. AI Executive Insights & Q&A
+- `GET /api/insights/providers`: List available AI providers and configuration status.
+- `GET /api/insights/<dataset_id>`: Retrieve or generate executive business insights.
+- `POST /api/insights/generate/<dataset_id>`: Trigger insight generation with provider override.
+- `GET /api/insights/context/<dataset_id>`: Inspect grounded JSON context supplied to AI.
+- `POST /api/chat/ask`: Ask natural-language questions about the dataset.
+- `POST /api/chat/plan`: Formulate multi-step Analysis Plan without executing calculations.
+- `GET /api/chat/history/<dataset_id>`: Retrieve conversation session turns.
+- `POST /api/chat/clear/<dataset_id>`: Clear conversation history for a dataset.
+- `GET /api/chat/suggested-questions/<dataset_id>`: Contextual question suggestions.
+- `GET /api/chat/tools`: List authorized deterministic analysis tools from `ToolRegistry`.
+
+### 8. Automated Reporting & Export
+- `GET, POST /api/report/generate/<dataset_id>`: Generate complete 9-section report.
+- `GET /api/report/download/<dataset_id>?format=html|md|json`: Download report attachment.
+
+### 9. System Health
+- `GET /api/health`: System health, capabilities, and environment status.
 
 ---
 
 ## 🧪 Testing & Quality Assurance
 
-Run the automated test suite with `pytest`:
+Run the entire automated test suite (278+ tests across 15 phases) with pytest:
+
 ```bash
+# Run all unit and integration tests
+python -m pytest
+
+# Run with verbose output
 python -m pytest -v
+
+# Run Phase 15 security and reliability tests specifically
+python -m pytest tests/test_phase15_security_reliability.py -v
+
+# Run full-system functionality check script
+python test_all_functionalities.py
 ```
 
-All **200 test cases** across all 13 phases pass with 100% test coverage.
+---
 
+## 📄 License
+
+This project is open source and available under the [MIT License](LICENSE).
