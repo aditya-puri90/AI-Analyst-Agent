@@ -65,6 +65,19 @@ CATEGORY_AI = "AI interpretation"
 CATEGORY_RECOMMENDATIONS = "Recommendations"
 
 
+def _fmt_num(val: Any, decimals: int = 2, fallback: str = "N/A") -> str:
+    """Safely format numerical values to string with fixed decimals, handling None and NaN gracefully."""
+    if val is None:
+        return fallback
+    try:
+        f = float(val)
+        if math.isnan(f) or math.isinf(f):
+            return fallback
+        return f"{f:.{decimals}f}"
+    except (ValueError, TypeError):
+        return str(val) if str(val).strip() != "" else fallback
+
+
 class ReportGenerator:
     """
     Phase 13 Comprehensive Executive Report Generator for AI Data Analyst Agent.
@@ -694,7 +707,7 @@ class ReportGenerator:
         num_stat_rows = []
         for col_name, st in list(num_stats.items())[:10]:
             num_stat_rows.append(
-                f"| `{col_name}` | {st.get('mean', 0):.2f} | {st.get('median', 0):.2f} | {st.get('std', 0):.2f} | [{st.get('min', 0):.2f}, {st.get('max', 0):.2f}] | {st.get('skewness', 0):.2f} | {st.get('kurtosis', 0):.2f} | [{st.get('ci_lower_95', 0):.2f}, {st.get('ci_upper_95', 0):.2f}] |"
+                f"| `{col_name}` | {_fmt_num(st.get('mean'))} | {_fmt_num(st.get('median'))} | {_fmt_num(st.get('std'))} | [{_fmt_num(st.get('min'))}, {_fmt_num(st.get('max'))}] | {_fmt_num(st.get('skewness'))} | {_fmt_num(st.get('kurtosis'))} | [{_fmt_num(st.get('ci_lower_95'))}, {_fmt_num(st.get('ci_upper_95'))}] |"
             )
         num_stat_table = (
             "| Column | Mean | Median | Std Dev | [Min, Max] | Skewness | Kurtosis | 95% CI |\n|---|---|---|---|---|---|---|---|\n"
@@ -711,7 +724,7 @@ class ReportGenerator:
             r = pair.get("correlation", pair.get("pearson_r", 0))
             strength = pair.get("strength", "N/A")
             direction = pair.get("direction", "N/A")
-            corr_rows.append(f"| `{c1}` & `{c2}` | **{r:.4f}** | {strength} | {direction} |")
+            corr_rows.append(f"| `{c1}` & `{c2}` | **{_fmt_num(r, 4)}** | {strength} | {direction} |")
         corr_table = (
             "| Feature Pair | Pearson r | Strength | Direction |\n|---|---|---|---|\n" + "\n".join(corr_rows)
             if corr_rows
@@ -723,7 +736,7 @@ class ReportGenerator:
         for o in out_cols:
             if o.get("outlier_count", 0) > 0:
                 out_rows.append(
-                    f"| `{o.get('column')}` | **{o.get('outlier_count')}** | {o.get('outlier_percentage'):.2f}% | [{o.get('lower_threshold', 0):.2f}, {o.get('upper_threshold', 0):.2f}] | [{o.get('min_outlier', 'N/A')}, {o.get('max_outlier', 'N/A')}] |"
+                    f"| `{o.get('column')}` | **{o.get('outlier_count', 0):,}** | {_fmt_num(o.get('outlier_percentage'))}% | [{_fmt_num(o.get('lower_threshold'))}, {_fmt_num(o.get('upper_threshold'))}] | [{o.get('min_outlier', 'N/A')}, {o.get('max_outlier', 'N/A')}] |"
                 )
         out_table = (
             "| Column | Outlier Count | Outlier % | IQR Thresholds [Lower, Upper] | Extreme Values |\n|---|---|---|---|---|\n"
@@ -800,7 +813,7 @@ class ReportGenerator:
 {corr_table}
 
 - ⚠️ **Potential Issues:**
-{chr(10).join(f"- ⚠️ Collinear Pair: `{m['feature_a']}` & `{m['feature_b']}` (r = {m['correlation']:.3f}) — {m['risk']}" for m in multi_flags) if multi_flags else "- No severe multicollinearity (|r| >= 0.85) detected."}
+{chr(10).join(f"- ⚠️ Collinear Pair: `{m['feature_a']}` & `{m['feature_b']}` (r = {_fmt_num(m['correlation'], 3)}) — {m['risk']}" for m in multi_flags) if multi_flags else "- No severe multicollinearity (|r| >= 0.85) detected."}
 
 - 🧠 **AI Interpretation:**
 > *Methodological Note: {s5['ai_interpretation']['disclaimer']}*
@@ -911,7 +924,7 @@ _{s8.get('grounding_statement')}_
             badge_class = "badge-indigo" if "Strong" in strength else "badge-cyan"
             corr_trs += f"""<tr>
                 <td><strong>{c1}</strong> & <strong>{c2}</strong></td>
-                <td style="font-family: monospace; font-weight: bold; color: #6366f1;">{r:.4f}</td>
+                <td style="font-family: monospace; font-weight: bold; color: #6366f1;">{_fmt_num(r, 4)}</td>
                 <td><span class="badge {badge_class}">{strength}</span></td>
                 <td>{direction}</td>
             </tr>"""
@@ -924,9 +937,9 @@ _{s8.get('grounding_statement')}_
             if o.get("outlier_count", 0) > 0:
                 out_trs += f"""<tr>
                     <td><strong>{o.get('column')}</strong></td>
-                    <td style="font-family: monospace; font-weight: bold; color: #f59e0b;">{o.get('outlier_count'):,}</td>
-                    <td style="font-family: monospace;">{o.get('outlier_percentage'):.2f}%</td>
-                    <td style="font-family: monospace;">[{o.get('lower_threshold', 0):.2f}, {o.get('upper_threshold', 0):.2f}]</td>
+                    <td style="font-family: monospace; font-weight: bold; color: #f59e0b;">{o.get('outlier_count', 0):,}</td>
+                    <td style="font-family: monospace;">{_fmt_num(o.get('outlier_percentage'))}%</td>
+                    <td style="font-family: monospace;">[{_fmt_num(o.get('lower_threshold'))}, {_fmt_num(o.get('upper_threshold'))}]</td>
                     <td style="font-family: monospace;">[{o.get('min_outlier', 'N/A')}, {o.get('max_outlier', 'N/A')}]</td>
                 </tr>"""
         if not out_trs:
@@ -952,12 +965,12 @@ _{s8.get('grounding_statement')}_
         for col_name, st in list(num_stats.items())[:10]:
             stats_trs += f"""<tr>
                 <td><strong>{col_name}</strong></td>
-                <td style="font-family: monospace;">{st.get('mean', 0):.2f}</td>
-                <td style="font-family: monospace;">{st.get('median', 0):.2f}</td>
-                <td style="font-family: monospace;">{st.get('std', 0):.2f}</td>
-                <td style="font-family: monospace;">[{st.get('min', 0):.2f}, {st.get('max', 0):.2f}]</td>
-                <td style="font-family: monospace;">{st.get('skewness', 0):.2f}</td>
-                <td style="font-family: monospace;">[{st.get('ci_lower_95', 0):.2f}, {st.get('ci_upper_95', 0):.2f}]</td>
+                <td style="font-family: monospace;">{_fmt_num(st.get('mean'))}</td>
+                <td style="font-family: monospace;">{_fmt_num(st.get('median'))}</td>
+                <td style="font-family: monospace;">{_fmt_num(st.get('std'))}</td>
+                <td style="font-family: monospace;">[{_fmt_num(st.get('min'))}, {_fmt_num(st.get('max'))}]</td>
+                <td style="font-family: monospace;">{_fmt_num(st.get('skewness'))}</td>
+                <td style="font-family: monospace;">[{_fmt_num(st.get('ci_lower_95'))}, {_fmt_num(st.get('ci_upper_95'))}]</td>
             </tr>"""
         if not stats_trs:
             stats_trs = "<tr><td colspan='7' class='text-muted'>No numerical continuous columns available for statistical moment calculation.</td></tr>"

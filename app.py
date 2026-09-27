@@ -1,17 +1,22 @@
 """
 Main Flask Application for AI Data Analyst Agent.
-Provides REST API endpoints and web views for dataset uploading, ingestion, profiling, and exploration.
+Provides REST API endpoints and web views for dataset uploading, ingestion, profiling,
+data quality cleaning, statistics, correlation, outlier remediation, interactive charts,
+AI executive insights, natural language Q&A, analysis planning, and automated reporting.
+
+Phase 15: Security, Reliability, and Production Hardening.
 """
 
 import io
+import json
 import logging
 from pathlib import Path
-from flask import Flask, request, jsonify, render_template, send_file
+from flask import Flask, request, jsonify, render_template, send_file, make_response
 import pandas as pd
 import numpy as np
 
 from config.settings import Config
-from utils.validators import validate_file_upload
+from utils.validators import validate_file_upload, allowed_file, sanitize_filename
 from utils.file_handler import (
     save_uploaded_file,
     load_dataset,
@@ -21,6 +26,18 @@ from utils.file_handler import (
     get_file_path,
     save_processed_dataset,
     get_latest_processed_file,
+)
+from utils.security import (
+    safe_path_resolve,
+    validate_safe_identifier,
+    mask_sensitive_data,
+    SensitiveDataFilter,
+    sanitize_input_string,
+)
+from utils.cleanup import (
+    cleanup_old_files,
+    cleanup_dataset,
+    cleanup_temp_files,
 )
 from analysis.profiler import (
     DatasetProfiler,
@@ -86,20 +103,24 @@ from agent.question_router import (
     distribution_analysis,
     investigate_further,
 )
-
-
-
 from analysis.tool_registry import registry
 from agent.planner import AnalysisPlanner
 from reports.report_generator import ReportGenerator
 
-# Configure logging
+# -----------------------------------------------------------------------------
+# Logging Configuration with Sensitive Data Redaction
+# -----------------------------------------------------------------------------
+log_level = getattr(logging, Config.LOG_LEVEL, logging.INFO)
 logging.basicConfig(
-    level=logging.INFO,
+    level=log_level,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger(__name__)
+
+# Attach sensitive data redaction filter to root logger
+for handler in logging.root.handlers:
+    handler.addFilter(SensitiveDataFilter())
 
 
 def create_app() -> Flask:
@@ -110,27 +131,73 @@ def create_app() -> Flask:
     # Ensure required directories exist
     Config.init_app()
 
+    # Validate production configuration & log warnings
+    prod_warnings = Config.validate_production_config()
+    for w in prod_warnings:
+        logger.warning(w)
+
     # -------------------------------------------------------------
-    # Error Handlers
+    # Global Security Headers
     # -------------------------------------------------------------
+    @app.after_request
+    def apply_security_headers(response):
+        """Inject modern security headers into all responses."""
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
+
+    # -------------------------------------------------------------
+    # Centralized Error Handlers
+    # -------------------------------------------------------------
+    @app.errorhandler(400)
+    def bad_request(error):
+        msg = str(error.description) if hasattr(error, "description") else "Bad request parameters."
+        return jsonify({"success": False, "error": msg, "code": 400}), 400
+
+    @app.errorhandler(404)
+    def not_found(error):
+        if request.path.startswith("/api/"):
+            return jsonify({"success": False, "error": "Requested resource was not found.", "code": 404}), 404
+        return render_template("index.html"), 404
+
+    @app.errorhandler(405)
+    def method_not_allowed(error):
+        return jsonify({"success": False, "error": "HTTP method not allowed for this endpoint.", "code": 405}), 405
+
     @app.errorhandler(413)
     def request_entity_too_large(error):
         max_mb = Config.MAX_CONTENT_LENGTH / (1024 * 1024)
         return jsonify({
             "success": False,
             "error": f"File size exceeds the maximum allowable limit of {max_mb:.0f} MB.",
+            "code": 413,
         }), 413
 
-    @app.errorhandler(404)
-    def not_found(error):
-        if request.path.startswith("/api/"):
-            return jsonify({"success": False, "error": "Requested resource was not found."}), 404
-        return render_template("index.html"), 404
+    @app.errorhandler(415)
+    def unsupported_media_type(error):
+        return jsonify({"success": False, "error": "Unsupported media type. Please upload a plain text CSV file.", "code": 415}), 415
+
+    @app.errorhandler(422)
+    def unprocessable_entity(error):
+        msg = str(error.description) if hasattr(error, "description") else "Unprocessable request payload."
+        return jsonify({"success": False, "error": msg, "code": 422}), 422
 
     @app.errorhandler(500)
     def internal_server_error(error):
-        logger.error("Internal Server Error: %s", error, exc_info=True)
-        return jsonify({"success": False, "error": "An internal server error occurred."}), 500
+        err_str = mask_sensitive_data(str(error))
+        logger.error("Internal Server Error: %s", err_str, exc_info=True)
+        # Never leak raw stack traces or internal filesystem paths to clients
+        return jsonify({"success": False, "error": "An internal server error occurred.", "code": 500}), 500
+
+    # -------------------------------------------------------------
+    # Helper Validation Functions
+    # -------------------------------------------------------------
+    def _validate_ds_id(ds_id: str):
+        if not ds_id or not validate_safe_identifier(ds_id):
+            return jsonify({"success": False, "error": "Invalid or unsafe dataset identifier."}), 400
+        return None
 
     # -------------------------------------------------------------
     # Page / View Routes
@@ -143,17 +210,17 @@ def create_app() -> Flask:
     @app.route("/dashboard")
     def dashboard():
         """Render analytics dashboard page."""
-        dataset_id = request.args.get("dataset_id", "")
+        dataset_id = sanitize_input_string(request.args.get("dataset_id", ""), max_length=128)
         return render_template("dashboard.html", dataset_id=dataset_id)
 
     @app.route("/chat")
     def chat():
         """Render AI Analyst conversational interface."""
-        dataset_id = request.args.get("dataset_id", "")
+        dataset_id = sanitize_input_string(request.args.get("dataset_id", ""), max_length=128)
         return render_template("chat.html", dataset_id=dataset_id)
 
     # -------------------------------------------------------------
-    # REST API Routes
+    # System Health & Production Info
     # -------------------------------------------------------------
     @app.route("/api/health", methods=["GET"])
     def health_check():
@@ -161,7 +228,10 @@ def create_app() -> Flask:
         return jsonify({
             "status": "healthy",
             "service": "AI Data Analyst Agent",
-            "phase": "Phase 13: Automated Analysis Report (Building on Phase 12 Dashboard)",
+            "environment": Config.FLASK_ENV,
+            "debug": Config.DEBUG,
+            "phase": "Phase 15: Security, Reliability, and Production Cleanup (Building on Phase 14 Comprehensive System, Phase 13 Automated Reports, Phase 12 Dashboard, Phase 11 Planning, Phase 5 Statistics)",
+            "version": "Phase 15: Security, Reliability & Production Ready",
             "capabilities": [
                 "dataset_profiling",
                 "data_quality_auditing",
@@ -180,11 +250,18 @@ def create_app() -> Flask:
                 "automated_analysis_reports",
                 "category_tagged_insights",
                 "multi_format_export",
+                "path_traversal_protection",
+                "dos_safeguards",
+                "sensitive_data_masking",
+                "session_isolation",
             ],
             "max_upload_mb": Config.MAX_CONTENT_LENGTH / (1024 * 1024),
             "allowed_extensions": list(Config.ALLOWED_EXTENSIONS),
         })
 
+    # -------------------------------------------------------------
+    # Dataset Ingestion & Upload
+    # -------------------------------------------------------------
     @app.route("/api/upload", methods=["POST"])
     def upload_file():
         """
@@ -222,6 +299,10 @@ def create_app() -> Flask:
     @app.route("/api/summary/<dataset_id>", methods=["GET"])
     def get_summary(dataset_id: str):
         """Retrieve the ingestion summary and first 10 rows for a dataset."""
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
         summary, error = get_dataset_summary(dataset_id)
         if error:
             return jsonify({"success": False, "error": error}), 404
@@ -233,9 +314,41 @@ def create_app() -> Flask:
         datasets = list_uploaded_datasets()
         return jsonify({"success": True, "count": len(datasets), "datasets": datasets})
 
+    @app.route("/api/dataset/<dataset_id>", methods=["DELETE"])
+    @app.route("/api/datasets/<dataset_id>", methods=["DELETE"])
+    def delete_dataset_route(dataset_id: str):
+        """
+        Safely delete a dataset, all its processed derivatives, reports, and session memory.
+        """
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
+        result = cleanup_dataset(dataset_id)
+        if not result.get("success", False):
+            return jsonify(result), 400
+        return jsonify(result), 200
+
+    @app.route("/api/admin/cleanup", methods=["POST"])
+    def trigger_cleanup_route():
+        """
+        Trigger automated cleanup of expired uploads, processed files, and temporary artifacts.
+        """
+        req_json = request.get_json(silent=True) or {}
+        max_age = req_json.get("max_age_hours", request.args.get("max_age_hours", None, type=int))
+        result = cleanup_old_files(max_age_hours=max_age)
+        return jsonify({"success": True, "cleanup_summary": result})
+
+    # -------------------------------------------------------------
+    # Profiling & Preview Routes
+    # -------------------------------------------------------------
     @app.route("/api/profile/<dataset_id>", methods=["GET"])
     def get_profile(dataset_id: str):
         """Retrieve the automated full data profile for a dataset."""
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
         df, error = load_dataset(dataset_id)
         if error:
             return jsonify({"success": False, "error": error}), 404
@@ -243,7 +356,6 @@ def create_app() -> Flask:
         profiler = DatasetProfiler(df, dataset_id=dataset_id)
         profile = profiler.to_dict()
 
-        # Attach original_filename and metadata from registry if available
         meta = get_dataset_metadata(dataset_id)
         if meta:
             profile["original_filename"] = meta.get("original_name") or meta.get("original_filename") or dataset_id
@@ -257,7 +369,11 @@ def create_app() -> Flask:
     @app.route("/api/profile/<dataset_id>/columns", methods=["GET"])
     def get_column_profiles(dataset_id: str):
         """Retrieve column-level profiling metrics for a dataset."""
-        col_type_filter = request.args.get("type", "").strip()
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
+        col_type_filter = sanitize_input_string(request.args.get("type", ""), max_length=50)
 
         df, error = load_dataset(dataset_id)
         if error:
@@ -280,6 +396,10 @@ def create_app() -> Flask:
     @app.route("/api/profile/<dataset_id>/column/<column_name>", methods=["GET"])
     def get_single_column_profile(dataset_id: str, column_name: str):
         """Retrieve detailed profiling metrics for an individual column."""
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
         df, error = load_dataset(dataset_id)
         if error:
             return jsonify({"success": False, "error": error}), 404
@@ -301,8 +421,12 @@ def create_app() -> Flask:
     @app.route("/api/preview/<dataset_id>", methods=["GET"])
     def get_preview(dataset_id: str):
         """Retrieve paginated tabular preview records for a dataset."""
-        page = request.args.get("page", 1, type=int)
-        page_size = request.args.get("page_size", 20, type=int)
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
+        page = max(1, request.args.get("page", 1, type=int))
+        page_size = min(100, max(1, request.args.get("page_size", 20, type=int)))
 
         df, error = load_dataset(dataset_id)
         if error:
@@ -311,16 +435,25 @@ def create_app() -> Flask:
         preview_data = get_dataset_preview(df, page=page, page_size=page_size)
         return jsonify({"success": True, **preview_data})
 
+    # -------------------------------------------------------------
+    # Statistical Analysis Routes
+    # -------------------------------------------------------------
     @app.route("/api/statistics/<dataset_id>", methods=["GET"])
     def get_statistics(dataset_id: str):
         """
-        Retrieve comprehensive Phase 5 statistical analysis:
-        - Numerical descriptive & inferential moments (mean, std, var, min, max, range, IQR, skewness, kurtosis, CI, percentiles)
+        Retrieve comprehensive statistical analysis:
+        - Numerical descriptive & inferential moments
         - Categorical distributions and entropy
         - Datetime periodicity and temporal breakdown
         - Rule-based deterministic statistical observations
         """
-        confidence_level = request.args.get("ci", 0.95, type=float)
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
+        raw_ci = request.args.get("ci", 0.95, type=float)
+        confidence_level = min(0.999, max(0.50, raw_ci if raw_ci is not None else 0.95))
+
         df, error = load_dataset(dataset_id)
         if error:
             return jsonify({"success": False, "error": error}), 404
@@ -332,7 +465,13 @@ def create_app() -> Flask:
     @app.route("/api/statistics/<dataset_id>/numerical", methods=["GET"])
     def get_numerical_statistics(dataset_id: str):
         """Retrieve tabular summary of numerical descriptive statistics."""
-        confidence_level = request.args.get("ci", 0.95, type=float)
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
+        raw_ci = request.args.get("ci", 0.95, type=float)
+        confidence_level = min(0.999, max(0.50, raw_ci if raw_ci is not None else 0.95))
+
         df, error = load_dataset(dataset_id)
         if error:
             return jsonify({"success": False, "error": error}), 404
@@ -350,7 +489,13 @@ def create_app() -> Flask:
     @app.route("/api/statistics/<dataset_id>/column/<column_name>", methods=["GET"])
     def get_column_statistics(dataset_id: str, column_name: str):
         """Retrieve deep statistical profile for an individual column."""
-        confidence_level = request.args.get("ci", 0.95, type=float)
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
+        raw_ci = request.args.get("ci", 0.95, type=float)
+        confidence_level = min(0.999, max(0.50, raw_ci if raw_ci is not None else 0.95))
+
         df, error = load_dataset(dataset_id)
         if error:
             return jsonify({"success": False, "error": error}), 404
@@ -366,7 +511,7 @@ def create_app() -> Flask:
 
         if col_type == "Numerical":
             col_stat = analyze_numerical_column(series, col_name=column_name, confidence_level=confidence_level)
-        elif col_type == "Categorical" or col_type == "Boolean":
+        elif col_type in ("Categorical", "Boolean"):
             col_stat = analyze_categorical_column(series, col_name=column_name)
         elif col_type == "Datetime":
             col_stat = analyze_datetime_column(series, col_name=column_name)
@@ -386,6 +531,10 @@ def create_app() -> Flask:
     @app.route("/api/statistics/<dataset_id>/observations", methods=["GET"])
     def get_statistical_observations_route(dataset_id: str):
         """Retrieve rule-based statistical observations and data patterns."""
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
         df, error = load_dataset(dataset_id)
         if error:
             return jsonify({"success": False, "error": error}), 404
@@ -399,20 +548,20 @@ def create_app() -> Flask:
         })
 
     # -------------------------------------------------------------
-    # Phase 6: Correlation Analysis API Routes
+    # Correlation Analysis Routes
     # -------------------------------------------------------------
     @app.route("/api/correlation/<dataset_id>", methods=["GET"])
     def get_correlation_analysis_route(dataset_id: str):
         """
-        Retrieve comprehensive Phase 6 Correlation Analysis:
-        - Numerical features identification
-        - Pearson correlation matrix
-        - Ranked correlation pairs sorted by strength with direction & classification
-        - Key correlations (strongest positive & negative associations)
-        - Interactive Plotly Heatmap JSON specification
-        - Non-causation guidance disclaimer
+        Retrieve Correlation Analysis with Plotly heatmap specification.
         """
-        threshold = request.args.get("threshold", 0.0, type=float)
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
+        raw_thresh = request.args.get("threshold", 0.0, type=float)
+        threshold = max(-1.0, min(1.0, raw_thresh if raw_thresh is not None else 0.0))
+
         df, error = load_dataset(dataset_id)
         if error:
             return jsonify({"success": False, "error": error}), 404
@@ -420,7 +569,6 @@ def create_app() -> Flask:
         engine = CorrelationAnalysisEngine(df, dataset_id=dataset_id)
         corr_data = engine.analyze(threshold=threshold)
 
-        # Generate Plotly heatmap spec
         heatmap_spec = build_correlation_heatmap_spec(
             corr_matrix=corr_data.get("correlation_matrix", {}),
             columns=corr_data.get("numerical_columns", []),
@@ -435,7 +583,13 @@ def create_app() -> Flask:
     @app.route("/api/correlation/<dataset_id>/pairs", methods=["GET"])
     def get_correlation_pairs_route(dataset_id: str):
         """Retrieve ranked correlation pairs filtered by threshold."""
-        threshold = request.args.get("threshold", 0.0, type=float)
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
+        raw_thresh = request.args.get("threshold", 0.0, type=float)
+        threshold = max(-1.0, min(1.0, raw_thresh if raw_thresh is not None else 0.0))
+
         df, error = load_dataset(dataset_id)
         if error:
             return jsonify({"success": False, "error": error}), 404
@@ -452,19 +606,22 @@ def create_app() -> Flask:
         })
 
     # -------------------------------------------------------------
-    # Phase 7: Outlier & Anomaly Detection API Routes
+    # Outlier Detection & Remediation Routes
     # -------------------------------------------------------------
     @app.route("/api/outliers/<dataset_id>", methods=["GET"])
     def get_dataset_outliers_route(dataset_id: str):
         """
-        Retrieve comprehensive Phase 7 Outlier Detection analysis:
-        - Method selection (IQR standard 1.5x / extreme 3.0x, Z-Score, Modified Z-Score)
-        - Column metrics (Total N, Valid N, Outlier count, Outlier percentage, Lower/Upper bounds)
-        - Edge-case statistical warnings (Zero std, Zero IQR, Small sample size)
-        - Confirmed data errors vs potential statistical outliers breakdown
-        - Multi-column Box Plot Plotly specification
+        Retrieve comprehensive Outlier Detection analysis.
         """
-        method = request.args.get("method", "iqr").strip().lower()
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
+        raw_method = request.args.get("method", "iqr")
+        method = raw_method.strip().lower() if raw_method else "iqr"
+        if method not in ("iqr", "zscore", "modified_zscore"):
+            method = "iqr"
+
         param_val = request.args.get("param", None, type=float)
         if param_val is None:
             param_val = request.args.get("multiplier", None, type=float)
@@ -480,7 +637,6 @@ def create_app() -> Flask:
         engine = OutlierDetectionEngine(df, dataset_id=dataset_id)
         outlier_data = engine.analyze(method=method, param=param_val, column=col_filter)
 
-        # Generate multi-feature Box Plot specification
         num_cols = engine.get_numerical_columns()
         boxplot_spec = build_outlier_boxplot_spec(df, columns=num_cols[:10])
 
@@ -493,13 +649,17 @@ def create_app() -> Flask:
     @app.route("/api/outliers/<dataset_id>/column/<column_name>", methods=["GET"])
     def get_column_outliers_route(dataset_id: str, column_name: str):
         """
-        Retrieve detailed outlier analysis and interactive charts for an individual column:
-        - Specific threshold bounds & moments
-        - Row-level outlier instances with Confirmed Data Error vs Potential Outlier classification
-        - Plotly Distribution Histogram & Boundary chart specification
-        - Plotly Single-Column Box Plot specification
+        Retrieve detailed outlier analysis and interactive charts for an individual column.
         """
-        method = request.args.get("method", "iqr").strip().lower()
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
+        raw_method = request.args.get("method", "iqr")
+        method = raw_method.strip().lower() if raw_method else "iqr"
+        if method not in ("iqr", "zscore", "modified_zscore"):
+            method = "iqr"
+
         param_val = request.args.get("param", None, type=float)
         if param_val is None:
             param_val = request.args.get("multiplier", None, type=float)
@@ -524,7 +684,6 @@ def create_app() -> Flask:
         else:
             col_res = detect_column_outliers_iqr(series, col_name=column_name, multiplier=param_val or 1.5)
 
-        # Generate distribution and boxplot specs
         dist_spec = build_outlier_distribution_spec(
             series=series,
             col_name=column_name,
@@ -546,6 +705,10 @@ def create_app() -> Flask:
     @app.route("/api/outliers/<dataset_id>/chart/boxplot", methods=["GET"])
     def get_outlier_boxplot_chart_route(dataset_id: str):
         """Generate custom multi-feature Box Plot specification."""
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
         cols_param = request.args.get("columns", "").strip()
         df, error = load_dataset(dataset_id)
         if error:
@@ -563,17 +726,22 @@ def create_app() -> Flask:
     @app.route("/api/outliers/remediate/<dataset_id>", methods=["POST"])
     def remediate_dataset_outliers_route(dataset_id: str):
         """
-        Execute non-destructive outlier remediation on a raw dataset:
-        - Actions: 'remove' (drop rows with outliers), 'cap' (winsorize bounds), 'remove_errors_only'
-        - Creates a new distinct processed dataset in data/processed/ with lineage tracking
-        - Original raw upload in data/uploads/ is NEVER modified
+        Execute non-destructive outlier remediation on a raw dataset.
+        Actions: 'remove', 'cap', 'remove_errors_only'.
         """
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
         df, error = load_dataset(dataset_id, is_processed=False)
         if error:
             return jsonify({"success": False, "error": error}), 404
 
-        req_json = request.get_json() or {}
+        req_json = request.get_json(silent=True) or {}
         action = req_json.get("action", "remove")
+        if action not in ("remove", "cap", "remove_errors_only"):
+            return jsonify({"success": False, "error": f"Invalid remediation action '{action}'. Must be 'remove', 'cap', or 'remove_errors_only'."}), 400
+
         columns = req_json.get("columns", None)
         method = req_json.get("method", "iqr")
         param = req_json.get("param", None)
@@ -586,7 +754,6 @@ def create_app() -> Flask:
             param=param,
         )
 
-        # Save to data/processed/ non-destructively
         proc_id, saved_path, save_err = save_processed_dataset(
             clean_df,
             original_dataset_id=dataset_id,
@@ -608,10 +775,13 @@ def create_app() -> Flask:
             "download_url": f"/api/cleaning/download/{dataset_id}",
         }), 200
 
+    # -------------------------------------------------------------
+    # Sample Datasets
+    # -------------------------------------------------------------
     @app.route("/api/sample/<sample_type>", methods=["POST"])
     def load_sample_dataset(sample_type: str):
         """
-        Provide a built-in realistic sample dataset for immediate testing without local CSV.
+        Provide a built-in realistic sample dataset for immediate exploration without local CSV.
         """
         np.random.seed(42)
         n = 250
@@ -661,7 +831,6 @@ def create_app() -> Flask:
         else:
             return jsonify({"success": False, "error": f"Unknown sample dataset type: '{sample_type}'."}), 400
 
-        # Save sample DataFrame to disk via standard upload pipeline
         csv_buffer = io.BytesIO()
         df.to_csv(csv_buffer, index=False)
         csv_buffer.seek(0)
@@ -670,6 +839,7 @@ def create_app() -> Flask:
             "filename": filename,
             "seek": csv_buffer.seek,
             "tell": csv_buffer.tell,
+            "read": csv_buffer.read,
             "save": lambda self, path: csv_buffer.seek(0) or open(path, "wb").write(csv_buffer.read()),
         })()
 
@@ -690,14 +860,17 @@ def create_app() -> Flask:
         }), 201
 
     # -------------------------------------------------------------
-    # Phase 4: Automated Data Quality & Cleaning API Routes
+    # Automated Data Quality & Cleaning Routes
     # -------------------------------------------------------------
     @app.route("/api/cleaning/audit/<dataset_id>", methods=["GET"])
     def audit_dataset_quality(dataset_id: str):
         """
-        Run all 12 deterministic data quality issue detection algorithms on the dataset.
-        Returns categorized issues, severity breakdown, and transformation previews.
+        Run all deterministic data quality issue detection algorithms on the dataset.
         """
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
         df, error = load_dataset(dataset_id)
         if error:
             return jsonify({"success": False, "error": error}), 404
@@ -722,9 +895,11 @@ def create_app() -> Flask:
 
     @app.route("/api/cleaning/preview/<dataset_id>", methods=["GET"])
     def get_cleaning_transformation_preview(dataset_id: str):
-        """
-        Generate illustrative before-and-after transformation preview pairs (Original -> Cleaned).
-        """
+        """Generate before-and-after transformation preview pairs."""
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
         df, error = load_dataset(dataset_id)
         if error:
             return jsonify({"success": False, "error": error}), 404
@@ -738,22 +913,20 @@ def create_app() -> Flask:
 
     @app.route("/api/cleaning/apply/<dataset_id>", methods=["POST"])
     def apply_cleaning_pipeline(dataset_id: str):
-        """
-        Execute the configurable cleaning pipeline on a raw dataset.
-        Never modifies raw files; saves output to data/processed/ and returns comprehensive summary metrics.
-        """
+        """Execute the configurable cleaning pipeline non-destructively."""
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
         df, error = load_dataset(dataset_id, is_processed=False)
         if error:
             return jsonify({"success": False, "error": error}), 404
 
-        # Parse requested cleaning configuration
-        req_json = request.get_json() or {}
+        req_json = request.get_json(silent=True) or {}
         operations = req_json.get("operations") if "operations" in req_json else req_json
 
-        # Execute transformation pipeline non-destructively
         clean_df, summary = execute_cleaning_pipeline(df, operations)
 
-        # Save to data/processed/
         proc_id, saved_path, save_err = save_processed_dataset(
             clean_df,
             original_dataset_id=dataset_id,
@@ -762,7 +935,6 @@ def create_app() -> Flask:
         if save_err:
             return jsonify({"success": False, "error": save_err}), 500
 
-        # Extract first 10 preview rows of cleaned data
         head_records = clean_df.head(10).replace({np.nan: None}).to_dict(orient="records")
         clean_head = [{k: _safe_json_value(v) for k, v in row.items()} for row in head_records]
 
@@ -778,14 +950,14 @@ def create_app() -> Flask:
 
     @app.route("/api/cleaning/download/<dataset_id>", methods=["GET"])
     def download_cleaned_dataset(dataset_id: str):
-        """
-        Download the cleaned CSV dataset from data/processed/.
-        If no processed version exists yet, executes default cleaning and serves the file.
-        """
+        """Download the cleaned CSV dataset from data/processed/."""
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
         proc_path = get_latest_processed_file(dataset_id)
         
         if not proc_path or not proc_path.exists():
-            # Automatically apply standard cleaning pipeline and save
             df, error = load_dataset(dataset_id, is_processed=False)
             if error:
                 return jsonify({"success": False, "error": error}), 404
@@ -799,29 +971,31 @@ def create_app() -> Flask:
             if save_err or not proc_path or not proc_path.exists():
                 return jsonify({"success": False, "error": "Could not generate cleaned dataset for download."}), 500
 
-        download_filename = proc_path.name
+        # Enforce safe path resolution
+        safe_file = safe_path_resolve(Config.PROCESSED_FOLDER, proc_path.name)
+        if not safe_file or not safe_file.exists():
+            return jsonify({"success": False, "error": "File access denied."}), 403
+
         return send_file(
-            str(proc_path),
+            str(safe_file),
             as_attachment=True,
-            download_name=download_filename,
+            download_name=safe_file.name,
             mimetype="text/csv",
         )
 
     # -------------------------------------------------------------
-    # Phase 8: Automatic Visualization Engine API Routes
+    # Visualization Routes
     # -------------------------------------------------------------
     @app.route("/api/visualization/recommendations/<dataset_id>", methods=["GET"])
     def get_visualization_recommendations_route(dataset_id: str):
-        """
-        Retrieve automated, ranked, non-redundant chart recommendations:
-        - Evaluates single numerical (histograms, box plots), single categorical (bars, donuts),
-          bivariate numerical (scatter with trend & r), datetime + numerical (time series),
-          categorical + numerical (aggregated bars), and datetime + categorical (temporal distributions).
-        - Prunes useless combinations (IDs, 0-variance).
-        - Returns Plotly dark-theme JSON specs and analytical rationales.
-        """
-        limit = request.args.get("limit", 12, type=int)
-        category_filter = request.args.get("category", "").strip() or None
+        """Retrieve automated chart recommendations."""
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
+        raw_limit = request.args.get("limit", 12, type=int)
+        limit = min(50, max(1, raw_limit if raw_limit is not None else 12))
+        category_filter = sanitize_input_string(request.args.get("category", ""), max_length=50) or None
 
         df, error = load_dataset(dataset_id)
         if error:
@@ -840,17 +1014,16 @@ def create_app() -> Flask:
 
     @app.route("/api/visualization/custom/<dataset_id>", methods=["POST"])
     def generate_custom_chart_route(dataset_id: str):
-        """
-        Generate an interactive Plotly chart specification from user-selected parameters:
-        - Supports Chart Types: bar, line, scatter, histogram, box, pie/donut, area
-        - Supports Aggregations: none, mean, sum, median, count, min, max, std
-        - Supports X, Y, Color grouping, and custom titles.
-        """
+        """Generate interactive Plotly chart specification from user parameters."""
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
         df, error = load_dataset(dataset_id)
         if error:
             return jsonify({"success": False, "error": error}), 404
 
-        req_json = request.get_json() or {}
+        req_json = request.get_json(silent=True) or {}
         chart_type = req_json.get("chart_type", "bar")
         x_col = req_json.get("x_col", "")
         y_col = req_json.get("y_col", None)
@@ -860,6 +1033,15 @@ def create_app() -> Flask:
 
         if not x_col:
             return jsonify({"success": False, "error": "Parameter 'x_col' is required."}), 400
+
+        # Whitelist allowed chart types & aggregations
+        allowed_charts = {"bar", "line", "scatter", "histogram", "box", "pie", "donut", "area"}
+        if chart_type not in allowed_charts:
+            return jsonify({"success": False, "error": f"Invalid chart_type '{chart_type}'. Allowed: {list(allowed_charts)}"}), 400
+
+        allowed_aggs = {"none", "mean", "sum", "median", "count", "min", "max", "std"}
+        if aggregation not in allowed_aggs:
+            aggregation = "none"
 
         spec = build_custom_chart_spec(
             df=df,
@@ -880,9 +1062,11 @@ def create_app() -> Flask:
 
     @app.route("/api/visualization/schema/<dataset_id>", methods=["GET"])
     def get_visualization_schema_route(dataset_id: str):
-        """
-        Retrieve column role classification and available features for chart building.
-        """
+        """Retrieve column role classification and schema for chart builder."""
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
         df, error = load_dataset(dataset_id)
         if error:
             return jsonify({"success": False, "error": error}), 404
@@ -896,17 +1080,13 @@ def create_app() -> Flask:
         })
 
     # -------------------------------------------------------------
-    # Phase 9: AI Insight Engine API Routes
+    # AI Insight Engine Routes
     # -------------------------------------------------------------
-    # In-memory insights cache: { dataset_id: insight_payload }
     _insights_cache = {}
 
     @app.route("/api/insights/providers", methods=["GET"])
     def get_ai_providers_route():
-        """
-        Retrieve available AI providers, configuration status, and model options.
-        Never leaks sensitive secret API keys.
-        """
+        """Retrieve available AI providers without leaking secret keys."""
         providers = Config.get_available_providers()
         active_provider = Config.AI_PROVIDER
         return jsonify({
@@ -917,13 +1097,14 @@ def create_app() -> Flask:
 
     @app.route("/api/insights/<dataset_id>", methods=["GET"])
     def get_dataset_insights_route(dataset_id: str):
-        """
-        Retrieve or compute AI Insights for a dataset.
-        If previously generated in cache, returns cached insights immediately.
-        """
+        """Retrieve or compute AI Insights for a dataset."""
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
         force_refresh = request.args.get("refresh", "false").lower() in ("true", "1", "yes")
-        provider_override = request.args.get("provider", "").strip() or None
-        model_override = request.args.get("model", "").strip() or None
+        provider_override = sanitize_input_string(request.args.get("provider", ""), max_length=50) or None
+        model_override = sanitize_input_string(request.args.get("model", ""), max_length=100) or None
 
         cache_key = f"{dataset_id}_{provider_override or 'default'}"
         if not force_refresh and cache_key in _insights_cache:
@@ -951,17 +1132,18 @@ def create_app() -> Flask:
 
     @app.route("/api/insights/generate/<dataset_id>", methods=["POST"])
     def generate_dataset_insights_route(dataset_id: str):
-        """
-        Explicitly trigger AI Insights generation with optional provider or model parameters.
-        Assembles structured analysis from Python engines and invokes LLM / deterministic synthesizer.
-        """
+        """Explicitly trigger AI Insights generation."""
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
         df, error = load_dataset(dataset_id)
         if error:
             return jsonify({"success": False, "error": error}), 404
 
-        req_json = request.get_json() or {}
-        provider = req_json.get("provider", None)
-        model = req_json.get("model", None)
+        req_json = request.get_json(silent=True) or {}
+        provider = sanitize_input_string(req_json.get("provider", ""), max_length=50) or None
+        model = sanitize_input_string(req_json.get("model", ""), max_length=100) or None
 
         agent = AnalystAgent(provider=provider, model=model)
         context = agent.build_analysis_context(df, dataset_id=dataset_id)
@@ -978,10 +1160,11 @@ def create_app() -> Flask:
 
     @app.route("/api/insights/context/<dataset_id>", methods=["GET"])
     def get_insights_context_route(dataset_id: str):
-        """
-        Retrieve the exact structured JSON context generated by the Python analysis engines
-        and supplied to the LLM. Provides 100% transparency into fact grounding.
-        """
+        """Retrieve structured JSON analysis context."""
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
         df, error = load_dataset(dataset_id)
         if error:
             return jsonify({"success": False, "error": error}), 404
@@ -994,24 +1177,24 @@ def create_app() -> Flask:
         })
 
     # -------------------------------------------------------------
-    # Phase 10: Natural-Language Dataset Q&A ("Ask Your Dataset") Routes
+    # Natural Language Dataset Q&A Routes
     # -------------------------------------------------------------
     @app.route("/api/chat/ask", methods=["POST"])
     def chat_ask_route():
-        """
-        Process user natural language query for a dataset.
-        Routes to deterministic Python analysis tool, executes calculation,
-        synthesizes grounded explanation, generates Plotly visualization spec,
-        and records to session history.
-        """
-        req_json = request.get_json() or {}
-        dataset_id = req_json.get("dataset_id", "").strip()
-        query = req_json.get("query", "").strip()
-        provider = req_json.get("provider", None)
-        model = req_json.get("model", None)
+        """Process user natural language query for a dataset."""
+        req_json = request.get_json(silent=True) or {}
+        dataset_id = sanitize_input_string(req_json.get("dataset_id", ""), max_length=128)
+        raw_query = req_json.get("query", "")
+        query = sanitize_input_string(raw_query, max_length=getattr(Config, "MAX_QUERY_LENGTH", 5000))
+        provider = sanitize_input_string(req_json.get("provider", ""), max_length=50) or None
+        model = sanitize_input_string(req_json.get("model", ""), max_length=100) or None
 
         if not dataset_id:
             return jsonify({"success": False, "error": "Parameter 'dataset_id' is required."}), 400
+
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
 
         if not query:
             return jsonify({"success": False, "error": "Parameter 'query' cannot be empty."}), 400
@@ -1033,9 +1216,11 @@ def create_app() -> Flask:
 
     @app.route("/api/chat/history/<dataset_id>", methods=["GET"])
     def get_chat_history_route(dataset_id: str):
-        """
-        Retrieve conversation history for the current dataset session.
-        """
+        """Retrieve conversation history for current dataset session."""
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
         history = session_manager.get_history(dataset_id)
         return jsonify({
             "success": True,
@@ -1046,9 +1231,11 @@ def create_app() -> Flask:
 
     @app.route("/api/chat/clear/<dataset_id>", methods=["POST"])
     def clear_chat_history_route(dataset_id: str):
-        """
-        Clear conversation history for the current dataset session.
-        """
+        """Clear conversation history for current dataset session."""
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
         cleared = session_manager.clear_history(dataset_id)
         return jsonify({
             "success": True,
@@ -1059,9 +1246,11 @@ def create_app() -> Flask:
 
     @app.route("/api/chat/suggested-questions/<dataset_id>", methods=["GET"])
     def get_chat_suggestions_route(dataset_id: str):
-        """
-        Retrieve dynamically generated question suggestions tailored to the dataset's columns.
-        """
+        """Retrieve question suggestions tailored to dataset."""
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
         df, error = load_dataset(dataset_id)
         if error or df is None:
             return jsonify({"success": False, "error": error}), 404
@@ -1075,18 +1264,20 @@ def create_app() -> Flask:
 
     @app.route("/api/chat/plan", methods=["POST"])
     def chat_plan_route():
-        """
-        Formulate and return the multi-step Analysis Plan and visualization requirement
-        for a user question without executing calculations.
-        """
-        req_json = request.get_json() or {}
-        dataset_id = req_json.get("dataset_id", "").strip()
-        query = req_json.get("query", "").strip()
-        provider = req_json.get("provider", None)
-        model = req_json.get("model", None)
+        """Formulate multi-step Analysis Plan without executing tool."""
+        req_json = request.get_json(silent=True) or {}
+        dataset_id = sanitize_input_string(req_json.get("dataset_id", ""), max_length=128)
+        raw_query = req_json.get("query", "")
+        query = sanitize_input_string(raw_query, max_length=getattr(Config, "MAX_QUERY_LENGTH", 5000))
+        provider = sanitize_input_string(req_json.get("provider", ""), max_length=50) or None
+        model = sanitize_input_string(req_json.get("model", ""), max_length=100) or None
 
         if not dataset_id:
             return jsonify({"success": False, "error": "Parameter 'dataset_id' is required."}), 400
+
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
 
         if not query:
             return jsonify({"success": False, "error": "Parameter 'query' cannot be empty."}), 400
@@ -1112,9 +1303,7 @@ def create_app() -> Flask:
 
     @app.route("/api/chat/tools", methods=["GET"])
     def get_chat_tools_route():
-        """
-        List all authorized deterministic analysis tools from the controlled ToolRegistry.
-        """
+        """List authorized deterministic tools from controlled ToolRegistry."""
         tools_info = registry.list_tools()
         return jsonify({
             "success": True,
@@ -1124,15 +1313,16 @@ def create_app() -> Flask:
         })
 
     # -------------------------------------------------------------
-    # Phase 13: Automated Analysis Report Generation & Export API Routes
+    # Automated Analysis Report Generation & Export Routes
     # -------------------------------------------------------------
     @app.route("/api/report/generate/<dataset_id>", methods=["GET", "POST"])
     @app.route("/api/reports/generate/<dataset_id>", methods=["GET", "POST"])
     def generate_report_route(dataset_id: str):
-        """
-        Compile comprehensive 9-section executive report for the dataset in structured JSON,
-        formatted Markdown, and standalone styled HTML with taxonomy badges.
-        """
+        """Compile comprehensive 9-section executive report."""
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
         df, error = load_dataset(dataset_id)
         if error or df is None:
             return jsonify({"success": False, "error": error or "Dataset not found."}), 404
@@ -1155,14 +1345,14 @@ def create_app() -> Flask:
     @app.route("/api/report/download/<dataset_id>/<report_format>", methods=["GET"])
     @app.route("/api/reports/download/<dataset_id>/<report_format>", methods=["GET"])
     def download_report_route(dataset_id: str, report_format: str = None):
-        """
-        Download executive report as .html, .md, or .json attachment.
-        Query param 'format' or path param 'report_format': 'html' (default), 'md', or 'json'.
-        """
-        import json as json_lib
+        """Download executive report as .html, .md, or .json attachment."""
+        val_err = _validate_ds_id(dataset_id)
+        if val_err:
+            return val_err
+
         if not report_format:
             report_format = request.args.get("format", "html")
-        report_format = report_format.lower().strip()
+        report_format = sanitize_input_string(report_format, max_length=20).lower().strip()
         
         df, error = load_dataset(dataset_id)
         if error or df is None:
@@ -1175,7 +1365,7 @@ def create_app() -> Flask:
             mimetype = "text/markdown"
             filename = f"report_{dataset_id}.md"
         elif report_format in ["json"]:
-            content = json_lib.dumps(generator.generate_structured_report(), indent=2)
+            content = json.dumps(generator.generate_structured_report(), indent=2)
             mimetype = "application/json"
             filename = f"report_{dataset_id}.json"
         else:
@@ -1195,10 +1385,9 @@ def create_app() -> Flask:
     return app
 
 
-
 # Create application instance
 app = create_app()
 
 if __name__ == "__main__":
-    logger.info("Starting AI Data Analyst Agent on http://%s:%s", Config.HOST, Config.PORT)
+    logger.info("Starting AI Data Analyst Agent on http://%s:%s (Env: %s, Debug: %s)", Config.HOST, Config.PORT, Config.FLASK_ENV, Config.DEBUG)
     app.run(host=Config.HOST, port=Config.PORT, debug=Config.DEBUG)
