@@ -8,6 +8,7 @@ and rule-based domain statistical observations without relying on LLMs.
 
 import math
 import logging
+import warnings
 from typing import Dict, Any, List, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
@@ -242,22 +243,28 @@ def analyze_numerical_column(series: pd.Series, col_name: str = "", confidence_l
     norm_p = None
     shape_desc = "Normal"
 
-    if n_valid >= 8 and not is_constant:
-        try:
-            # D'Agostino-Pearson omnibus test
-            k2, p_val = stats.normaltest(clean_s)
-            norm_stat = float(k2) if not math.isnan(k2) else None
-            norm_p = float(p_val) if not math.isnan(p_val) else None
-            is_normal = bool(norm_p is not None and norm_p > 0.05)
-        except Exception:
-            try:
-                # Shapiro-Wilk test for smaller sample sizes
-                sh_stat, sh_p = stats.shapiro(clean_s.head(500))
-                norm_stat = float(sh_stat)
-                norm_p = float(sh_p)
-                is_normal = bool(norm_p > 0.05)
-            except Exception:
-                pass
+    if n_valid >= 3 and not is_constant:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            if n_valid >= 20:
+                try:
+                    # D'Agostino-Pearson omnibus test
+                    k2, p_val = stats.normaltest(clean_s)
+                    norm_stat = float(k2) if not math.isnan(k2) else None
+                    norm_p = float(p_val) if not math.isnan(p_val) else None
+                    is_normal = bool(norm_p is not None and norm_p > 0.05)
+                except Exception:
+                    pass
+            
+            if norm_p is None:
+                try:
+                    # Shapiro-Wilk test for sample sizes
+                    sh_stat, sh_p = stats.shapiro(clean_s.head(500))
+                    norm_stat = float(sh_stat) if not math.isnan(sh_stat) else None
+                    norm_p = float(sh_p) if not math.isnan(sh_p) else None
+                    is_normal = bool(norm_p is not None and norm_p > 0.05)
+                except Exception:
+                    pass
 
     # Characterize distribution shape
     if is_constant:

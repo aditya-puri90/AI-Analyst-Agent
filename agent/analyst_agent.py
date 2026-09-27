@@ -589,12 +589,15 @@ class AnalystAgent:
         user_prompt = build_analyst_user_prompt(analysis_context)
 
         # Dispatch based on provider
+        from utils.security import mask_sensitive_data
+
         if active_prov == "gemini" and self.is_provider_configured("gemini"):
             try:
                 raw_markdown = self._call_gemini(user_prompt, model=active_model)
             except Exception as e:
-                logger.warning("Gemini LLM call failed (%s). Falling back to deterministic synthesizer.", e)
-                error_msg = f"Gemini API error: {str(e)}"
+                safe_err = mask_sensitive_data(str(e))
+                logger.warning("Gemini LLM call failed (%s). Falling back to deterministic synthesizer.", safe_err)
+                error_msg = f"Gemini API error: {safe_err}"
                 raw_markdown, _ = synthesize_deterministic_insights(analysis_context)
                 used_provider = "deterministic_fallback"
                 used_model = "rule-based-synthesizer"
@@ -604,8 +607,9 @@ class AnalystAgent:
             try:
                 raw_markdown = self._call_openai(user_prompt, model=active_model)
             except Exception as e:
-                logger.warning("OpenAI LLM call failed (%s). Falling back to deterministic synthesizer.", e)
-                error_msg = f"OpenAI API error: {str(e)}"
+                safe_err = mask_sensitive_data(str(e))
+                logger.warning("OpenAI LLM call failed (%s). Falling back to deterministic synthesizer.", safe_err)
+                error_msg = f"OpenAI API error: {safe_err}"
                 raw_markdown, _ = synthesize_deterministic_insights(analysis_context)
                 used_provider = "deterministic_fallback"
                 used_model = "rule-based-synthesizer"
@@ -615,8 +619,9 @@ class AnalystAgent:
             try:
                 raw_markdown = self._call_anthropic(user_prompt, model=active_model)
             except Exception as e:
-                logger.warning("Anthropic LLM call failed (%s). Falling back to deterministic synthesizer.", e)
-                error_msg = f"Anthropic API error: {str(e)}"
+                safe_err = mask_sensitive_data(str(e))
+                logger.warning("Anthropic LLM call failed (%s). Falling back to deterministic synthesizer.", safe_err)
+                error_msg = f"Anthropic API error: {safe_err}"
                 raw_markdown, _ = synthesize_deterministic_insights(analysis_context)
                 used_provider = "deterministic_fallback"
                 used_model = "rule-based-synthesizer"
@@ -709,13 +714,17 @@ class AnalystAgent:
 
         # Fallback to direct Gemini REST API
         model_name = model if "gemini" in model else "gemini-1.5-pro"
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
+        headers = {
+            "x-goog-api-key": api_key,
+            "Content-Type": "application/json",
+        }
         payload = {
             "system_instruction": {"parts": [{"text": SYSTEM_ANALYST_PROMPT}]},
             "contents": [{"parts": [{"text": user_prompt}]}],
             "generationConfig": {"temperature": 0.2, "maxOutputTokens": 4096},
         }
-        res = requests.post(url, json=payload, timeout=45)
+        res = requests.post(url, headers=headers, json=payload, timeout=45)
         res.raise_for_status()
         data = res.json()
         candidates = data.get("candidates", [])

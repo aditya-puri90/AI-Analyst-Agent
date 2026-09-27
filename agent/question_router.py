@@ -1599,6 +1599,8 @@ class ConversationSessionManager:
         # Key: dataset_id -> List[Dict[str, Any]]
         self._sessions: Dict[str, List[Dict[str, Any]]] = {}
 
+    MAX_SESSION_TURNS = 100
+
     def get_history(self, dataset_id: str) -> List[Dict[str, Any]]:
         """Retrieve conversation turns for the dataset."""
         return self._sessions.get(dataset_id, [])
@@ -1617,7 +1619,7 @@ class ConversationSessionManager:
         requires_visualization: Optional[bool] = None,
         recommended_chart_type: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Record a completed question-answer interaction."""
+        """Record a completed question-answer interaction with sliding window memory."""
         if dataset_id not in self._sessions:
             self._sessions[dataset_id] = []
 
@@ -1637,6 +1639,11 @@ class ConversationSessionManager:
             "recommended_chart_type": recommended_chart_type,
         }
         self._sessions[dataset_id].append(turn_entry)
+        
+        # Enforce sliding window to avoid unbounded memory growth
+        if len(self._sessions[dataset_id]) > self.MAX_SESSION_TURNS:
+            self._sessions[dataset_id] = self._sessions[dataset_id][-self.MAX_SESSION_TURNS:]
+
         return turn_entry
 
     def clear_history(self, dataset_id: str) -> bool:
@@ -1863,6 +1870,8 @@ class QuestionRouter:
         """
         Generate and return only the Analysis Plan without executing the tool.
         """
+        from utils.security import sanitize_input_string
+        query = sanitize_input_string(query, max_length=getattr(Config, "MAX_QUERY_LENGTH", 5000))
         active_prov = (provider or self.provider).lower()
         active_model = model or self.model
 
@@ -1896,6 +1905,8 @@ class QuestionRouter:
         5. Generate interactive Plotly visualization specification
         6. Record turn to conversation session memory
         """
+        from utils.security import sanitize_input_string, mask_sensitive_data
+        query = sanitize_input_string(query, max_length=getattr(Config, "MAX_QUERY_LENGTH", 5000))
         start_time = datetime.utcnow()
         active_prov = (provider or self.provider).lower()
         active_model = model or self.model
@@ -2105,13 +2116,14 @@ class QuestionRouter:
             except ImportError:
                 pass
 
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model if 'gemini' in model else 'gemini-1.5-pro'}:generateContent?key={api_key}"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model if 'gemini' in model else 'gemini-1.5-pro'}:generateContent"
+            headers = {"x-goog-api-key": api_key, "Content-Type": "application/json"}
             payload = {
                 "system_instruction": {"parts": [{"text": system_prompt}]},
                 "contents": [{"parts": [{"text": user_prompt}]}],
                 "generationConfig": {"temperature": 0.1, "maxOutputTokens": 2048},
             }
-            r = requests.post(url, json=payload, timeout=30)
+            r = requests.post(url, headers=headers, json=payload, timeout=30)
             r.raise_for_status()
             data = r.json()
             candidates = data.get("candidates", [])
