@@ -28,14 +28,22 @@ wheels/
 .env
 .env.local
 .env.*.local
+*.key
+*.pem
 
-# Data uploads, processed outputs, and reports (Keep directory structures with .gitkeep)
+# Data uploads, processed outputs, reports, and temp files (Keep directory structures with .gitkeep)
 data/uploads/*
 !data/uploads/.gitkeep
 data/processed/*
 !data/processed/.gitkeep
 data/reports/*
 !data/reports/.gitkeep
+data/temp/*
+!data/temp/.gitkeep
+
+# Logs
+*.log
+logs/
 
 # Testing & coverage
 .pytest_cache/

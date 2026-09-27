@@ -1,10 +1,12 @@
 """
 Centralized Configuration Settings for AI Data Analyst Agent.
-Handles environment variables, storage paths, security settings, and defaults.
+Handles environment variables, storage paths, security settings, DoS safeguards, and defaults.
 """
 
 import os
+import logging
 from pathlib import Path
+from typing import List, Dict, Optional
 from dotenv import load_dotenv
 
 # Base directory of the project
@@ -14,35 +16,81 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 ENV_PATH = BASE_DIR / ".env"
 load_dotenv(dotenv_path=ENV_PATH)
 
+logger = logging.getLogger(__name__)
+
 
 class Config:
-    """Application configuration class."""
+    """Application configuration class with strict security and production defaults."""
+
+    # Base Directory
+    BASE_DIR = BASE_DIR
 
     # Flask Settings
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
-    FLASK_ENV = os.getenv("FLASK_ENV", "development")
-    DEBUG = os.getenv("FLASK_DEBUG", "True").lower() in ("true", "1", "yes")
+    FLASK_ENV = os.getenv("FLASK_ENV", "development").lower()
+    
+    # In production, debug mode MUST be disabled by default
+    _raw_debug = os.getenv("FLASK_DEBUG", None)
+    if _raw_debug is not None:
+        DEBUG = _raw_debug.lower() in ("true", "1", "yes")
+    else:
+        DEBUG = FLASK_ENV != "production"
+
     HOST = os.getenv("HOST", "127.0.0.1")
     PORT = int(os.getenv("PORT", 5000))
+    LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 
     # File Upload & Storage Settings
-    MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH_MB", 50)) * 1024 * 1024  # 50 MB
+    MAX_CONTENT_LENGTH_MB = int(os.getenv("MAX_CONTENT_LENGTH_MB", 50))
+    MAX_CONTENT_LENGTH = MAX_CONTENT_LENGTH_MB * 1024 * 1024  # Enforced in Flask
     ALLOWED_EXTENSIONS = set(
         ext.strip().lower() for ext in os.getenv("ALLOWED_EXTENSIONS", "csv").split(",")
     )
 
+    # Storage Paths (relative to project root or absolute paths)
     UPLOAD_FOLDER = BASE_DIR / os.getenv("UPLOAD_FOLDER", "data/uploads")
     PROCESSED_FOLDER = BASE_DIR / os.getenv("PROCESSED_FOLDER", "data/processed")
+    REPORTS_FOLDER = BASE_DIR / os.getenv("REPORTS_FOLDER", "data/reports")
+    TEMP_FOLDER = BASE_DIR / os.getenv("TEMP_FOLDER", "data/temp")
+
+    # Retention & Pruning Safeguards
+    FILE_RETENTION_HOURS = int(os.getenv("FILE_RETENTION_HOURS", 24))
+
+    # DoS & Resource Exhaustion Protection Limits
+    MAX_ROWS_LIMIT = int(os.getenv("MAX_ROWS_LIMIT", 1_000_000))
+    MAX_COLUMNS_LIMIT = int(os.getenv("MAX_COLUMNS_LIMIT", 500))
+    MAX_QUERY_LENGTH = int(os.getenv("MAX_QUERY_LENGTH", 5000))
 
     # Supported Encodings for Resilient Parsing
     FALLBACK_ENCODINGS = ["utf-8", "utf-8-sig", "latin-1", "cp1252", "iso-8859-1"]
 
-    # AI Configuration (Phase 9: AI Insight Engine)
+    # AI Configuration
     AI_PROVIDER = os.getenv("AI_PROVIDER", "gemini").lower()
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "") or os.getenv("GOOGLE_API_KEY", "")
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
     ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
     LLM_MODEL = os.getenv("LLM_MODEL", "gemini-1.5-pro")
+
+    @classmethod
+    def is_production(cls) -> bool:
+        """Check if application is running in production mode."""
+        return cls.FLASK_ENV == "production"
+
+    @classmethod
+    def validate_production_config(cls) -> List[str]:
+        """
+        Validate security settings for production deployments.
+        Returns a list of warnings or recommendations.
+        """
+        warnings = []
+        if cls.is_production():
+            if cls.DEBUG:
+                warnings.append("SECURITY WARNING: DEBUG mode is active in production environment.")
+            if cls.SECRET_KEY in ("dev-secret-key-change-in-production", "replace-with-a-secure-random-secret-key-in-production", ""):
+                warnings.append("SECURITY CRITICAL: Default insecure SECRET_KEY detected in production. Set a unique, cryptographically strong SECRET_KEY.")
+            if cls.HOST in ("0.0.0.0", "::") and not os.getenv("REVERSE_PROXY_CONFIGURED"):
+                warnings.append("SECURITY NOTICE: Application is bound to all interfaces. Ensure a reverse proxy (Nginx, Traefik) is configured with TLS.")
+        return warnings
 
     @classmethod
     def get_available_providers(cls) -> dict:
@@ -80,11 +128,12 @@ class Config:
 
     @classmethod
     def init_app(cls):
-        """Ensure necessary storage directories exist."""
+        """Ensure all required storage directories exist."""
         cls.UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
         cls.PROCESSED_FOLDER.mkdir(parents=True, exist_ok=True)
+        cls.REPORTS_FOLDER.mkdir(parents=True, exist_ok=True)
+        cls.TEMP_FOLDER.mkdir(parents=True, exist_ok=True)
 
 
 # Initialize folders upon import
 Config.init_app()
-
