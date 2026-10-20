@@ -64,11 +64,16 @@ def app_client(sample_sales_df):
     sample_sales_df.to_csv(csv_buf, index=False)
     csv_buf.seek(0)
 
+    def _save_mock(path):
+        csv_buf.seek(0)
+        with open(path, "wb") as f:
+            f.write(csv_buf.read())
+
     mock_storage = type("MockStorage", (), {
         "filename": "test_insights_sales.csv",
         "seek": csv_buf.seek,
         "tell": csv_buf.tell,
-        "save": lambda self, path: csv_buf.seek(0) or open(path, "wb").write(csv_buf.read()),
+        "save": lambda self, path: _save_mock(path),
     })()
 
     dataset_id, _, _, _ = save_uploaded_file(mock_storage)
