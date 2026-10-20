@@ -263,25 +263,109 @@ cp .env.example .env
 
 ## 🌐 Production Deployment Guide
 
-### Option 1: Serving with Waitress (Recommended for Windows / Cross-Platform)
+### 1. Production Configuration & Security Checklist
+
+Before deploying the AI Data Analyst Agent to production, ensure the following checklist is completed:
+
+- [x] **Disable Debug Mode**: Set `FLASK_ENV=production` and `FLASK_DEBUG=False` in your `.env` file. The server automatically rejects running in debug mode when in production.
+- [x] **Generate Cryptographic Secret Key**: Generate a secure 64-character random key:
+  ```bash
+  python -c "import secrets; print(secrets.token_hex(32))"
+  ```
+  Set this value as `SECRET_KEY` in `.env`.
+- [x] **Set Directory Permissions**: Restrict file system permissions on `data/` and `logs/` to the service user only (`chmod -R 700 data logs`).
+- [x] **AI Provider Keys**: Ensure `GEMINI_API_KEY`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY` are provided as secure environment variables or via a secrets manager. If no key is set, the application automatically defaults to the deterministic rule-based analysis engine.
+- [x] **Enforce Resource Caps**: Review `MAX_CONTENT_LENGTH_MB=50`, `MAX_ROWS_LIMIT=1000000`, and `MAX_COLUMNS_LIMIT=500` to prevent Denial-of-Service (DoS) attacks.
+
+---
+
+### 2. Deployment Options
+
+#### Option A: Production WSGI with Waitress (Recommended for Windows & Cross-Platform)
 Waitress is a production-grade pure-Python WSGI server included in `requirements.txt`:
 ```bash
 # Start Waitress server on port 5000
 waitress-serve --host=127.0.0.1 --port=5000 wsgi:app
+
+# Or execute wsgi.py directly
+python wsgi.py
 ```
 
-### Option 2: Serving with Gunicorn (Recommended for Linux / Containerized Deployments)
+#### Option B: Production WSGI with Gunicorn (Recommended for Linux)
+On Linux environments, Gunicorn provides high-performance multi-process worker management:
 ```bash
-# Install gunicorn (if on Linux)
+# Install gunicorn in your environment
 pip install gunicorn
 
-# Start Gunicorn with 4 worker processes
+# Start Gunicorn with 4 workers bound to localhost
 gunicorn -w 4 -b 127.0.0.1:5000 wsgi:app
 ```
 
-### Option 3: Production Reverse Proxy Setup (Nginx)
-Configure Nginx as a reverse proxy in front of Waitress/Gunicorn:
+#### Option C: Containerized Deployment with Docker
+A production multi-stage, unprivileged Docker container is included with health monitoring:
+```bash
+# Build the Docker image
+docker build -t ai-data-analyst-agent:latest .
+
+# Run the container with environment variables and storage persistence
+docker run -d \
+  --name ai-data-analyst \
+  -p 5000:5000 \
+  --env-file .env \
+  -v $(pwd)/data:/app/data \
+  --restart unless-stopped \
+  ai-data-analyst-agent:latest
+```
+
+---
+
+### 3. Linux Systemd Service Setup
+
+To manage the application as a persistent system service on Ubuntu/Debian/RHEL:
+
+1. Create a service file at `/etc/systemd/system/ai-data-analyst.service`:
+```ini
+[Unit]
+Description=AI Data Analyst Agent Service
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/AI-Data-Analyst-Agent
+Environment="PATH=/opt/AI-Data-Analyst-Agent/venv/bin"
+EnvironmentFile=/opt/AI-Data-Analyst-Agent/.env
+ExecStart=/opt/AI-Data-Analyst-Agent/venv/bin/waitress-serve --host=127.0.0.1 --port=5000 wsgi:app
+Restart=always
+RestartSec=5
+
+# Security sandbox
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+```
+
+2. Enable and start the service:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable ai-data-analyst
+sudo systemctl start ai-data-analyst
+sudo systemctl status ai-data-analyst
+```
+
+---
+
+### 4. Reverse Proxy & SSL Termination (Nginx)
+
+Always place a hardened reverse proxy in front of the application to manage TLS, buffer requests, and enforce payload boundaries:
+
 ```nginx
+# Rate limiting zone (optional, protects upload and chat endpoints)
+limit_req_zone $binary_remote_addr zone=api_limit:10m rate=10r/s;
+
 server {
     listen 80;
     server_name data-analyst.yourdomain.com;
@@ -292,12 +376,31 @@ server {
     listen 443 ssl http2;
     server_name data-analyst.yourdomain.com;
 
-    ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+    # SSL Certificates (e.g. Let's Encrypt Certbot)
+    ssl_certificate /etc/letsencrypt/live/data-analyst.yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/data-analyst.yourdomain.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
 
+    # Maximum file upload size (must align with MAX_CONTENT_LENGTH_MB in .env)
     client_max_body_size 50M;
 
+    # Proxy to WSGI upstream
     location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Buffer settings for large CSV uploads
+        proxy_read_timeout 120s;
+        proxy_connect_timeout 60s;
+    }
+
+    # Rate limiting on API endpoints
+    location /api/ {
+        limit_req zone=api_limit burst=20 nodelay;
         proxy_pass http://127.0.0.1:5000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -305,6 +408,22 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
+```
+
+---
+
+### 5. Automated File Retention & Maintenance
+
+Uploaded datasets and analysis artifacts expire according to `FILE_RETENTION_HOURS` (default: 24h). Configure automated pruning via cron or an API scheduler:
+
+```bash
+# Add a crontab entry to run automated cleanup every night at 2:00 AM
+0 2 * * * curl -X POST -H "Content-Type: application/json" -d '{"max_age_hours": 24}' http://127.0.0.1:5000/api/admin/cleanup > /dev/null 2>&1
+```
+
+Or execute directly via Python CLI:
+```bash
+python -c "from utils.cleanup import cleanup_old_files; print(cleanup_old_files(max_age_hours=24))"
 ```
 
 ---
