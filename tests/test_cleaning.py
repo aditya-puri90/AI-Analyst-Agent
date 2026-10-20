@@ -267,11 +267,16 @@ def test_save_processed_dataset(messy_dataframe, tmp_path):
     messy_dataframe.to_csv(csv_bytes, index=False)
     csv_bytes.seek(0)
 
+    def _save_mock(path):
+        csv_bytes.seek(0)
+        with open(path, "wb") as f:
+            f.write(csv_bytes.read())
+
     file_storage = type("MockFileStorage", (), {
         "filename": "dirty_input.csv",
         "seek": csv_bytes.seek,
         "tell": csv_bytes.tell,
-        "save": lambda self, path: csv_bytes.seek(0) or open(path, "wb").write(csv_bytes.read()),
+        "save": lambda self, path: _save_mock(path),
     })()
 
     dataset_id, raw_path, err, meta = save_uploaded_file(file_storage)
@@ -360,6 +365,7 @@ def test_api_cleaning_apply_and_download_endpoints(client):
     assert download_res.content_type.startswith("text/csv")
     assert "attachment" in download_res.headers.get("Content-Disposition", "")
     assert len(download_res.data) > 0
+    download_res.close()
 
 
 def test_api_cleaning_invalid_dataset_id(client):
