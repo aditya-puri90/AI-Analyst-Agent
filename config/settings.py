@@ -93,6 +93,24 @@ class Config:
         return warnings
 
     @classmethod
+    def get_security_summary(cls) -> dict:
+        """
+        Return high-level summary of active security controls,
+        DoS limits, and environment modes without exposing credentials.
+        """
+        return {
+            "environment": cls.FLASK_ENV,
+            "debug_mode": cls.DEBUG,
+            "is_production": cls.is_production(),
+            "max_upload_size_mb": cls.MAX_CONTENT_LENGTH_MB,
+            "allowed_extensions": sorted(list(cls.ALLOWED_EXTENSIONS)),
+            "max_rows_limit": cls.MAX_ROWS_LIMIT,
+            "max_columns_limit": cls.MAX_COLUMNS_LIMIT,
+            "file_retention_hours": cls.FILE_RETENTION_HOURS,
+            "configured_ai_providers": [k for k, v in cls.get_available_providers().items() if v.get("configured")],
+        }
+
+    @classmethod
     def get_available_providers(cls) -> dict:
         """
         Check which AI providers are configured with valid API keys.
