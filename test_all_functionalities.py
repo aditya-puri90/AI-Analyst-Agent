@@ -237,6 +237,16 @@ def run_checks():
     except Exception as e:
         results.append(("16. Multi-Turn Conversational Memory (/api/chat/history)", False, str(e)))
 
+    # 17. Security Audit & Posture Check
+    try:
+        status, data = get("/api/security/audit")
+        assert status == 200 and data["success"] is True
+        assert "security" in data
+        assert "environment" in data["security"]
+        results.append(("17. Runtime Security Audit (/api/security/audit)", True, f"Env: {data['security']['environment']}, Max MB: {data['security']['max_upload_size_mb']}"))
+    except Exception as e:
+        results.append(("17. Runtime Security Audit (/api/security/audit)", False, str(e)))
+
     # Print Summary Table
     print("\n" + "-" * 80)
     print(f"{'CHECK / FEATURE':<55} | {'STATUS':<8} | {'DETAILS'}")
@@ -250,7 +260,7 @@ def run_checks():
     print("-" * 80)
     
     if all_passed:
-        print("\nALL 16 COMPREHENSIVE FUNCTIONALITY CHECKS PASSED WITH ZERO ERRORS!")
+        print(f"\nALL {len(results)} COMPREHENSIVE FUNCTIONALITY CHECKS PASSED WITH ZERO ERRORS!")
     else:
         print("\nSOME CHECKS FAILED.")
         sys.exit(1)
