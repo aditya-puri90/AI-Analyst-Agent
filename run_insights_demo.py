@@ -40,11 +40,16 @@ def run_demo(target_dataset_query: str = ""):
         buf = io.BytesIO()
         df.to_csv(buf, index=False)
         buf.seek(0)
+        def _save_mock(p):
+            buf.seek(0)
+            with open(p, "wb") as f:
+                f.write(buf.read())
+
         mock_file = type("MockFile", (), {
             "filename": "sample_ecommerce.csv",
             "seek": buf.seek,
             "tell": buf.tell,
-            "save": lambda self, p: buf.seek(0) or open(p, "wb").write(buf.read()),
+            "save": lambda self, p: _save_mock(p),
         })()
         target_id, _, _, _ = save_uploaded_file(mock_file)
     else:
