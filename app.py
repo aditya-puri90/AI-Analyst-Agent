@@ -257,6 +257,16 @@ def create_app() -> Flask:
             ],
             "max_upload_mb": Config.MAX_CONTENT_LENGTH / (1024 * 1024),
             "allowed_extensions": list(Config.ALLOWED_EXTENSIONS),
+            "security_summary": Config.get_security_summary(),
+        })
+
+    @app.route("/api/security/audit", methods=["GET"])
+    def security_audit_endpoint():
+        """Retrieve runtime security summary and production deployment validation."""
+        return jsonify({
+            "success": True,
+            "security": Config.get_security_summary(),
+            "production_warnings": Config.validate_production_config(),
         })
 
     # -------------------------------------------------------------
