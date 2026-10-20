@@ -1,0 +1,39 @@
+version: "3.8"
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ai-data-analyst-agent:latest
+    container_name: ai-data-analyst-agent
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - FLASK_DEBUG=False
+      - PORT=5000
+      - HOST=0.0.0.0
+      - SECRET_KEY=${SECRET_KEY:-replace-with-a-secure-random-secret-key-in-production}
+      - MAX_CONTENT_LENGTH_MB=50
+      - ALLOWED_EXTENSIONS=csv
+      - MAX_ROWS_LIMIT=1000000
+      - MAX_COLUMNS_LIMIT=500
+      - FILE_RETENTION_HOURS=24
+      - AI_PROVIDER=${AI_PROVIDER:-gemini}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - LLM_MODEL=${LLM_MODEL:-gemini-1.5-pro}
+    volumes:
+      - ./data/uploads:/app/data/uploads
+      - ./data/processed:/app/data/processed
+      - ./data/reports:/app/data/reports
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
