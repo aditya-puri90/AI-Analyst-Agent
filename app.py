@@ -835,12 +835,17 @@ def create_app() -> Flask:
         df.to_csv(csv_buffer, index=False)
         csv_buffer.seek(0)
 
+        def _save_mock_file(path):
+            csv_buffer.seek(0)
+            with open(path, "wb") as f:
+                f.write(csv_buffer.read())
+
         file_storage = type("MockFileStorage", (), {
             "filename": filename,
             "seek": csv_buffer.seek,
             "tell": csv_buffer.tell,
             "read": csv_buffer.read,
-            "save": lambda self, path: csv_buffer.seek(0) or open(path, "wb").write(csv_buffer.read()),
+            "save": lambda self, path: _save_mock_file(path),
         })()
 
         dataset_id, saved_path, error, meta = save_uploaded_file(file_storage)
