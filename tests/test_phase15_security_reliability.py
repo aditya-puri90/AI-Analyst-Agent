@@ -481,3 +481,20 @@ class TestProductionConfiguration:
         import wsgi
         assert wsgi.app is not None
         assert wsgi.app.name == "app"
+
+    def test_config_security_summary(self):
+        """Verify Config.get_security_summary() reports expected keys."""
+        summary = Config.get_security_summary()
+        assert "environment" in summary
+        assert "max_upload_size_mb" in summary
+        assert "max_rows_limit" in summary
+        assert "allowed_extensions" in summary
+
+    def test_security_audit_api_endpoint(self, client):
+        """Verify GET /api/security/audit returns security controls and warnings."""
+        res = client.get("/api/security/audit")
+        assert res.status_code == 200
+        data = res.get_json()
+        assert data["success"] is True
+        assert "security" in data
+        assert "production_warnings" in data
