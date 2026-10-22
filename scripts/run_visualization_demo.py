@@ -4,6 +4,12 @@ Inspects columns, executes rule-based chart recommendations, displays ranking an
 and demonstrates custom chart specification generation.
 """
 
+import os
+import sys
+
+# Ensure repository root is on sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import sys
 import os
 import pandas as pd

@@ -697,6 +697,19 @@ AI-Data-Analyst-Agent/
 │   ├── test_phase14_comprehensive.py
 │   └── test_phase15_security_reliability.py  # Security & reliability test suite
 │
+├── scripts/
+│   ├── __init__.py
+│   ├── run_cleaning_demo.py     # Interactive data quality & 12-point cleaning showcase
+│   ├── run_correlation_demo.py  # Pearson correlation engine & ranked relationships CLI
+│   ├── run_insights_demo.py     # AI insight engine & grounded narrative showcase
+│   ├── run_outliers_demo.py     # Multi-method outlier detection (IQR/Z-score/MAD) runner
+│   ├── run_planning_demo.py     # Multi-step analysis planning & tool orchestration demo
+│   ├── run_profiler_demo.py     # Interactive dataset profiling & schema inference CLI
+│   ├── run_qa_demo.py           # Natural-language Q&A & deterministic tool router showcase
+│   ├── run_report_demo.py       # 9-section executive report generator runner
+│   ├── run_statistics_demo.py   # Parametric & non-parametric statistical metrics demo
+│   └── run_visualization_demo.py # Plotly chart recommendation & custom visualizer demo
+│
 ├── test_all_functionalities.py # Standalone 17-point full-system health check
 └── test_dashboard_flow.py      # End-to-end integration workflow check
 ```

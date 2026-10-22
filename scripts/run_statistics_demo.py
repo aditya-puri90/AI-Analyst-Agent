@@ -3,6 +3,12 @@ Standalone CLI demonstration script for Phase 5 Statistical Analysis Engine.
 Executes pure Python calculations across numerical, categorical, and datetime columns.
 """
 
+import os
+import sys
+
+# Ensure repository root is on sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import sys
 import os
 import pandas as pd

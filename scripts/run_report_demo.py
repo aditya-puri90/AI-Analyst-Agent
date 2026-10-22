@@ -4,6 +4,12 @@ Executes the comprehensive report generator engine across all 9 sections,
 verifies taxonomy categorization, and exports structured JSON, Markdown, and standalone HTML reports.
 """
 
+import os
+import sys
+
+# Ensure repository root is on sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import sys
 import os
 from pathlib import Path

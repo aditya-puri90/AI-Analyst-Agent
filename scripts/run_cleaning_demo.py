@@ -2,6 +2,12 @@
 Interactive Showcase & Verification Demo for Phase 4: Automated Data Quality and Cleaning Engine.
 """
 
+import os
+import sys
+
+# Ensure repository root is on sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import sys
 import io
 import pandas as pd

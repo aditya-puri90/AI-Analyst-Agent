@@ -4,6 +4,12 @@ Demonstrates routing natural language questions to safe deterministic Python ana
 executing calculations on Pandas DataFrames, and synthesizing grounded zero-hallucination explanations.
 """
 
+import os
+import sys
+
+# Ensure repository root is on sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import sys
 import os
 import io

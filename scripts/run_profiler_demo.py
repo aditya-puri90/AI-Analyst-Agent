@@ -3,6 +3,12 @@ Interactive Phase 3 Dataset Profiler Runner and Terminal Demo.
 Supports choosing datasets via CLI argument, e.g. `python run_profiler_demo.py ecommerce`
 """
 
+import os
+import sys
+
+# Ensure repository root is on sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import sys
 import pandas as pd
 from analysis.profiler import DatasetProfiler, profile_dataset
