@@ -48,6 +48,11 @@
             </div>
             
             <nav class="nav-actions-header">
+                <div class="system-status-pill header-status-pill">
+                    <span class="status-dot"></span>
+                    <span>Studio Engine Online</span>
+                </div>
+
                 <!-- Dataset Switcher -->
                 <div class="select-wrapper select-wrapper-sm">
                     <select id="dataset-selector" class="custom-select custom-select-sm" title="Switch Dataset">
@@ -1338,7 +1343,18 @@
                         <!-- Custom Generated Chart Container -->
                         <div class="custom-chart-result-container hidden" id="custom-chart-result-container">
                             <div class="custom-chart-header">
-                                <h4 class="custom-chart-title" id="custom-chart-title-display">Generated Custom Visualization</h4>
+                                <div class="flex items-center gap-2">
+                                    <span class="chart-category-pill cat-indigo">Custom Studio Plot</span>
+                                    <h4 class="custom-chart-title" id="custom-chart-title-display">Generated Custom Visualization</h4>
+                                </div>
+                                <div class="chart-header-actions">
+                                    <button class="chart-action-btn" title="Download High-Res PNG" onclick="window.downloadPlotImage('plotly-custom-chart', 'custom_chart')">
+                                        <span>📷</span> PNG
+                                    </button>
+                                    <button class="chart-action-btn" title="Reset Axes" onclick="window.resetPlotView('plotly-custom-chart')">
+                                        <span>⛶</span> Reset
+                                    </button>
+                                </div>
                             </div>
                             <div class="custom-plot-container" id="plotly-custom-chart"></div>
                         </div>
@@ -1559,7 +1575,7 @@
                     <div class="section-header-flex">
                         <div>
                             <div class="flex items-center gap-2 mb-1">
-                                <span class="badge badge-indigo">Phase 13 Engine</span>
+                                <span class="badge badge-indigo"><span class="pulse-dot-sm"></span> Autonomous Report Generator</span>
                                 <h2 class="section-title" style="margin-bottom: 0;">Automated Analysis Report Generator</h2>
                             </div>
                             <p class="section-subtitle">Compile comprehensive 9-section analysis reports clearly distinguishing Observed Results, Potential Issues, AI Interpretation, and Recommendations.</p>
@@ -1705,7 +1721,7 @@
                 <span class="footer-desc">Professional Portfolio Analytics Application &bull; Automated Profiling, Quality Auditing, Statistical Modeling, Interactive Plotly Visualizations & Executive Reports.</span>
             </div>
             <div class="footer-right">
-                <span>Phase 12: Professional Analytics Dashboard UI</span>
+                <span>Enterprise Analytics Dashboard &bull; Studio Pro</span>
                 <span>&bull;</span>
                 <span>Python / Flask / Pandas / Plotly.js</span>
             </div>
