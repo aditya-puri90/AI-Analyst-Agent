@@ -115,6 +115,52 @@ document.addEventListener('DOMContentLoaded', () => {
         }, duration);
     }
 
+    // Global Plotly Utilities for High-Res PNG Download & Axis Reset
+    window.downloadPlotImage = function(divId, filename = 'chart') {
+        const el = document.getElementById(divId);
+        if (!el || !window.Plotly) return;
+        Plotly.downloadImage(el, {
+            format: 'png',
+            width: 1200,
+            height: 700,
+            filename: (filename || 'chart').replace(/[^a-zA-Z0-9_-]/g, '_')
+        });
+    };
+
+    window.resetPlotView = function(divId) {
+        const el = document.getElementById(divId);
+        if (!el || !window.Plotly) return;
+        Plotly.relayout(el, {
+            'xaxis.autorange': true,
+            'yaxis.autorange': true
+        });
+    };
+
+    function normalizeCategory(rawCat) {
+        const c = (rawCat || '').toLowerCase().trim();
+        if (c.startsWith('distribut')) return 'distribution';
+        if (c.startsWith('relat') || c.startsWith('corr') || c.startsWith('scat')) return 'relationship';
+        if (c.startsWith('cat')) return 'categorical';
+        if (c.startsWith('temp') || c.startsWith('time') || c.startsWith('trend') || c.startsWith('date')) return 'temporal';
+        return 'distribution';
+    }
+
+    function getCategoryBadge(cat) {
+        const norm = normalizeCategory(cat);
+        switch (norm) {
+            case 'distribution':
+                return { cls: 'cat-cyan', label: '📊 Distribution', icon: '📊' };
+            case 'relationship':
+                return { cls: 'cat-purple', label: '🔗 Relationship', icon: '🔗' };
+            case 'categorical':
+                return { cls: 'cat-emerald', label: '🏷️ Categorical', icon: '🏷️' };
+            case 'temporal':
+                return { cls: 'cat-amber', label: '📅 Temporal', icon: '📅' };
+            default:
+                return { cls: 'cat-indigo', label: '📈 Visual', icon: '📈' };
+        }
+    }
+
     // -------------------------------------------------------------
     // View Navigation & Tab Routing (11 Sections)
     // -------------------------------------------------------------
@@ -146,8 +192,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 80);
 
         // Lazy-load specific view engines if not yet loaded
-        if (targetTabId === 'reports-view' && !currentReport) {
-            loadExecutiveReport();
+        if (targetTabId === 'reports-view') {
+            if (!currentReport) {
+                loadExecutiveReport();
+            } else {
+                setTimeout(() => {
+                    renderReportVisualizations(currentReport);
+                    const plots = document.querySelectorAll('#report-html-preview .js-plotly-plot');
+                    plots.forEach(p => { try { Plotly.Plots.resize(p); } catch (e) {} });
+                }, 80);
+            }
         } else if (targetTabId === 'chat-view') {
             loadChatSuggestions();
         }
@@ -659,15 +713,35 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!grid || allRecommendations.length === 0) return;
 
         const top2 = allRecommendations.slice(0, 2);
-        grid.innerHTML = top2.map((rec, idx) => `
+        grid.innerHTML = top2.map((rec, idx) => {
+            const catMeta = getCategoryBadge(rec.category);
+            return `
             <div class="dash-chart-card">
                 <div class="dash-chart-header">
-                    <span class="chart-tag">${escapeHtml(rec.category || 'Distribution')}</span>
-                    <h4 class="dash-chart-title">${escapeHtml(rec.title || `Chart #${idx + 1}`)}</h4>
+                    <div class="chart-header-left">
+                        <div class="chart-badge-row">
+                            <span class="chart-category-pill ${catMeta.cls}">${catMeta.label}</span>
+                            <span class="chart-type-pill">${escapeHtml(rec.chart_type || rec.type || 'Plot')}</span>
+                        </div>
+                        <h4 class="dash-chart-title">${escapeHtml(rec.title || `Chart #${idx + 1}`)}</h4>
+                    </div>
+                    <div class="chart-header-actions">
+                        <button class="chart-action-btn" title="Download High-Res PNG" onclick="window.downloadPlotImage('dash-top-chart-${idx}', '${escapeHtml(rec.title || 'top_chart')}')">
+                            <span>📷</span> PNG
+                        </button>
+                    </div>
                 </div>
-                <div class="dash-chart-container" id="dash-top-chart-${idx}"></div>
+                <div class="dash-chart-canvas-wrap">
+                    <div class="dash-chart-container" id="dash-top-chart-${idx}"></div>
+                </div>
+                ${rec.rationale ? `
+                <div class="chart-rationale-box">
+                    <span class="rationale-icon">💡</span>
+                    <div class="rationale-text">${escapeHtml(rec.rationale)}</div>
+                </div>` : ''}
             </div>
-        `).join('');
+            `;
+        }).join('');
 
         top2.forEach((rec, idx) => {
             const plotDiv = document.getElementById(`dash-top-chart-${idx}`);
@@ -675,10 +749,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const spec = rec.plotly_spec;
                 const layout = Object.assign({}, spec.layout || {}, {
                     autosize: true,
-                    margin: { l: 40, r: 20, t: 30, b: 40 },
+                    margin: { l: 45, r: 25, t: 30, b: 40 },
                     paper_bgcolor: 'transparent',
                     plot_bgcolor: 'transparent',
-                    font: { color: '#94a3b8', family: 'Plus Jakarta Sans' },
+                    font: { color: '#cbd5e1', family: 'Plus Jakarta Sans' },
                 });
                 Plotly.newPlot(plotDiv, spec.data || [], layout, { responsive: true, displayModeBar: false });
             }
@@ -1264,32 +1338,53 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let filtered = allRecommendations;
         if (activeVizFilter !== 'all') {
-            filtered = filtered.filter(r => (r.category || '').toLowerCase() === activeVizFilter.toLowerCase());
+            filtered = filtered.filter(r => normalizeCategory(r.category) === activeVizFilter.toLowerCase());
         }
 
+        // Accurately compute category counts using normalizeCategory
         document.getElementById('viz-count-all').textContent = allRecommendations.length;
-        document.getElementById('viz-count-dist').textContent = allRecommendations.filter(r => (r.category || '').toLowerCase() === 'distribution').length;
-        document.getElementById('viz-count-rel').textContent = allRecommendations.filter(r => (r.category || '').toLowerCase() === 'relationship').length;
-        document.getElementById('viz-count-cat').textContent = allRecommendations.filter(r => (r.category || '').toLowerCase() === 'categorical').length;
-        document.getElementById('viz-count-temp').textContent = allRecommendations.filter(r => (r.category || '').toLowerCase() === 'temporal').length;
+        document.getElementById('viz-count-dist').textContent = allRecommendations.filter(r => normalizeCategory(r.category) === 'distribution').length;
+        document.getElementById('viz-count-rel').textContent = allRecommendations.filter(r => normalizeCategory(r.category) === 'relationship').length;
+        document.getElementById('viz-count-cat').textContent = allRecommendations.filter(r => normalizeCategory(r.category) === 'categorical').length;
+        document.getElementById('viz-count-temp').textContent = allRecommendations.filter(r => normalizeCategory(r.category) === 'temporal').length;
 
         if (filtered.length === 0) {
             grid.innerHTML = '<div class="preview-card-placeholder">No chart recommendations match the selected category filter.</div>';
             return;
         }
 
-        grid.innerHTML = filtered.map((rec, idx) => `
+        grid.innerHTML = filtered.map((rec, idx) => {
+            const catMeta = getCategoryBadge(rec.category);
+            return `
             <div class="dash-chart-card">
                 <div class="dash-chart-header">
-                    <div>
-                        <span class="chart-tag">${escapeHtml(rec.category || 'Chart')}</span>
-                        <h4 class="dash-chart-title" style="margin-top: 4px;">${escapeHtml(rec.title || `Chart #${idx + 1}`)}</h4>
+                    <div class="chart-header-left">
+                        <div class="chart-badge-row">
+                            <span class="chart-category-pill ${catMeta.cls}">${catMeta.label}</span>
+                            <span class="chart-type-pill">${escapeHtml(rec.chart_type || rec.type || 'Plot')}</span>
+                        </div>
+                        <h4 class="dash-chart-title">${escapeHtml(rec.title || `Chart #${idx + 1}`)}</h4>
+                    </div>
+                    <div class="chart-header-actions">
+                        <button class="chart-action-btn" title="Download High-Res PNG" onclick="window.downloadPlotImage('viz-rec-plot-${idx}', '${escapeHtml(rec.title || 'chart')}')">
+                            <span>📷</span> PNG
+                        </button>
+                        <button class="chart-action-btn" title="Reset Axes" onclick="window.resetPlotView('viz-rec-plot-${idx}')">
+                            <span>⛶</span> Reset
+                        </button>
                     </div>
                 </div>
-                <div class="dash-chart-container" id="viz-rec-plot-${idx}"></div>
-                <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">${escapeHtml(rec.rationale || '')}</p>
+                <div class="dash-chart-canvas-wrap">
+                    <div class="dash-chart-container" id="viz-rec-plot-${idx}"></div>
+                </div>
+                ${rec.rationale ? `
+                <div class="chart-rationale-box">
+                    <span class="rationale-icon">💡</span>
+                    <div class="rationale-text"><strong>Analytical Rationale:</strong> ${escapeHtml(rec.rationale)}</div>
+                </div>` : ''}
             </div>
-        `).join('');
+            `;
+        }).join('');
 
         filtered.forEach((rec, idx) => {
             const plotDiv = document.getElementById(`viz-rec-plot-${idx}`);
@@ -1302,7 +1397,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     font: { color: '#cbd5e1', family: 'Plus Jakarta Sans' },
                     margin: { l: 45, r: 25, t: 35, b: 45 },
                 });
-                Plotly.newPlot(plotDiv, spec.data || [], layout, { responsive: true });
+                Plotly.newPlot(plotDiv, spec.data || [], layout, { responsive: true, displayModeBar: true });
             }
         });
     }
@@ -1631,6 +1726,38 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) {}
     });
 
+    function renderReportVisualizations(reportData) {
+        if (!reportData) return;
+        const s7 = reportData.report && reportData.report.section_7_important_visualizations;
+        const charts = (s7 && s7.charts) || [];
+        if (charts.length === 0) return;
+
+        setTimeout(() => {
+            charts.forEach((c, idx) => {
+                const divId = `plotly_report_chart_${idx}`;
+                const targetEl = document.getElementById(divId);
+                if (!targetEl) return;
+
+                const spec = c.spec || {};
+                if (!spec.data || spec.data.length === 0) return;
+
+                const layout = Object.assign({}, spec.layout || {}, {
+                    autosize: true,
+                    paper_bgcolor: 'transparent',
+                    plot_bgcolor: 'transparent',
+                    font: { color: '#cbd5e1', family: 'Plus Jakarta Sans, sans-serif' },
+                    margin: { l: 50, r: 25, t: 35, b: 50 }
+                });
+
+                try {
+                    Plotly.newPlot(divId, spec.data, layout, spec.config || { responsive: true, displayModeBar: true });
+                } catch (err) {
+                    console.error(`Error plotting report chart ${divId}:`, err);
+                }
+            });
+        }, 60);
+    }
+
     // -------------------------------------------------------------
     // VIEW 11: REPORTS STUDIO (EXECUTIVE REPORT COMPILER)
     // -------------------------------------------------------------
@@ -1656,14 +1783,20 @@ document.addEventListener('DOMContentLoaded', () => {
             // Render HTML preview
             if (data.html) {
                 htmlPreview.innerHTML = data.html;
+
+                // Deterministically render all Section 7 charts
+                renderReportVisualizations(data);
+
                 // Execute inline chart scripts within injected HTML
                 const scripts = htmlPreview.querySelectorAll('script');
                 scripts.forEach(s => {
                     try {
-                        const newScript = document.createElement('script');
-                        newScript.textContent = s.textContent;
-                        document.body.appendChild(newScript);
-                        setTimeout(() => newScript.remove(), 100);
+                        if (s.textContent && s.textContent.trim()) {
+                            const newScript = document.createElement('script');
+                            newScript.textContent = s.textContent;
+                            document.body.appendChild(newScript);
+                            setTimeout(() => newScript.remove(), 100);
+                        }
                     } catch (e) {
                         console.warn('Inline chart script execution error:', e);
                     }
@@ -1703,6 +1836,13 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('btn-report-view-md').classList.remove('active');
         document.getElementById('report-html-preview').classList.remove('hidden');
         document.getElementById('report-md-preview').classList.add('hidden');
+        if (currentReport) {
+            renderReportVisualizations(currentReport);
+            setTimeout(() => {
+                const plots = document.querySelectorAll('#report-html-preview .js-plotly-plot');
+                plots.forEach(p => { try { Plotly.Plots.resize(p); } catch (e) {} });
+            }, 60);
+        }
     });
 
     document.getElementById('btn-report-view-md')?.addEventListener('click', () => {
