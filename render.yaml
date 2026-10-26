@@ -18,7 +18,7 @@ services:
       - key: AI_PROVIDER
         value: gemini
       - key: GEMINI_API_KEY
-        sync: false
+        value: ""
       - key: LLM_MODEL
         value: gemini-1.5-pro
       - key: MAX_CONTENT_LENGTH_MB
