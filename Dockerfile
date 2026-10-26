@@ -46,4 +46,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:5000/api/health || exit 1
 
 # Production WSGI server command (Waitress)
-CMD ["waitress-serve", "--host=0.0.0.0", "--port=5000", "wsgi:app"]
+CMD ["sh", "-c", "waitress-serve --host=0.0.0.0 --port=${PORT:-5000} wsgi:app"]

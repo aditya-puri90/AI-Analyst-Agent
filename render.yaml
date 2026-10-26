@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: ai-data-analyst-agent
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /api/health
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_DEBUG
+        value: "False"
+      - key: PORT
+        value: "5000"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: AI_PROVIDER
+        value: gemini
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        value: gemini-1.5-pro
+      - key: MAX_CONTENT_LENGTH_MB
+        value: "50"
+      - key: MAX_ROWS_LIMIT
+        value: "1000000"
