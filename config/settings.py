@@ -69,7 +69,7 @@ class Config:
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "") or os.getenv("GOOGLE_API_KEY", "")
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
     ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
-    LLM_MODEL = os.getenv("LLM_MODEL", "gemini-1.5-pro")
+    LLM_MODEL = os.getenv("LLM_MODEL", "gemini-3.8-flash")
 
     @classmethod
     def is_production(cls) -> bool:
@@ -120,8 +120,8 @@ class Config:
             "gemini": {
                 "name": "Google Gemini",
                 "configured": bool(cls.GEMINI_API_KEY and cls.GEMINI_API_KEY.strip() and not cls.GEMINI_API_KEY.startswith("your_")),
-                "default_model": os.getenv("GEMINI_MODEL", "gemini-1.5-pro"),
-                "models": ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-2.0-flash"],
+                "default_model": os.getenv("GEMINI_MODEL", "gemini-3.8-flash"),
+                "models": ["gemini-3.8-flash", "gemini-2.5-pro", "gemini-flash-latest"],
             },
             "openai": {
                 "name": "OpenAI",
