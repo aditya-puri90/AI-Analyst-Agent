@@ -7,6 +7,7 @@
 [![Tests](https://img.shields.io/badge/Tests-280%20Passed-success?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
 [![Security](https://img.shields.io/badge/Security-Hardened%20(Zero%20RCE)-blueviolet?style=for-the-badge&logo=shield&logoColor=white)](#-security)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/aditya-puri90/AI-Analyst-Agent)
 
 An enterprise-grade, portfolio-ready **Autonomous AI Data Analyst Agent** web application. It transforms raw, arbitrary CSV datasets into comprehensive exploratory data analysis (EDA), data quality audits, parametric and non-parametric statistics, interactive Plotly visualizations, automated data cleaning pipelines, natural language AI insights with strict deterministic grounding, intelligent analysis planning, and publication-ready multi-format executive reports.
 
