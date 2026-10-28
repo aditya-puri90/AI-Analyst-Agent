@@ -161,8 +161,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function debounce(fn, delay = 150) {
+        let timer = null;
+        return function (...args) {
+            clearTimeout(timer);
+            timer = setTimeout(() => fn.apply(this, args), delay);
+        };
+    }
+
     // -------------------------------------------------------------
-    // View Navigation & Tab Routing (11 Sections)
+    // View Navigation & Tab Routing (11 Sections) - High Performance
     // -------------------------------------------------------------
     function switchTab(targetTabId, updateHash = true) {
         studioTabBtns.forEach(btn => {
@@ -179,33 +187,50 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (updateHash) {
             const hashName = targetTabId.replace('-view', '');
-            window.location.hash = hashName;
+            if (window.history && window.history.replaceState) {
+                window.history.replaceState(null, '', '#' + hashName);
+            } else {
+                window.location.hash = hashName;
+            }
         }
 
-        // Trigger Plotly Resize on all visible chart containers
-        setTimeout(() => {
-            window.dispatchEvent(new Event('resize'));
-            const plotDivs = document.querySelectorAll('.js-plotly-plot');
-            plotDivs.forEach(p => {
-                try { Plotly.Plots.resize(p); } catch (e) {}
-            });
-        }, 80);
+        // Zero-lag: only resize charts that belong to the active tab via requestAnimationFrame
+        requestAnimationFrame(() => {
+            const activePane = document.getElementById(targetTabId);
+            if (activePane) {
+                const plots = activePane.querySelectorAll('.js-plotly-plot');
+                plots.forEach(p => {
+                    try { Plotly.Plots.resize(p); } catch (e) {}
+                });
+            }
+        });
 
         // Lazy-load specific view engines if not yet loaded
         if (targetTabId === 'reports-view') {
             if (!currentReport) {
                 loadExecutiveReport();
             } else {
-                setTimeout(() => {
+                requestAnimationFrame(() => {
                     renderReportVisualizations(currentReport);
                     const plots = document.querySelectorAll('#report-html-preview .js-plotly-plot');
                     plots.forEach(p => { try { Plotly.Plots.resize(p); } catch (e) {} });
-                }, 80);
+                });
             }
         } else if (targetTabId === 'chat-view') {
             loadChatSuggestions();
         }
     }
+
+    // Debounced window resize handler for active charts only
+    window.addEventListener('resize', debounce(() => {
+        const activePane = document.querySelector('.studio-tab-content.active');
+        if (activePane) {
+            const plots = activePane.querySelectorAll('.js-plotly-plot');
+            plots.forEach(p => {
+                try { Plotly.Plots.resize(p); } catch (e) {}
+            });
+        }
+    }, 120));
 
     studioTabBtns.forEach(btn => {
         btn.addEventListener('click', () => {
@@ -896,10 +921,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    document.getElementById('column-search')?.addEventListener('input', (e) => {
+    document.getElementById('column-search')?.addEventListener('input', debounce((e) => {
         columnSearchQuery = e.target.value.trim();
         renderColumnsProfileTable();
-    });
+    }, 120));
 
     // Cleaned Data Toggle in Explorer
     document.getElementById('preview-cleaned-toggle')?.addEventListener('change', (e) => {
@@ -1188,11 +1213,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // Threshold Slider Listener
         const slider = document.getElementById('corr-threshold-slider');
         const display = document.getElementById('corr-threshold-display');
+        const debouncedRenderCorr = debounce(() => renderCorrelationsTable(), 100);
         if (slider) {
             slider.addEventListener('input', (e) => {
                 currentCorrThreshold = parseFloat(e.target.value);
                 if (display) display.textContent = currentCorrThreshold.toFixed(2);
-                renderCorrelationsTable();
+                debouncedRenderCorr();
             });
         }
     }
