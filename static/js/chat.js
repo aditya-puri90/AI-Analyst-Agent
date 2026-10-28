@@ -489,7 +489,12 @@ function renderAssistantMessage(data) {
             const chartDiv = document.getElementById(chartId);
             if (chartDiv) {
                 const spec = data.visualization;
-                Plotly.newPlot(chartDiv, spec.data || [], spec.layout || {}, {
+                const darkLayout = Object.assign({
+                    paper_bgcolor: 'transparent',
+                    plot_bgcolor: 'transparent',
+                    font: { color: '#94a3b8', family: "'Plus Jakarta Sans', sans-serif" }
+                }, spec.layout || {});
+                Plotly.newPlot(chartDiv, spec.data || [], darkLayout, {
                     responsive: true,
                     displayModeBar: true,
                     displaylogo: false,
