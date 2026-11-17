@@ -723,7 +723,7 @@ AI-Data-Analyst-Agent/
 - **GitHub**: [@aditya-puri90](https://github.com/aditya-puri90)  
 - **Repository**: [AI-Analyst-Agent](https://github.com/aditya-puri90/AI-Analyst-Agent)  
 - **Email**: puriaditya90@gmail.com  
-- **Role**: Data Analyst & AI Solutions Engineer  
+- **Role**: Data Analyst | AI Solutions Engineer | Data Engineer 
 
 ---
 
